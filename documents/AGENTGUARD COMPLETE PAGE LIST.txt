@@ -1,0 +1,1707 @@
+🚀 AGENTGUARD — COMPLETE PAGE LIST
+
+0. 🔑 AUTHENTICATION
+
+#
+
+Page
+
+Route
+
+1
+
+Login
+
+/login
+
+2
+
+Register Organization
+
+/register
+
+3
+
+Forgot Password
+
+/forgot-password
+
+4
+
+Reset Password
+
+/reset-password
+
+5
+
+MFA Verification
+
+/mfa
+
+6
+
+Session Management
+
+/sessions
+
+1. 🏠 EXECUTIVE DASHBOARD
+
+Main Dashboard
+
+/dashboard
+
+Sections
+
+Total Agents
+
+Active Agents
+
+Suspended Agents
+
+High-Risk Agents
+
+Actions Today
+
+Blocked Actions
+
+Pending Approvals
+
+Policy Violations
+
+AI Spending
+
+Average Risk
+
+Average Trust
+
+Agent Activity Graph
+
+Risk Trend
+
+Decision Distribution
+
+Tool Usage
+
+Human Approval Statistics
+
+Agent Performance
+
+This is the main command center.
+
+2. 🤖 AGENT MANAGEMENT
+
+Agent Dashboard
+
+/agents
+
+Pages:
+
+Page
+
+Route
+
+All Agents
+
+/agents
+
+Create Agent
+
+/agents/create
+
+Agent Details
+
+/agents/:id
+
+Edit Agent
+
+/agents/:id/edit
+
+Agent Passport
+
+/agents/:id/passport
+
+Agent Permissions
+
+/agents/:id/permissions
+
+Agent Tools
+
+/agents/:id/tools
+
+Agent Credentials
+
+/agents/:id/credentials
+
+Agent Activity
+
+/agents/:id/activity
+
+Agent Risk
+
+/agents/:id/risk
+
+Agent Reputation
+
+/agents/:id/reputation
+
+Agent Behavior
+
+/agents/:id/behavior
+
+Agent History
+
+/agents/:id/history
+
+The original project specifically defines an /agents management page with creation, deactivation, ownership, purpose, permissions, spending limits, expiration and autonomy controls.
+
+3. 🪪 AGENT PASSPORT
+
+Passport Dashboard
+
+/agents/:id/passport
+
+Contains:
+
+Agent ID
+
+Name
+
+Owner
+
+Organization
+
+Department
+
+Purpose
+
+Creation date
+
+Expiration
+
+Model
+
+Version
+
+Environment
+
+Autonomy level
+
+Risk score
+
+Trust score
+
+Status
+
+Credentials
+
+Permissions
+
+Authorized tools
+
+This becomes the AI equivalent of an employee identity card.
+
+4. 🔐 IDENTITY & ACCESS MANAGEMENT
+
+IAM Dashboard
+
+/iam
+
+Subpages:
+
+Page
+
+Route
+
+Identity Overview
+
+/iam
+
+Human Users
+
+/iam/users
+
+Roles
+
+/iam/roles
+
+Agent Identities
+
+/iam/agents
+
+Credentials
+
+/iam/credentials
+
+API Keys
+
+/iam/api-keys
+
+Sessions
+
+/iam/sessions
+
+Access History
+
+/iam/access-history
+
+5. 🔑 PERMISSION MANAGEMENT
+
+Permission Dashboard
+
+/permissions
+
+Pages:
+
+Permission Overview
+
+Permission Matrix
+
+Agent Permissions
+
+Resource Permissions
+
+Tool Permissions
+
+Database Permissions
+
+API Permissions
+
+Permission Templates
+
+Permission Changes
+
+Permission History
+
+Example:
+
+                 READ   WRITE   DELETE
+
+Orders            ✓      ✕        ✕
+
+Customers         ✓      ✕        ✕
+
+Refunds           ✓      ✓        ✕
+
+Payroll           ✕      ✕        ✕
+
+6. ⚡ CAPABILITY MANAGEMENT
+
+Capability Dashboard
+
+/capabilities
+
+Pages:
+
+Capability Overview
+
+Capability Tokens
+
+Active Tokens
+
+Expired Tokens
+
+Token Requests
+
+Capability Policies
+
+Delegated Capabilities
+
+Capability History
+
+Token Details
+
+/capabilities/:id
+
+Show:
+
+Agent
+
+Capability
+
+Resource
+
+Action
+
+Scope
+
+Amount limit
+
+Created time
+
+Expiry
+
+Status
+
+Issuer
+
+Usage
+
+The dynamic capability-token concept is one of the major additions to the project.
+
+7. ⚖️ POLICY CENTER
+
+Policy Dashboard
+
+/policies
+
+Pages:
+
+Page
+
+Route
+
+Policy Overview
+
+/policies
+
+All Policies
+
+/policies/all
+
+Create Policy
+
+/policies/create
+
+Policy Details
+
+/policies/:id
+
+Policy Editor
+
+/policies/:id/edit
+
+Policy Rules
+
+/policies/:id/rules
+
+Policy Versions
+
+/policies/:id/versions
+
+Policy Simulator
+
+/policies/simulator
+
+Policy Violations
+
+/policies/violations
+
+Policy types
+
+Data access
+
+Financial
+
+Tool access
+
+Agent-to-agent
+
+Autonomy
+
+Security
+
+Privacy
+
+Impact
+
+Resource usage
+
+8. 🧠 AI COMMAND CENTER
+
+AI Dashboard
+
+/ai
+
+Pages:
+
+Page
+
+Route
+
+AI Command Center
+
+/ai
+
+Natural Language Command
+
+/ai/command
+
+Intent Analysis
+
+/ai/intents
+
+AI Decisions
+
+/ai/decisions
+
+Model Management
+
+/ai/models
+
+Prompt Management
+
+/ai/prompts
+
+AI Assistant
+
+/ai/assistant
+
+Example:
+
+"Refund ₹4,500 for customer 9281."
+
+AI:
+
+Intent
+
+refund
+
+Customer
+
+9281
+
+Amount
+
+₹4,500
+
+Required Capability
+
+refund:create
+
+Then the deterministic governance engine decides.
+
+9. ⚖️ DECISION ENGINE
+
+Decision Dashboard
+
+/decisions
+
+Pages:
+
+All Decisions
+
+Decision Details
+
+Allow Decisions
+
+Review Decisions
+
+Refused Decisions
+
+Failed Decisions
+
+Decision Black Box
+
+Decision Explanation
+
+Decision Details
+
+/decisions/:id
+
+Show:
+
+REQUEST
+
+↓
+
+IDENTITY
+
+↓
+
+PERMISSIONS
+
+↓
+
+CONTEXT
+
+↓
+
+RISK
+
+↓
+
+POLICY
+
+↓
+
+DECISION
+
+↓
+
+EXECUTION
+
+10. 🛡️ RISK MANAGEMENT
+
+Risk Dashboard
+
+/risk
+
+Pages:
+
+Page
+
+Route
+
+Risk Overview
+
+/risk
+
+Agent Risk
+
+/risk/agents
+
+Risk Events
+
+/risk/events
+
+Risk Trends
+
+/risk/trends
+
+Risk Rules
+
+/risk/rules
+
+Risk Configuration
+
+/risk/settings
+
+Show:
+
+Current risk
+
+Risk history
+
+Risk factors
+
+Risk escalation
+
+Critical agents
+
+Risk distribution
+
+11. 🧬 REPUTATION / TRUST
+
+Trust Dashboard
+
+/trust
+
+Pages:
+
+Trust Overview
+
+Agent Reputation
+
+Trust History
+
+Trust Factors
+
+Trust Changes
+
+Low Trust Agents
+
+Example:
+
+Trust Score
+
+94 / 100
+
+Successful Tasks
+
+18,293
+
+Violations
+
+0
+
+Anomalies
+
+2
+
+Human Overrides
+
+12
+
+The expanded specification proposes this as continuous trust rather than simple authentication.
+
+12. 🕵️ BEHAVIOR ANALYTICS
+
+Behavior Dashboard
+
+/behavior
+
+Pages:
+
+Behavior Overview
+
+Agent Behavior Profiles
+
+Normal Behavior
+
+Behavioral Deviations
+
+Behavior Timeline
+
+Behavioral Risk
+
+Baseline Configuration
+
+Compare:
+
+NORMAL
+
+100–300 actions/day
+
+09:00–18:00
+
+₹0–₹5,000
+
+Orders DB
+
+Refund API
+
+VS
+
+CURRENT
+
+2,400 actions
+
+03:17 AM
+
+₹48,000
+
+Customer Export
+
+External API
+
+13. 🚨 SECURITY OPERATIONS CENTER
+
+Security Dashboard
+
+/security
+
+Pages:
+
+Page
+
+Route
+
+Security Overview
+
+/security
+
+Live Threats
+
+/security/threats
+
+Security Events
+
+/security/events
+
+Incidents
+
+/security/incidents
+
+Incident Details
+
+/security/incidents/:id
+
+Suspicious Agents
+
+/security/agents
+
+Security Alerts
+
+/security/alerts
+
+14. 🔴 CIRCUIT BREAKER
+
+Runtime Safety Dashboard
+
+/runtime
+
+Pages:
+
+Runtime Overview
+
+Circuit Breakers
+
+Suspended Agents
+
+Restricted Agents
+
+Kill Switch
+
+Credential Revocation
+
+Runtime Policies
+
+Emergency Actions
+
+Agent states:
+
+NORMAL
+
+ ↓
+
+WARNING
+
+ ↓
+
+RESTRICTED
+
+ ↓
+
+HUMAN APPROVAL
+
+ ↓
+
+CIRCUIT BREAK
+
+ ↓
+
+SUSPENDED
+
+15. 📡 LIVE ACTIVITY
+
+Real-Time Dashboard
+
+/activity
+
+This should be a live WebSocket-powered screen.
+
+Show:
+
+Agent events
+
+Tool calls
+
+Database access
+
+API calls
+
+Decisions
+
+Risk changes
+
+Approvals
+
+Refusals
+
+Errors
+
+Example:
+
+14:32:01 RefundAgent
+
+→ Order DB
+
+14:32:02 RefundAgent
+
+→ Refund ₹4,500
+
+14:32:02 Policy Engine
+
+→ ALLOW
+
+14:32:03 Refund API
+
+→ SUCCESS
+
+The original specification explicitly calls for a real-time activity page using WebSockets.
+
+16. 👨‍💼 HUMAN APPROVAL CENTER
+
+Approval Dashboard
+
+/approvals
+
+Pages:
+
+Pending Approvals
+
+My Approvals
+
+Approved
+
+Rejected
+
+Expired
+
+Approval Details
+
+Example:
+
+RefundAgent
+
+₹48,000 refund
+
+Risk: HIGH
+
+Reason:
+
+Above automatic limit
+
+[ APPROVE ]
+
+[ REJECT ]
+
+17. 🕸️ AGENT NETWORK
+
+Agent Network Dashboard
+
+/agent-network
+
+Visualize:
+
+CustomerAgent
+
+      ↓
+
+RefundAgent
+
+      ↓
+
+Payment API
+
+Features:
+
+Agent relationships
+
+Agent-to-agent requests
+
+Delegation
+
+Trust status
+
+Communication history
+
+Blocked communications
+
+Dependency map
+
+18. 🤝 AGENT TRUST NEGOTIATION
+
+Trust Negotiation
+
+/agent-network/trust
+
+Pages:
+
+Trust Requests
+
+Active Trust
+
+Failed Trust
+
+Delegation Requests
+
+Capability Requests
+
+Trust Policies
+
+Trust History
+
+19. 🔎 PROVENANCE GRAPH
+
+Provenance Dashboard
+
+/provenance
+
+Visual graph:
+
+Human
+
+ ↓
+
+CustomerAgent
+
+ ↓
+
+RefundAgent
+
+ ↓
+
+Refund API
+
+ ↓
+
+Customer
+
+ ↓
+
+₹4,500
+
+Functions:
+
+Trace action
+
+Trace agent
+
+Trace human
+
+Trace data
+
+Trace policy
+
+Trace tool
+
+Trace transaction
+
+20. 🧾 AUDIT CENTER
+
+Audit Dashboard
+
+/audit
+
+Pages:
+
+Audit Overview
+
+Audit Logs
+
+Decision Logs
+
+Agent Logs
+
+Security Logs
+
+Access Logs
+
+Policy Logs
+
+Human Actions
+
+Export Audit
+
+Filters:
+
+Agent
+
+User
+
+Action
+
+Date
+
+Risk
+
+Policy
+
+Result
+
+21. 🧨 AGENTGUARD RED-TEAM LAB
+
+Security Testing Dashboard
+
+/red-team
+
+Pages:
+
+Page
+
+Route
+
+Red-Team Overview
+
+/red-team
+
+Create Test
+
+/red-team/create
+
+Test Scenarios
+
+/red-team/scenarios
+
+Test Runs
+
+/red-team/runs
+
+Test Results
+
+/red-team/results
+
+Vulnerabilities
+
+/red-team/vulnerabilities
+
+Security Score
+
+/red-team/score
+
+Tests:
+
+Prompt injection
+
+Goal hijacking
+
+Privilege escalation
+
+Tool abuse
+
+Data exfiltration
+
+Unauthorized delegation
+
+Excessive spending
+
+The expanded project specifically proposes this AgentGuard Lab.
+
+22. 🧪 DIGITAL TWIN / SIMULATION
+
+Digital Twin Dashboard
+
+/digital-twin
+
+Pages:
+
+Twin Overview
+
+Create Twin
+
+Agent Simulation
+
+Scenario Builder
+
+Simulation Runs
+
+Simulation Results
+
+Deployment Readiness
+
+Compare Real vs Twin
+
+Test:
+
+10× Traffic
+
+API Failure
+
+Database Failure
+
+Prompt Injection
+
+Malicious Data
+
+Permission Change
+
+Abnormal Behavior
+
+23. 💰 AGENT ECONOMICS
+
+Financial Guardrail Dashboard
+
+/economics
+
+Pages:
+
+Economics Overview
+
+Agent Budgets
+
+Transactions
+
+Spending
+
+Cost Analytics
+
+Budget Rules
+
+Vendors
+
+Financial Approvals
+
+Example:
+
+< ₹5,000
+
+ALLOW
+
+₹5,000–₹25,000
+
+REVIEW
+
+> ₹25,000
+
+HUMAN
+
+> ₹50,000
+
+REFUSE
+
+The proposed economic guardrails cover daily/monthly budgets, transaction limits, vendors, currencies and approval thresholds.
+
+24. 🌍 RESPONSIBLE AI / IMPACT
+
+Impact Dashboard
+
+/impact
+
+Pages:
+
+Impact Overview
+
+Impact Assessments
+
+High-Impact Decisions
+
+Fairness Risk
+
+Human Impact
+
+Reversibility
+
+Human Review
+
+Example:
+
+Customer Impact
+
+HIGH
+
+Fairness Risk
+
+MEDIUM
+
+Reversibility
+
+LOW
+
+Human Review
+
+REQUIRED
+
+This gives AgentGuard the social/responsible-AI dimension.
+
+25. ⚡ RESOURCE & MODEL ROUTER
+
+Optimization Dashboard
+
+/optimization
+
+Pages:
+
+Resource Overview
+
+Model Router
+
+Compute Router
+
+Model Comparison
+
+Cost Optimization
+
+Latency Optimization
+
+Energy Usage
+
+Resource Usage
+
+Compare:
+
+Model A
+
+98% accuracy
+
+12 sec
+
+High cost
+
+Model B
+
+96% accuracy
+
+3 sec
+
+Low cost
+
+Model C
+
+91% accuracy
+
+1 sec
+
+Low cost
+
+26. 📊 ANALYTICS CENTER
+
+Analytics Dashboard
+
+/analytics
+
+Sub-dashboards:
+
+Agent Analytics
+
+/analytics/agents
+
+Security Analytics
+
+/analytics/security
+
+Risk Analytics
+
+/analytics/risk
+
+Policy Analytics
+
+/analytics/policies
+
+Financial Analytics
+
+/analytics/finance
+
+Performance Analytics
+
+/analytics/performance
+
+Human Intervention Analytics
+
+/analytics/humans
+
+Resource Analytics
+
+/analytics/resources
+
+The original design calls for agent activity, risk distribution, policy violations, tool usage, human approvals, failed actions and performance analytics.
+
+27. 🤖 AI ADMIN ASSISTANT
+
+Route
+
+/assistant
+
+Chat interface:
+
+┌─────────────────────────────────────┐
+
+│ AgentGuard AI Assistant             │
+
+│                                     │
+
+│ You: Why was AG-184 blocked?        │
+
+│                                     │
+
+│ AI: AG-184 was blocked because...   │
+
+│                                     │
+
+│ You: Which agents look suspicious?  │
+
+│                                     │
+
+│ AI: RefundAgent has a 340%...       │
+
+└─────────────────────────────────────┘
+
+28. 👥 USERS & ORGANIZATION
+
+User Management
+
+/users
+
+Pages:
+
+All Users
+
+Invite User
+
+User Details
+
+Roles
+
+Permissions
+
+Teams
+
+Departments
+
+Activity
+
+Sessions
+
+Roles:
+
+ADMIN
+
+MANAGER
+
+SECURITY OFFICER
+
+AUDITOR
+
+AGENT
+
+These roles are part of the original authentication design.
+
+29. 🌐 DEVELOPER PORTAL
+
+Developer Dashboard
+
+/developers
+
+Pages:
+
+Developer Overview
+
+API Keys
+
+API Documentation
+
+API Explorer
+
+Webhooks
+
+SDKs
+
+Agent Registration
+
+API Usage
+
+API Logs
+
+Rate Limits
+
+30. 🔌 INTEGRATIONS
+
+Route
+
+/integrations
+
+Connect:
+
+LLM providers
+
+Databases
+
+REST APIs
+
+Cloud services
+
+Payment APIs
+
+Email
+
+CRM
+
+HR systems
+
+Storage
+
+Monitoring systems
+
+31. 📈 SYSTEM MONITORING
+
+Route
+
+/system
+
+Pages:
+
+System Health
+
+API Health
+
+Database Health
+
+Redis
+
+Kafka
+
+WebSockets
+
+Queue Status
+
+Service Status
+
+Error Logs
+
+Performance
+
+32. ⚙️ SETTINGS
+
+Route
+
+/settings
+
+Pages:
+
+General
+
+Organization
+
+Security
+
+Authentication
+
+Notifications
+
+API
+
+AI Models
+
+Policies
+
+Risk Configuration
+
+Billing/Usage
+
+Data Retention
+
+Audit Configuration
+
+33. 🔔 NOTIFICATION CENTER
+
+Route
+
+/notifications
+
+Notifications for:
+
+High-risk agent
+
+Policy violation
+
+Approval request
+
+Agent suspension
+
+Security incident
+
+Budget exceeded
+
+Capability expiration
+
+Anomaly detected
+
+System failure
+
+34. 📱 GLOBAL SEARCH
+
+Route
+
+/search
+
+Search across:
+
+Agents
+
+Users
+
+Actions
+
+Decisions
+
+Policies
+
+Audit Logs
+
+Incidents
+
+Transactions
+
+Capabilities
+
+🗺️ COMPLETE FRONTEND MAP
+
+So the final sidebar can look like:
+
+AGENTGUARD
+
+│
+
+├── 🏠 Dashboard
+
+│
+
+├── 🤖 AGENTS
+
+│   ├── All Agents
+
+│   ├── Create Agent
+
+│   ├── Agent Passport
+
+│   ├── Agent Network
+
+│   └── Digital Twins
+
+│
+
+├── 🔐 IDENTITY & ACCESS
+
+│   ├── Users
+
+│   ├── Roles
+
+│   ├── Permissions
+
+│   ├── Credentials
+
+│   ├── API Keys
+
+│   └── Sessions
+
+│
+
+├── ⚡ CAPABILITIES
+
+│   ├── Capability Tokens
+
+│   ├── Active Tokens
+
+│   ├── Requests
+
+│   └── Delegation
+
+│
+
+├── ⚖️ GOVERNANCE
+
+│   ├── Policies
+
+│   ├── Rules
+
+│   ├── Simulator
+
+│   ├── Decisions
+
+│   └── Approvals
+
+│
+
+├── 🧠 AI
+
+│   ├── Command Center
+
+│   ├── Intent Analysis
+
+│   ├── AI Models
+
+│   └── AI Assistant
+
+│
+
+├── 🛡️ SECURITY
+
+│   ├── Security Center
+
+│   ├── Risk
+
+│   ├── Behavior
+
+│   ├── Reputation
+
+│   ├── Incidents
+
+│   ├── Circuit Breaker
+
+│   └── Red-Team Lab
+
+│
+
+├── 📡 REAL-TIME
+
+│   └── Live Activity
+
+│
+
+├── 🔎 AUDIT
+
+│   ├── Audit Logs
+
+│   ├── Decision Black Box
+
+│   └── Provenance Graph
+
+│
+
+├── 💰 ECONOMICS
+
+│   ├── Budgets
+
+│   ├── Transactions
+
+│   └── Cost Analytics
+
+│
+
+├── 🌍 RESPONSIBLE AI
+
+│   └── Impact Assessment
+
+│
+
+├── ⚡ OPTIMIZATION
+
+│   ├── Model Router
+
+│   ├── Compute Router
+
+│   └── Resource Usage
+
+│
+
+├── 📊 ANALYTICS
+
+│   ├── Agent Analytics
+
+│   ├── Security Analytics
+
+│   ├── Risk Analytics
+
+│   ├── Policy Analytics
+
+│   ├── Financial Analytics
+
+│   └── Performance
+
+│
+
+├── 🌐 DEVELOPERS
+
+│   ├── API
+
+│   ├── API Keys
+
+│   ├── Webhooks
+
+│   └── API Logs
+
+│
+
+├── 🔌 INTEGRATIONS
+
+│
+
+├── 🖥️ SYSTEM
+
+│   ├── System Health
+
+│   ├── Services
+
+│   └── Logs
+
+│
+
+├── 🔔 Notifications
+
+│
+
+└── ⚙️ Settings
+
+🎯 In simple terms
+
+Your whole frontend isn't one dashboard.
+
+It is an enterprise AI operating console containing:
+
+~15 major dashboards + 30+ functional sections + dozens of detail/create/edit pages.
+
+And the architecture has a very clear flow:
+
+Agent Passport → Identity → Permissions → Capability → AI Intent → Policy → Risk → Allow/Review/Refuse → Execution → Live Monitoring → Behavior → Security → Audit/Provenance → Analytics → Optimization
+
+That flow is what keeps the huge number of pages from feeling like random features. The source material's intended product is essentially a unified control plane covering identity, authorization, runtime safety, trust/audit, and optimization.

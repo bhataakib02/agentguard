@@ -1,0 +1,1403 @@
+🎨 AGENTGUARD — FINAL UI DESIGN SYSTEM
+
+1. Overall Design Direction
+
+Style: Modern + Minimal + Premium + Enterprise + AI
+
+Think:
+
+Apple-like cleanliness + modern SaaS dashboard + trustworthy AI governance
+
+Main characteristics
+
+White/off-white backgrounds
+
+Very light borders
+
+Rounded cards
+
+Soft shadows
+
+Large whitespace
+
+Times New Roman typography
+
+Dark charcoal text
+
+Green as the primary action color
+
+Orange/yellow for attention
+
+Red only for dangerous situations
+
+Purple/blue for AI/intelligence elements
+
+Small fruit/botanical visual accents
+
+No excessive gradients
+
+No excessive colors
+
+No dark dashboard as the primary theme
+
+🖋️ 2. FONT SYSTEM
+
+Primary Font
+
+Times New Roman
+
+Use it everywhere.
+
+font-family:
+
+"Times New Roman", Times, serif;
+
+This should apply to:
+
+Page titles
+
+Headings
+
+Body
+
+Buttons
+
+Navigation
+
+Cards
+
+Tables
+
+Forms
+
+Modals
+
+Charts
+
+Tooltips
+
+Notifications
+
+Agent Passport
+
+Reports
+
+Why?
+
+It gives AgentGuard:
+
+Trust + Authority + Professional + Academic + Enterprise
+
+📐 3. FONT SIZES
+
+Desktop
+
+Element
+
+Size
+
+Weight
+
+Main Page Title
+
+32px
+
+Bold
+
+Section Heading
+
+24px
+
+Bold
+
+Card Heading
+
+18px
+
+Bold
+
+Subheading
+
+16px
+
+Bold
+
+Body
+
+14px
+
+Regular
+
+Small Text
+
+12px
+
+Regular
+
+Caption
+
+11px
+
+Regular
+
+KPI Number
+
+28–32px
+
+Bold
+
+Navigation
+
+14px
+
+Regular
+
+Button
+
+14px
+
+Bold
+
+Table Header
+
+13px
+
+Bold
+
+Table Body
+
+13px
+
+Regular
+
+Tooltip
+
+12px
+
+Regular
+
+🎨 4. MAIN COLOR PALETTE
+
+This is the important part.
+
+🟢 Primary Green
+
+#2E9D50
+
+Use for:
+
+Primary buttons
+
+Active navigation
+
+Success
+
+Allowed actions
+
+Healthy systems
+
+Positive trends
+
+Confirm buttons
+
+Active agents
+
+Trust indicators
+
+Example:
+
+[ + Create Agent ]
+
+Green button.
+
+🌿 Light Green
+
+#EAF7EE
+
+Use for:
+
+Green KPI backgrounds
+
+Success cards
+
+Active status backgrounds
+
+Selected navigation
+
+Positive notification backgrounds
+
+Example:
+
+┌─────────────────────┐
+
+│ 🟢 ACTIVE AGENTS    │
+
+│ 17                  │
+
+└─────────────────────┘
+
+Background:
+
+#EAF7EE
+
+🟠 Primary Orange
+
+#F59A23
+
+Use for:
+
+Warnings
+
+Pending approvals
+
+Review actions
+
+Attention required
+
+Medium-risk items
+
+Important notifications
+
+Example:
+
+REVIEW REQUIRED
+
+Orange.
+
+🟡 Soft Yellow
+
+#FFF4D9
+
+Use for:
+
+Warning card backgrounds
+
+Pending states
+
+Medium priority
+
+Financial attention
+
+Expiring capability
+
+🔴 Primary Red
+
+#E53935
+
+Use very carefully.
+
+Only for:
+
+Critical risk
+
+Refused actions
+
+Security incidents
+
+Agent suspension
+
+Kill switch
+
+Critical policy violation
+
+Dangerous behavior
+
+Failed security test
+
+Never use red for normal UI decoration.
+
+🌸 Light Red
+
+#FDECEC
+
+Use for:
+
+Error backgrounds
+
+Critical alerts
+
+Refused-action cards
+
+High-risk agent cards
+
+🔵 Primary Blue
+
+#2878D4
+
+Use for:
+
+Links
+
+Information
+
+API-related features
+
+Technical information
+
+Data visualization
+
+Secondary actions
+
+💙 Light Blue
+
+#EAF3FC
+
+Use for:
+
+Information cards
+
+API cards
+
+System information
+
+Informational alerts
+
+🟣 Purple
+
+#8064C8
+
+Use specifically for AI/Intelligence.
+
+For example:
+
+AI Command
+
+AI Assistant
+
+Model Router
+
+AI analytics
+
+AI-generated recommendations
+
+AI-related charts
+
+Light Purple
+
+#F1EDFA
+
+🖤 PRIMARY TEXT
+
+#1F1F1F
+
+Use for:
+
+Headings
+
+Main text
+
+Navigation
+
+Important numbers
+
+Labels
+
+🩶 SECONDARY TEXT
+
+#666666
+
+Use for:
+
+Descriptions
+
+Supporting information
+
+Metadata
+
+Timestamps
+
+Secondary labels
+
+⚪ PAGE BACKGROUND
+
+#FCFCFA
+
+This should be the main application background.
+
+Not pure white.
+
+It gives the interface the soft premium look shown in the second design.
+
+🤍 CARD BACKGROUND
+
+#FFFFFF
+
+All dashboard cards should generally use:
+
+background: #FFFFFF
+
+🩶 BORDER
+
+#E8E8E4
+
+Use for:
+
+Card borders
+
+Input borders
+
+Table borders
+
+Dividers
+
+Sidebar separation
+
+🌫️ SUBTLE BORDER
+
+#F0F0EC
+
+Use for extremely subtle separators.
+
+🪟 5. CARD DESIGN
+
+This is one of the most important visual rules.
+
+Standard card
+
+Background: #FFFFFF
+
+Border: #E8E8E4
+
+Radius: 14px
+
+Shadow: very soft
+
+Padding: 20px
+
+Don't use
+
+❌ Heavy shadows❌ Black borders❌ Extremely rounded 30–40px cards❌ Glassmorphism everywhere
+
+📦 6. CARD RADIUS
+
+Component
+
+Radius
+
+KPI Card
+
+14px
+
+Dashboard Card
+
+14px
+
+Modal
+
+16px
+
+Input
+
+8px
+
+Button
+
+8px
+
+Badge
+
+999px
+
+Avatar
+
+50%
+
+Table
+
+12px
+
+🔘 7. BUTTON SYSTEM
+
+Primary Button
+
+Background: #2E9D50
+
+Text: #FFFFFF
+
+Radius: 8px
+
+Height: 40px
+
+Example:
+
++ Create Agent
+
+Secondary Button
+
+Background: #FFFFFF
+
+Border: #D9D9D5
+
+Text: #1F1F1F
+
+Example:
+
+Export Report
+
+Danger Button
+
+Background: #E53935
+
+Text: #FFFFFF
+
+Example:
+
+Suspend Agent
+
+Warning Button
+
+Background: #F59A23
+
+Text: #FFFFFF
+
+Example:
+
+Request Review
+
+🏷️ 8. STATUS COLORS
+
+This should be consistent across the entire application.
+
+Status
+
+Color
+
+Meaning
+
+🟢 Active
+
+#2E9D50
+
+Working normally
+
+🟢 Allowed
+
+#2E9D50
+
+Action permitted
+
+🔵 Information
+
+#2878D4
+
+Informational
+
+🟡 Pending
+
+#F59A23
+
+Waiting
+
+🟠 Review
+
+#F59A23
+
+Human review
+
+🔴 Refused
+
+#E53935
+
+Blocked
+
+🔴 Critical
+
+#E53935
+
+Dangerous
+
+🟣 AI
+
+#8064C8
+
+AI-related
+
+⚪ Disabled
+
+#888888
+
+Inactive
+
+📊 9. DASHBOARD CHART COLORS
+
+Don't randomly choose colors for every chart.
+
+Use a fixed chart palette:
+
+Primary
+
+#2E9D50
+
+Secondary
+
+#2878D4
+
+Third
+
+#8064C8
+
+Fourth
+
+#F59A23
+
+Fifth
+
+#E86B8A
+
+Critical
+
+#E53935
+
+📈 10. RISK COLORS
+
+This needs special treatment.
+
+LOW
+
+🟢
+
+#2E9D50
+
+0–30
+
+MEDIUM
+
+🟡
+
+#F59A23
+
+31–60
+
+HIGH
+
+🟠/Red-orange
+
+#E76F32
+
+61–80
+
+CRITICAL
+
+🔴
+
+#E53935
+
+81–100
+
+⚖️ 11. AI DECISION COLORS
+
+This should become one of AgentGuard's recognizable visual systems.
+
+ALLOW
+
+🟢 #2E9D50
+
+REVIEW
+
+🟠 #F59A23
+
+REFUSE
+
+🔴 #E53935
+
+So everywhere:
+
+┌──────────────┐
+
+│ ✓ ALLOW      │ Green
+
+└──────────────┘
+
+┌──────────────┐
+
+│ ! REVIEW     │ Orange
+
+└──────────────┘
+
+┌──────────────┐
+
+│ ✕ REFUSE     │ Red
+
+└──────────────┘
+
+🧠 12. AI VISUAL LANGUAGE
+
+Anything related to AI should use:
+
+Purple #8064C8
+
+For:
+
+AI Assistant
+
+AI Command
+
+Model Router
+
+AI recommendations
+
+Intent extraction
+
+AI insights
+
+But don't make the whole AI page purple.
+
+Instead:
+
+White card
+
++
+
+Purple icon
+
++
+
+Light purple background
+
+This keeps the interface minimal.
+
+🪪 13. AGENT PASSPORT DESIGN
+
+The Agent Passport should look slightly different from normal cards.
+
+Passport
+
+Background: #FFFFFF
+
+Border: #DCDCD6
+
+Radius: 16px
+
+Identity accent:
+
+Green
+
+Agent status:
+
+🟢 Active
+
+Risk:
+
+Color-coded.
+
+Trust:
+
+Green/blue.
+
+🔐 14. SECURITY UI
+
+Security should use a mostly neutral interface.
+
+Normal
+
+White + green
+
+Warning
+
+White + orange
+
+Critical
+
+White + red
+
+Do not make the whole security dashboard red.
+
+Only the dangerous information should be red.
+
+🧨 15. RED-TEAM LAB COLORS
+
+Since this is a security-testing area:
+
+Primary:
+
+Dark charcoal + orange
+
+Use:
+
+#F59A23
+
+for attack/test indicators.
+
+Red:
+
+#E53935
+
+only when the test discovers a vulnerability.
+
+Green:
+
+#2E9D50
+
+when the agent successfully blocks the attack.
+
+This creates a nice:
+
+Attack → Defense → Result
+
+visual language.
+
+💰 16. ECONOMICS DASHBOARD
+
+Use:
+
+Green
+
+Revenue/savings/healthy budget
+
+Orange
+
+Budget warning
+
+Red
+
+Budget exceeded
+
+Blue
+
+Neutral financial data
+
+Avoid making finance pages entirely green.
+
+🌱 17. FRUIT / BOTANICAL ACCENT
+
+This is something I would keep from the second design, but very lightly.
+
+Use tiny decorative elements:
+
+Orange slice
+
+Leaf
+
+Small botanical shape
+
+Fruit-inspired circular icon
+
+But only around:
+
+Empty states
+
+Dashboard corners
+
+Login page
+
+Welcome screen
+
+Footer
+
+Don't use fruit illustrations everywhere.
+
+The fruit theme should be a brand accent, not the entire product identity.
+
+🧭 18. SIDEBAR
+
+Background
+
+#FFFFFF
+
+Width
+
+240–250px
+
+Navigation
+
+14px Times New Roman.
+
+Normal
+
+#444444
+
+Hover
+
+#F2F8F3
+
+Active
+
+Background: #EAF7EE
+
+Text: #237A3C
+
+Icon: #2E9D50
+
+This is exactly the kind of subtle green selection shown in the second design.
+
+🧭 19. TOP NAVBAR
+
+Height:
+
+64–72px
+
+Background:
+
+#FFFFFF
+
+Bottom border:
+
+#E8E8E4
+
+Contains:
+
+Search
+
+Notifications
+
+Help
+
+Profile
+
+🔎 20. SEARCH BAR
+
+Width:
+
+280–340px
+
+Height:
+
+38–40px
+
+Background:
+
+#FFFFFF
+
+Border:
+
+#E3E3DF
+
+Radius:
+
+8px
+
+Placeholder:
+
+#888888
+
+📊 21. KPI CARDS
+
+The second design's KPI cards are a good reference.
+
+Use:
+
+White card
+
+with:
+
+Small colored circular icon
+
+Label
+
+Large number
+
+Small trend
+
+Tiny comparison text
+
+Example:
+
+┌────────────────────────────┐
+
+│ 🟢  ACTIVE AGENTS          │
+
+│                            │
+
+│ 17                         │
+
+│ ↑ 8% from last week        │
+
+└────────────────────────────┘
+
+📐 22. SPACING SYSTEM
+
+Use multiples of 4px.
+
+4px
+
+8px
+
+12px
+
+16px
+
+20px
+
+24px
+
+32px
+
+40px
+
+48px
+
+64px
+
+Standard
+
+Card padding:
+
+20px
+
+Between cards:
+
+16–24px
+
+Section spacing:
+
+32px
+
+Page padding:
+
+28–32px
+
+🖥️ 23. DESKTOP LAYOUT
+
+Recommended:
+
+┌─────────────────────────────────────────────────────┐
+
+│                     TOP NAV                         │
+
+├──────────────┬──────────────────────────────────────┤
+
+│              │                                      │
+
+│   SIDEBAR    │             CONTENT                  │
+
+│              │                                      │
+
+│   240px      │          flexible width              │
+
+│              │                                      │
+
+│              │                                      │
+
+└──────────────┴──────────────────────────────────────┘
+
+Main content
+
+Maximum width:
+
+1440–1600px
+
+Centered where appropriate.
+
+📱 24. RESPONSIVE BREAKPOINTS
+
+Device
+
+Width
+
+Mobile
+
+<640px
+
+Tablet
+
+640–1024px
+
+Laptop
+
+1024–1440px
+
+Desktop
+
+1440–1920px
+
+Large Desktop
+
+>1920px
+
+🧩 25. ICON STYLE
+
+Use Lucide-style line icons.
+
+Icons should be:
+
+Simple
+
+Thin
+
+Consistent
+
+18–20px
+
+Examples:
+
+Dashboard       ◉
+
+Agents          ♙
+
+Passport        ▣
+
+Permissions     🔒
+
+Capabilities    ⚡
+
+Policies        ⚖
+
+Risk            ◇
+
+Security        🛡
+
+Audit           ≡
+
+Analytics       ◫
+
+Settings        ⚙
+
+But in the actual UI, use a consistent icon library rather than emoji.
+
+📋 26. TABLE DESIGN
+
+Tables should be clean.
+
+Agent       Status       Risk       Trust       Actions
+
+──────────────────────────────────────────────────────
+
+AG-184      Active       72         78          View
+
+AG-221      Active       58         91          View
+
+AG-067      Review       65         73          View
+
+Header:
+
+#666666
+
+Body:
+
+#1F1F1F
+
+Borders:
+
+#EEEEEA
+
+Row hover:
+
+#FAFAF7
+
+🪟 27. MODALS
+
+Width
+
+Normal:
+
+480–600px
+
+Large:
+
+700–900px
+
+Background:
+
+#FFFFFF
+
+Radius:
+
+16px
+
+Shadow:
+
+Soft.
+
+Overlay:
+
+rgba(0,0,0,0.20)
+
+📝 28. FORM DESIGN
+
+Input:
+
+Height: 40–44px
+
+Radius: 8px
+
+Border: #DCDCD6
+
+Font: 14px Times New Roman
+
+Focus:
+
+Border: #2E9D50
+
+Error:
+
+Border: #E53935
+
+🏷️ 29. BADGES
+
+Active
+
+Green light:
+
+#EAF7EE
+
+Text:
+
+#237A3C
+
+Pending
+
+Yellow:
+
+#FFF4D9
+
+Text:
+
+#A56300
+
+Refused
+
+Red:
+
+#FDECEC
+
+Text:
+
+#C62828
+
+AI
+
+Purple:
+
+#F1EDFA
+
+Text:
+
+#6B4BAA
+
+🌈 30. GRADIENT RULE
+
+Use gradients very rarely.
+
+If used:
+
+Green → Light Green
+
+or
+
+Blue → Purple
+
+Only for:
+
+Hero sections
+
+AI visualization
+
+Marketing landing page
+
+Never use gradients on every card.
+
+🌓 31. DARK MODE
+
+For your first version, I recommend:
+
+❌ Don't build dark mode initially.
+
+The light theme you've selected is much more distinctive and easier to keep visually consistent.
+
+You can add dark mode later.
+
+🏆 FINAL COLOR SYSTEM
+
+This is the palette I recommend we actually use in the project:
+
+Purpose
+
+Color
+
+Hex
+
+🟢 Primary
+
+Green
+
+#2E9D50
+
+🌿 Success BG
+
+Light Green
+
+#EAF7EE
+
+🟠 Warning
+
+Orange
+
+#F59A23
+
+🟡 Warning BG
+
+Soft Yellow
+
+#FFF4D9
+
+🔴 Danger
+
+Red
+
+#E53935
+
+🌸 Danger BG
+
+Light Red
+
+#FDECEC
+
+🔵 Info
+
+Blue
+
+#2878D4
+
+💙 Info BG
+
+Light Blue
+
+#EAF3FC
+
+🟣 AI
+
+Purple
+
+#8064C8
+
+💜 AI BG
+
+Light Purple
+
+#F1EDFA
+
+🖤 Primary Text
+
+Charcoal
+
+#1F1F1F
+
+🩶 Secondary Text
+
+Gray
+
+#666666
+
+⚪ Background
+
+Off White
+
+#FCFCFA
+
+🤍 Cards
+
+White
+
+#FFFFFF
+
+▫️ Border
+
+Light Gray
+
+#E8E8E4
+
+🎯 The final visual identity
+
+Font: Times New RomanBackground: Off-whiteCards: WhitePrimary brand: GreenAI: PurpleInformation: BlueWarning: OrangeCritical: RedText: CharcoalBorders: Very light grayCorners: 8–16pxShadows: Soft/minimalIcons: Simple line iconsSpacing: GenerousDecorations: Minimal fruit/botanical accents
+
+This gives AgentGuard a modern, premium, trustworthy AI-governance look without looking like another generic dark cybersecurity dashboard.

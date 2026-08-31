@@ -1,0 +1,22 @@
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env*.local
+
+# Python / FastAPI
+backend/__pycache__/
+backend/*/__pycache__/
+backend/*/*/__pycache__/
+backend/*.pyc
+backend/*.db
+backend/.env
+backend/venv/
+backend/.venv/
+
+# IDE / System
+.vscode/
+.idea/
+.DS_Store
+*.log
