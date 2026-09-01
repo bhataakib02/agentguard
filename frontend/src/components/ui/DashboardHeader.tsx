@@ -89,7 +89,7 @@ export default function DashboardHeader() {
       </div>
 
       {/* 2. Right Side Workspace Actions */}
-      <div className="flex items-center gap-4 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0 flex-wrap justify-between sm:justify-end w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-[#E8E8E4]">
         {/* Notifications Icon Dropdown */}
         <div className="relative">
           <button
@@ -105,7 +105,7 @@ export default function DashboardHeader() {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] shadow-xl p-3 z-30 space-y-2 text-[12px]">
+            <div className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] shadow-xl p-3 z-30 space-y-2 text-[12px]">
               <div className="flex items-center justify-between border-b border-[#E8E8E4] pb-2 font-bold text-[#1F1F1F]">
                 <span>Notifications & Alerts</span>
                 <span className="text-[10px] text-[#2E9D50] uppercase font-mono">{unreadCount} unread</span>

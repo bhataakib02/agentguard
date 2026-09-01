@@ -23,21 +23,41 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const allCookies = request.cookies.getAll();
+  const supabaseCookie = allCookies.find(
+    (c) =>
+      c.name.startsWith("sb-") &&
+      (c.name.includes("auth-token") || c.name.includes("access-token"))
+  )?.value;
+
   const token =
     request.cookies.get("agentguard_token")?.value ||
-    request.cookies.get("sb-xjragvyzlailmtfwjfnm-auth-token")?.value;
+    request.cookies.get("sb-xjragvyzlailmtfwjfnm-auth-token")?.value ||
+    supabaseCookie;
 
-  const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isPublicRoute = PUBLIC_AUTH_ROUTES.some((route) => {
+    if (route === "/") {
+      return pathname === "/";
+    }
+    return pathname === route || pathname.startsWith(`${route}/`);
+  });
 
-  if (!token && !isPublicAuthRoute) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+  // Redirect unauthenticated users accessing protected routes to the landing page '/'
+  if (!token && !isPublicRoute) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (token && isPublicAuthRoute) {
+  // Redirect logged-in users attempting to access login/register pages to '/dashboard'
+  const isGuestOnlyRoute = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+    "/verify-otp",
+    "/verify-email",
+  ].some((route) => pathname === route || pathname.startsWith(`${route}/`));
+
+  if (token && isGuestOnlyRoute) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

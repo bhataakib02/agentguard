@@ -41,7 +41,7 @@ export default function RiskPage() {
           </p>
         </div>
       ) : (
-        <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[12px] overflow-hidden shadow-sm">
+        <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[12px] overflow-x-auto shadow-sm">
           <table className="w-full text-left border-collapse text-[13px]">
             <thead>
               <tr className="bg-[#FCFCFA] border-b border-[#E8E8E4] text-[11px] font-bold text-[#666666] uppercase">

@@ -203,7 +203,7 @@ export default function PublicLandingPage() {
                 </a>
               </div>
 
-              <div className="pt-6 border-t border-[#E8E8E4] grid grid-cols-3 gap-4 text-[12px] text-[#666666]">
+              <div className="pt-6 border-t border-[#E8E8E4] grid grid-cols-1 sm:grid-cols-3 gap-4 text-[12px] text-[#666666]">
                 <div>
                   <span className="font-bold text-[#1F1F1F] block text-[15px]">Zero-Trust</span>
                   <span>Agent Identity System</span>

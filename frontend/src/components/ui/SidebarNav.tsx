@@ -34,7 +34,12 @@ import {
   ChevronDown
 } from "lucide-react";
 
-export default function SidebarNav() {
+interface SidebarNavProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function SidebarNav({ isOpen = false, onClose }: SidebarNavProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const userRole = user?.role || "USER";
@@ -42,6 +47,13 @@ export default function SidebarNav() {
   const [orgBranding, setOrgBranding] = useState<any>(null);
   const [orgList, setOrgList] = useState<any[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>("ALL");
+
+  // Auto-close mobile drawer when route changes
+  useEffect(() => {
+    if (onClose) {
+      onClose();
+    }
+  }, [pathname]);
 
   useEffect(() => {
     async function loadBranding() {
@@ -101,7 +113,20 @@ export default function SidebarNav() {
   const visibleItems = allNavItems.filter((item) => hasRoutePermission(userRole, item.href));
 
   return (
-    <aside className="w-64 bg-[#FFFFFF] border-r border-[#E8E8E4] flex flex-col h-screen fixed left-0 top-0 z-20">
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-[#1F1F1F]/50 backdrop-blur-xs z-30 lg:hidden transition-opacity"
+        />
+      )}
+
+      <aside
+        className={`w-64 bg-[#FFFFFF] border-r border-[#E8E8E4] flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300 lg:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
       {/* 1. AGENTGUARD Platform Brand Header */}
       <div className="p-4 border-b border-[#E8E8E4] flex items-center gap-3">
         <div className="w-9 h-9 rounded-[8px] bg-[#FCFCFA] border border-[#E8E8E4] p-1 flex items-center justify-center shrink-0 shadow-sm">
@@ -241,5 +266,6 @@ export default function SidebarNav() {
         </button>
       </div>
     </aside>
-  );
+  </>
+);
 }
