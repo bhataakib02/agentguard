@@ -28,3 +28,48 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Premium 3D Clockwise Rotating Shield Logo Keyframes */
+@keyframes agentguardLogoRotate {
+  from {
+    transform: perspective(1000px) rotateY(0deg);
+  }
+  to {
+    transform: perspective(1000px) rotateY(360deg);
+  }
+}
+
+@keyframes metallicGlareSweep {
+  0% {
+    transform: translateX(-150%) skewX(-25deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.4;
+  }
+  70% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(250%) skewX(-25deg);
+    opacity: 0;
+  }
+}
+
+.animate-rotate-3d-shield {
+  transform-style: preserve-3d;
+  animation: agentguardLogoRotate 10s linear infinite;
+}
+
+.animate-metallic-glare {
+  animation: metallicGlareSweep 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rotate-3d-shield,
+  .animate-metallic-glare {
+    animation: none !important;
+  }
+}
+
+
