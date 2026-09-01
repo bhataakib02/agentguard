@@ -282,7 +282,17 @@ def invite_user_to_organization(
     # 3. Duplicate Email Check
     existing = db.query(models.User).filter(models.User.email == payload.email).first()
     if existing:
-        raise HTTPException(status_code=400, detail="User with this email already exists")
+        if str(existing.org_id) == str(current_user.org_id):
+            return {
+                "status": "SUCCESS",
+                "message": f"User {payload.email} is already a member of this organization (idempotent).",
+                "user_id": str(existing.id),
+                "email": existing.email,
+                "role": existing.role,
+                "org_id": str(existing.org_id)
+            }
+        else:
+            raise HTTPException(status_code=400, detail="User with this email already belongs to another organization")
 
     # 4. Create User
     new_user = models.User(

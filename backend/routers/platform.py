@@ -1,14 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import datetime
+import re
 
 from database import get_db
 from core.deps import get_current_user, require_super_admin, HUMAN_ROLES
 from core import security
 import models
+
+def slugify(text_val: str) -> str:
+    if not text_val:
+        return "unnamed-org"
+    clean = re.sub(r'[^a-zA-Z0-9]+', '-', text_val.strip()).lower().strip('-')
+    return clean or "unnamed-org"
 
 router = APIRouter(prefix="/platform", tags=["Platform Administration & Multi-Tenancy"])
 
@@ -316,14 +323,38 @@ def revoke_organization_license(
 @router.post("/organizations")
 def create_organization(
     payload: CreateOrgRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     current_user: models.User = Depends(require_super_admin),
     db: Session = Depends(get_db)
 ):
+    target_slug = slugify(payload.name)
+    existing_org = db.query(models.Organization).filter(
+        (models.Organization.slug == target_slug) | 
+        (models.Organization.name.ilike(payload.name.strip()))
+    ).first()
+
+    if existing_org:
+        admin_user = db.query(models.User).filter(models.User.org_id == existing_org.id, models.User.role == "ADMIN").first()
+        if not admin_user:
+            admin_user = db.query(models.User).filter(models.User.email == payload.admin_email).first()
+        lic = db.query(models.License).filter(models.License.org_id == existing_org.id).first()
+        plan_id = lic.plan_id if lic else (payload.plan_id.upper() if payload.plan_id else "STARTER")
+        return {
+            "status": "SUCCESS",
+            "message": f"Organization '{existing_org.name}' already exists (idempotent).",
+            "org_id": str(existing_org.id),
+            "name": existing_org.name,
+            "slug": existing_org.slug,
+            "plan_id": plan_id,
+            "admin_user_id": str(admin_user.id) if admin_user else ""
+        }
+
     # 1. Create Organization
     org = models.Organization(
-        name=payload.name,
-        domain=payload.domain,
-        admin_email=payload.admin_email,
+        name=payload.name.strip(),
+        slug=target_slug,
+        domain=payload.domain.strip() if payload.domain else None,
+        admin_email=payload.admin_email.strip(),
         status="ACTIVE"
     )
     db.add(org)
@@ -393,7 +424,7 @@ def create_organization(
         action=f"Created organization {org.name} under plan {target_plan_id}",
         resource="organizations",
         result="SUCCESS",
-        metadata_json={"org_id": str(org.id), "org_name": org.name, "admin_email": payload.admin_email}
+        metadata_json={"org_id": str(org.id), "org_name": org.name, "admin_email": payload.admin_email, "idempotency_key": idempotency_key}
     )
     db.add(audit)
     db.commit()
@@ -402,9 +433,113 @@ def create_organization(
         "status": "SUCCESS",
         "org_id": str(org.id),
         "name": org.name,
+        "slug": org.slug,
         "plan_id": target_plan_id,
         "admin_user_id": admin_user_id
     }
+
+class UserStatusUpdateRequest(BaseModel):
+    status: str  # ACTIVE, SUSPENDED, INACTIVE
+
+class UserRoleUpdateRequest(BaseModel):
+    role: str
+
+@router.get("/users")
+def list_platform_users(
+    search: Optional[str] = None,
+    org_id: Optional[str] = None,
+    role: Optional[str] = None,
+    current_user: models.User = Depends(require_super_admin),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.User)
+    if org_id:
+        query = query.filter(models.User.org_id == org_id)
+    if role:
+        query = query.filter(models.User.role == role.upper())
+    if search:
+        s = f"%{search.strip()}%"
+        query = query.filter((models.User.email.ilike(s)) | (models.User.full_name.ilike(s)))
+
+    users = query.order_by(models.User.created_at.desc()).all()
+    res = []
+    for u in users:
+        org = db.query(models.Organization).filter(models.Organization.id == u.org_id).first()
+        res.append({
+            "id": str(u.id),
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": u.role,
+            "department": u.department or "General",
+            "status": u.status or "ACTIVE",
+            "org_id": str(u.org_id),
+            "org_name": org.name if org else "Unknown",
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None
+        })
+    return res
+
+@router.patch("/users/{user_id}/status")
+def update_user_status(
+    user_id: str,
+    payload: UserStatusUpdateRequest,
+    current_user: models.User = Depends(require_super_admin),
+    db: Session = Depends(get_db)
+):
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    old_status = target_user.status
+    target_user.status = payload.status.upper()
+    db.commit()
+
+    audit = models.AuditLog(
+        event_type="USER_STATUS_CHANGED",
+        actor_type="SUPER_ADMIN",
+        actor_id=str(current_user.id),
+        action=f"Changed user {target_user.email} status from {old_status} to {target_user.status}",
+        resource="users",
+        result="SUCCESS",
+        metadata_json={"user_id": str(target_user.id), "old_status": old_status, "new_status": target_user.status}
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"status": "SUCCESS", "user_id": str(target_user.id), "new_status": target_user.status}
+
+@router.patch("/users/{user_id}/role")
+def update_user_role(
+    user_id: str,
+    payload: UserRoleUpdateRequest,
+    current_user: models.User = Depends(require_super_admin),
+    db: Session = Depends(get_db)
+):
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_role = payload.role.upper()
+    if new_role not in HUMAN_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid human role. Allowed: {', '.join(HUMAN_ROLES)}")
+
+    old_role = target_user.role
+    target_user.role = new_role
+    db.commit()
+
+    audit = models.AuditLog(
+        event_type="USER_ROLE_CHANGED",
+        actor_type="SUPER_ADMIN",
+        actor_id=str(current_user.id),
+        action=f"Changed user {target_user.email} role from {old_role} to {new_role}",
+        resource="users",
+        result="SUCCESS",
+        metadata_json={"user_id": str(target_user.id), "old_role": old_role, "new_role": new_role}
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"status": "SUCCESS", "user_id": str(target_user.id), "new_role": new_role}
 
 @router.get("/organizations/{org_id}")
 def get_organization_details(

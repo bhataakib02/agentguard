@@ -29,6 +29,7 @@ class Organization(Base):
 
     id = Column(GUID(), primary_key=True, default=gen_uuid)
     name = Column(String, nullable=False)
+    slug = Column(String, unique=True, index=True, nullable=True)
     display_name = Column(String, nullable=True)
     domain = Column(String, nullable=True)
     status = Column(String, default="ACTIVE")  # ACTIVE, SUSPENDED, RESTRICTED, DEACTIVATED

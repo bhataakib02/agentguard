@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -7,6 +8,12 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from database import SessionLocal, engine, Base
 from core import security
 import models
+
+def slugify(text_val: str) -> str:
+    if not text_val:
+        return "unnamed-org"
+    clean = re.sub(r'[^a-zA-Z0-9]+', '-', text_val.strip()).lower().strip('-')
+    return clean or "unnamed-org"
 
 def seed_five_demo_organizations():
     db = SessionLocal()
@@ -182,10 +189,14 @@ def seed_five_demo_organizations():
 
     for item in demo_orgs_data:
         # 1. Create Organization
-        org = db.query(models.Organization).filter(models.Organization.name == item["name"]).first()
+        target_slug = slugify(item["name"])
+        org = db.query(models.Organization).filter(
+            (models.Organization.slug == target_slug) | (models.Organization.name == item["name"])
+        ).first()
         if not org:
             org = models.Organization(
                 name=item["name"],
+                slug=target_slug,
                 display_name=item["display_name"],
                 domain=item["domain"],
                 status="ACTIVE",
@@ -196,6 +207,7 @@ def seed_five_demo_organizations():
             db.commit()
             db.refresh(org)
         else:
+            org.slug = target_slug
             org.display_name = item["display_name"]
             org.logo_url = item["logo_url"]
             db.commit()

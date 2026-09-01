@@ -46,7 +46,12 @@ export default function SidebarNav({ isOpen = false, onClose }: SidebarNavProps)
 
   const [orgBranding, setOrgBranding] = useState<any>(null);
   const [orgList, setOrgList] = useState<any[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string>("ALL");
+  const [selectedOrgId, setSelectedOrgId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("agentguard_selected_org_id") || "ALL";
+    }
+    return "ALL";
+  });
 
   // Auto-close mobile drawer when route changes
   useEffect(() => {
@@ -63,7 +68,12 @@ export default function SidebarNav({ isOpen = false, onClose }: SidebarNavProps)
 
         if (userRole === "SUPER_ADMIN") {
           const orgs = await fetchApi("/platform/organizations").catch(() => []);
-          setOrgList(orgs || []);
+          // Deduplicate orgs by ID if any
+          const uniqueOrgsMap = new Map<string, any>();
+          (orgs || []).forEach((o: any) => {
+            if (o && o.id) uniqueOrgsMap.set(o.id, o);
+          });
+          setOrgList(Array.from(uniqueOrgsMap.values()));
         }
       } catch (err) {
         console.error("Branding load error:", err);
@@ -71,6 +81,19 @@ export default function SidebarNav({ isOpen = false, onClose }: SidebarNavProps)
     }
     loadBranding();
   }, [userRole]);
+
+  const handleOrgContextChange = (newOrgId: string) => {
+    setSelectedOrgId(newOrgId);
+    if (typeof window !== "undefined") {
+      if (newOrgId === "ALL") {
+        localStorage.removeItem("agentguard_selected_org_id");
+      } else {
+        localStorage.setItem("agentguard_selected_org_id", newOrgId);
+      }
+      window.dispatchEvent(new Event("org-context-changed"));
+      window.location.reload();
+    }
+  };
 
   const getInitials = (name?: string, email?: string) => {
     if (name && name.trim().length > 0) {
@@ -148,7 +171,7 @@ export default function SidebarNav({ isOpen = false, onClose }: SidebarNavProps)
           <div className="relative">
             <select
               value={selectedOrgId}
-              onChange={(e) => setSelectedOrgId(e.target.value)}
+              onChange={(e) => handleOrgContextChange(e.target.value)}
               className="w-full text-[12px] font-bold bg-[#FFFFFF] border border-[#E8E8E4] rounded-[6px] px-2 py-1 text-[#1F1F1F] outline-none cursor-pointer"
             >
               <option value="ALL">🌐 All Organizations (Global)</option>
