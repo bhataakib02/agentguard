@@ -1,5 +1,5 @@
 import random, datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
@@ -16,11 +16,24 @@ def list_agents(current_user: models.User = Depends(get_current_user), db: Sessi
 
 @router.post("", response_model=schemas.AgentSchema)
 async def create_agent(req: schemas.AgentCreateRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Enforce License Limit for Agents
+    # 1. Reject attempts to create agents under another organization
+    if req.org_id and current_user.role != "SUPER_ADMIN" and str(req.org_id) != str(current_user.org_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot create an AI agent under another organization"
+        )
+
+    # 2. Enforce License Limit for Agents
     check_license_limit(str(current_user.org_id), "agents", db)
 
     org_id = current_user.org_id
     owner_id = current_user.id
+
+    # Handle requested owner_id within the same organization
+    if req.owner_id:
+        target_owner = db.query(models.User).filter(models.User.id == req.owner_id).first()
+        if target_owner and (current_user.role == "SUPER_ADMIN" or target_owner.org_id == current_user.org_id):
+            owner_id = target_owner.id
 
     code_num = db.query(models.Agent).count() + 101
     agent_code = f"AG-{code_num}"
@@ -30,8 +43,8 @@ async def create_agent(req: schemas.AgentCreateRequest, current_user: models.Use
         org_id=org_id,
         owner_id=owner_id,
         name=req.name,
-        department=req.department,
-        purpose=req.purpose,
+        department=req.department or "Operations",
+        purpose=req.purpose or "Autonomous AI Agent Workflow",
         model_name=req.model_name,
         model_version=req.model_version,
         environment=req.environment,
@@ -77,21 +90,39 @@ async def create_agent(req: schemas.AgentCreateRequest, current_user: models.Use
     return agent
 
 @router.get("/{id}", response_model=schemas.AgentSchema)
-def get_agent(id: str, db: Session = Depends(get_db)):
+def get_agent(
+    id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     agent = db.query(models.Agent).filter((models.Agent.id == id) | (models.Agent.agent_code == id)).first()
     if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot view AI agent belonging to another organization"
+        )
+
     return agent
 
 @router.get("/{id}/passport")
-def get_agent_passport(id: str, db: Session = Depends(get_db)):
+def get_agent_passport(
+    id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     agent = db.query(models.Agent).filter((models.Agent.id == id) | (models.Agent.agent_code == id)).first()
     if not agent:
-        # Fallback to first agent if any exists in DB
-        agent = db.query(models.Agent).first()
-    if not agent:
-        raise HTTPException(status_code=404, detail="No agent registered in database")
-    
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot view Agent Passport belonging to another organization"
+        )
+
     passport = db.query(models.AgentPassport).filter(models.AgentPassport.agent_id == agent.id).first()
     owner = db.query(models.User).filter(models.User.id == agent.owner_id).first()
     permissions = db.query(models.Permission).filter(models.Permission.agent_id == agent.id).all()
@@ -107,10 +138,20 @@ def get_agent_passport(id: str, db: Session = Depends(get_db)):
     }
 
 @router.post("/{id}/suspend")
-async def suspend_agent(id: str, db: Session = Depends(get_db)):
+async def suspend_agent(
+    id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     agent = db.query(models.Agent).filter((models.Agent.id == id) | (models.Agent.agent_code == id)).first()
     if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot suspend AI agent belonging to another organization"
+        )
 
     agent.status = "SUSPENDED"
     cb = db.query(models.CircuitBreaker).filter(models.CircuitBreaker.agent_id == agent.id).first()
@@ -132,10 +173,20 @@ async def suspend_agent(id: str, db: Session = Depends(get_db)):
     return {"status": "SUCCESS", "message": f"Agent {agent.agent_code} has been suspended and all active capabilities revoked."}
 
 @router.post("/{id}/restore")
-async def restore_agent(id: str, db: Session = Depends(get_db)):
+async def restore_agent(
+    id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     agent = db.query(models.Agent).filter((models.Agent.id == id) | (models.Agent.agent_code == id)).first()
     if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot restore AI agent belonging to another organization"
+        )
 
     agent.status = "NORMAL"
     cb = db.query(models.CircuitBreaker).filter(models.CircuitBreaker.agent_id == agent.id).first()

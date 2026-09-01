@@ -28,7 +28,7 @@ class TokenResponse(BaseModel):
 class UserSchema(BaseModel):
     id: str
     auth_user_id: Optional[str] = None
-    org_id: str
+    org_id: Optional[str] = None
     email: str
     full_name: str
     role: str
@@ -42,13 +42,15 @@ class UserSchema(BaseModel):
 
 class AgentCreateRequest(BaseModel):
     name: str
-    department: str
-    purpose: str
+    department: str = "Operations"
+    purpose: str = "Autonomous AI Agent Workflow"
     model_name: str = "gpt-4o"
     model_version: str = "1.0.0"
     environment: str = "PRODUCTION"
     autonomy_level: str = "MEDIUM"
     daily_budget: float = 10000.0
+    org_id: Optional[str] = None
+    owner_id: Optional[str] = None
 
 class AgentSchema(BaseModel):
     id: str

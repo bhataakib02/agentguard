@@ -55,11 +55,11 @@ class TestFiveDemoOrganizations(unittest.TestCase):
     def test_01_verify_all_5_organizations_exist(self):
         """VERIFY 1-3: Verify 5 demo orgs exist in PostgreSQL with valid licenses and custom branding"""
         expected_names = [
-            "Acme Financial Technologies",
-            "NovaCare Health Systems",
-            "Vertex Manufacturing Industries",
-            "Orbit Retail & Commerce",
-            "Skyline Logistics & Mobility"
+            "ACME Technologies",
+            "Nexa Financial Services",
+            "MedCore Health Systems",
+            "UrbanGrid Logistics",
+            "EduNova Learning"
         ]
 
         for name in expected_names:
@@ -76,11 +76,11 @@ class TestFiveDemoOrganizations(unittest.TestCase):
         """VERIFY 4-5 & 20: Each org has exactly 8 human users with distinct roles (ADMIN, MANAGER, etc.)"""
         orgs = self.db.query(models.Organization).filter(
             models.Organization.name.in_([
-                "Acme Financial Technologies",
-                "NovaCare Health Systems",
-                "Vertex Manufacturing Industries",
-                "Orbit Retail & Commerce",
-                "Skyline Logistics & Mobility"
+                "ACME Technologies",
+                "Nexa Financial Services",
+                "MedCore Health Systems",
+                "UrbanGrid Logistics",
+                "EduNova Learning"
             ])
         ).all()
 

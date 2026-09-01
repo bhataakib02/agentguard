@@ -128,7 +128,7 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=schemas.UserSchema)
 def get_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     org = db.query(models.Organization).filter(models.Organization.id == current_user.org_id).first()
-    org_name = org.name if org else "AgentGuard Enterprise"
+    org_name = org.name if org else ("AgentGuard Control Plane" if current_user.role == "SUPER_ADMIN" else "AgentGuard Enterprise")
 
     return schemas.UserSchema(
         id=current_user.id,
