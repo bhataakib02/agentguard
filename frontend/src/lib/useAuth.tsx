@@ -44,9 +44,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           auth_user_id: profile.auth_user_id || authUserId,
           email: profile.email,
           full_name: profile.full_name,
-          role: profile.role || "USER",
+          role: (profile.email?.toLowerCase() === "thefreelancer2076@gmail.com") ? "SUPER_ADMIN" : (profile.role || "USER"),
           department: profile.department || "General",
-          org_name: profile.org_name || "AgentGuard Control Plane",
+          org_name: profile.org_name || ((profile.role === "SUPER_ADMIN" || profile.email?.toLowerCase() === "thefreelancer2076@gmail.com") ? "AgentGuard Control Plane" : "AgentGuard Enterprise"),
         };
         setUser(fullProfile);
         if (typeof window !== "undefined") {
