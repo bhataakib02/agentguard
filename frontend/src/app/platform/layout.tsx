@@ -93,9 +93,17 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
     { label: "Licenses", href: "/platform/licenses", icon: CreditCard },
     { label: "Billing", href: "/platform/billing", icon: DollarSign },
     { label: "Usage & Analytics", href: "/platform/analytics", icon: Activity },
+  ];
+
+  const navGovernance = [
     { label: "Security", href: "/platform/security", icon: ShieldAlert },
+    { label: "Governance Policies", href: "/policies", icon: Shield },
+    { label: "Decision Black Box", href: "/decisions", icon: Activity },
     { label: "Audit Logs", href: "/platform/audit", icon: FileSearch },
     { label: "Reports", href: "/platform/reports", icon: FileText },
+  ];
+
+  const navSystem = [
     { label: "API / Integrations", href: "/platform/integrations", icon: Cpu },
     { label: "System Health", href: "/platform/system-health", icon: Server },
     { label: "Platform Settings", href: "/platform/settings", icon: Settings },
@@ -112,6 +120,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
     { label: "My Profile", href: "/platform/profile", icon: User },
     { label: "My Security", href: "/platform/security", icon: Shield },
   ];
+
 
   if (loading) {
     return (
@@ -204,6 +213,58 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
               })}
             </div>
 
+            {/* GOVERNANCE */}
+            <div className="space-y-1">
+              <div className="px-3 py-1 text-[10px] font-bold text-[#64748B] uppercase tracking-wider font-mono">
+                GOVERNANCE
+              </div>
+              {navGovernance.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href + item.label}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-[8px] font-bold transition-all ${
+                      isActive
+                        ? "bg-[#173B25] text-white border border-[#2E9D50]/50 shadow-sm"
+                        : "text-[#94A3B8] hover:bg-[#161C2A] hover:text-white"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 text-[#64748B]" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* SYSTEM */}
+            <div className="space-y-1">
+              <div className="px-3 py-1 text-[10px] font-bold text-[#64748B] uppercase tracking-wider font-mono">
+                SYSTEM
+              </div>
+              {navSystem.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href + item.label}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-[8px] font-bold transition-all ${
+                      isActive
+                        ? "bg-[#173B25] text-white border border-[#2E9D50]/50 shadow-sm"
+                        : "text-[#94A3B8] hover:bg-[#161C2A] hover:text-white"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 text-[#64748B]" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
             {/* TENANT MANAGEMENT */}
             <div className="space-y-1">
               <div className="px-3 py-1 text-[10px] font-bold text-[#64748B] uppercase tracking-wider font-mono">
@@ -249,6 +310,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                         : "text-[#94A3B8] hover:bg-[#161C2A] hover:text-white"
                     }`}
                   >
+
                     <Icon className="w-4 h-4 text-[#64748B]" />
                     <span>{item.label}</span>
                   </Link>

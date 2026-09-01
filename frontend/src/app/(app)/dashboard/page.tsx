@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fetchApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import KpiCard from "@/components/ui/KpiCard";
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const userRole = user?.role || "USER";
 
@@ -50,8 +52,12 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (user?.role === "SUPER_ADMIN" || user?.email === "thefreelancer2076@gmail.com") {
+      router.push("/platform");
+    } else {
+      loadData();
+    }
+  }, [user]);
 
   const handleTestEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();

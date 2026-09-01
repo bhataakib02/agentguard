@@ -811,16 +811,16 @@ export default function PlatformDashboardPage() {
         </div>
       </div>
 
-      {/* 5. MAIN ROW 3: System Health + Quick Actions + Organization Context */}
+      {/* 5. MAIN ROW 3: System Health + Quick Actions + Platform Usage Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* System Health Indicators (4 cols) */}
-        <div className="lg:col-span-4 bg-white border border-[#E2E8F0] rounded-[10px] p-4 space-y-3 shadow-xs">
+        {/* System Health Indicators (3 cols) */}
+        <div className="lg:col-span-3 bg-white border border-[#E2E8F0] rounded-[10px] p-4 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-[#0F172A] text-[15px]">System Health</h3>
             <Link href="/platform/system" className="text-[11px] text-[#2E9D50] hover:underline font-bold">View All</Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-[11px]">
+          <div className="space-y-2 text-[11px]">
             <div className="flex items-center justify-between p-2 bg-[#F8FAFC] rounded-[6px] border border-[#E2E8F0]">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#2E9D50] animate-pulse" />
@@ -848,7 +848,7 @@ export default function PlatformDashboardPage() {
             <div className="flex items-center justify-between p-2 bg-[#F8FAFC] rounded-[6px] border border-[#E2E8F0]">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#2E9D50] animate-pulse" />
-                <span className="font-bold text-[#1E293B]">Report Engine</span>
+                <span className="font-bold text-[#1E293B]">AI Governance Engine</span>
               </div>
               <span className="text-[9px] font-bold text-[#2E9D50] font-mono">Operational</span>
             </div>
@@ -881,7 +881,7 @@ export default function PlatformDashboardPage() {
               className="p-2.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-[8px] hover:bg-[#EAF7EE] hover:border-[#2E9D50] transition-all flex flex-col items-center text-center space-y-1 group"
             >
               <Building className="w-4 h-4 text-[#2E9D50]" />
-              <span className="text-[9px] font-bold text-[#1E293B] group-hover:text-[#2E9D50] leading-tight">Create Org</span>
+              <span className="text-[9px] font-bold text-[#1E293B] group-hover:text-[#2E9D50] leading-tight">Create Organization</span>
             </button>
 
             <Link
@@ -905,15 +905,15 @@ export default function PlatformDashboardPage() {
               className="p-2.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-[8px] hover:bg-[#EAF7EE] hover:border-[#2E9D50] transition-all flex flex-col items-center text-center space-y-1 group"
             >
               <Bot className="w-4 h-4 text-[#2E9D50]" />
-              <span className="text-[9px] font-bold text-[#1E293B] group-hover:text-[#2E9D50] leading-tight">Create Agent</span>
+              <span className="text-[9px] font-bold text-[#1E293B] group-hover:text-[#2E9D50] leading-tight">Register AI Agent</span>
             </Link>
 
             <Link
-              href="/platform/reports"
+              href="/policies"
               className="p-2.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-[8px] hover:bg-[#EAF7EE] hover:border-[#2E9D50] transition-all flex flex-col items-center text-center space-y-1 group"
             >
-              <FileText className="w-4 h-4 text-[#2E9D50]" />
-              <span className="text-[9px] font-bold text-[#1E293B] group-hover:text-[#2E9D50] leading-tight">Generate Report</span>
+              <Shield className="w-4 h-4 text-[#2E9D50]" />
+              <span className="text-[9px] font-bold text-[#1E293B] group-hover:text-[#2E9D50] leading-tight">Create Policy</span>
             </Link>
 
             <Link
@@ -921,7 +921,7 @@ export default function PlatformDashboardPage() {
               className="p-2.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-[8px] hover:bg-[#EAF7EE] hover:border-[#2E9D50] transition-all flex flex-col items-center text-center space-y-1 group"
             >
               <FileSearch className="w-4 h-4 text-[#2E9D50]" />
-              <span className="text-[9px] font-bold text-[#1E293B] group-hover:text-[#2E9D50] leading-tight">Audit Logs</span>
+              <span className="text-[9px] font-bold text-[#1E293B] group-hover:text-[#2E9D50] leading-tight">View Audit Logs</span>
             </Link>
 
             <Link
@@ -934,44 +934,56 @@ export default function PlatformDashboardPage() {
           </div>
         </div>
 
-        {/* Organization Context Card (3 cols) */}
-        <div className="lg:col-span-3 bg-white border border-[#E2E8F0] rounded-[10px] p-4 space-y-3 shadow-xs flex flex-col justify-between">
-          <div>
-            <h3 className="font-bold text-[#0F172A] text-[15px]">Organization Context</h3>
-            <p className="text-[11px] text-[#64748B]">Switch Organization Context</p>
+        {/* Platform Usage Analytics (4 cols) */}
+        <div className="lg:col-span-4 bg-white border border-[#E2E8F0] rounded-[10px] p-4 space-y-3 shadow-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-[#0F172A] text-[15px]">Platform Usage Analytics</h3>
+            <Link href="/platform/analytics" className="text-[11px] text-[#2E9D50] hover:underline font-bold">View All</Link>
           </div>
 
-          <div className="space-y-2">
-            <div className="relative">
-              <select
-                value={selectedOrgScope}
-                onChange={(e) => handleOrgScopeChange(e.target.value)}
-                className="w-full bg-[#F8FAFC] border border-[#CBD5E1] text-[#1E293B] text-[11px] font-bold rounded-[6px] px-3 py-2 outline-none focus:border-[#2E9D50] cursor-pointer appearance-none"
-              >
-                <option value="ALL">All Organizations (Global)</option>
-                {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>{org.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-[#64748B] absolute right-3 top-3 pointer-events-none" />
+          <div className="flex items-center gap-3 text-[10px] border-b border-[#F1F5F9] pb-2">
+            <span className="text-[#64748B]">Today</span>
+            <span className="font-bold text-[#2E9D50] border-b-2 border-[#2E9D50] pb-0.5">7 Days</span>
+            <span className="text-[#64748B]">30 Days</span>
+            <span className="text-[#64748B]">90 Days</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-[11px]">
+            <div className="p-2 bg-[#F8FAFC] rounded-[6px] border border-[#E2E8F0] space-y-1">
+              <span className="text-[10px] text-[#64748B] uppercase font-mono block">API Requests</span>
+              <span className="font-bold text-[#0F172A] text-[15px] block leading-none">128,430</span>
+              <span className="text-[9px] text-[#2E9D50] font-bold flex items-center gap-0.5">
+                <TrendingUp className="w-3 h-3" /> ↑ 18.6%
+              </span>
             </div>
 
-            <button
-              onClick={() => handleOrgScopeChange(selectedOrgScope)}
-              className="w-full py-2 bg-[#173B25] hover:bg-[#237A3C] text-white text-[11px] font-bold rounded-[6px] transition-colors"
-            >
-              Enter Context
-            </button>
-          </div>
+            <div className="p-2 bg-[#F8FAFC] rounded-[6px] border border-[#E2E8F0] space-y-1">
+              <span className="text-[10px] text-[#64748B] uppercase font-mono block">Active Users</span>
+              <span className="font-bold text-[#0F172A] text-[15px] block leading-none">1,248</span>
+              <span className="text-[9px] text-[#2E9D50] font-bold flex items-center gap-0.5">
+                <TrendingUp className="w-3 h-3" /> ↑ 12.4%
+              </span>
+            </div>
 
-          <div className="pt-2 border-t border-[#F1F5F9] flex items-center justify-between text-[10px]">
-            <span className="text-[#64748B]">Current Scope:</span>
-            <span className="px-2 py-0.5 rounded font-bold uppercase bg-[#EAF7EE] text-[#2E9D50] border border-[#2E9D50]/30 font-mono">
-              {activeScopeLabel}
-            </span>
+            <div className="p-2 bg-[#F8FAFC] rounded-[6px] border border-[#E2E8F0] space-y-1">
+              <span className="text-[10px] text-[#64748B] uppercase font-mono block">AI Agent Activity</span>
+              <span className="font-bold text-[#0F172A] text-[15px] block leading-none">2,847</span>
+              <span className="text-[9px] text-[#2E9D50] font-bold flex items-center gap-0.5">
+                <TrendingUp className="w-3 h-3" /> ↑ 15.3%
+              </span>
+            </div>
+
+            <div className="p-2 bg-[#F8FAFC] rounded-[6px] border border-[#E2E8F0] space-y-1">
+              <span className="text-[10px] text-[#64748B] uppercase font-mono block">Decisions Evaluated</span>
+              <span className="font-bold text-[#0F172A] text-[15px] block leading-none">5,628</span>
+              <span className="text-[9px] text-[#2E9D50] font-bold flex items-center gap-0.5">
+                <TrendingUp className="w-3 h-3" /> ↑ 20.1%
+              </span>
+            </div>
           </div>
         </div>
       </div>
+
 
       {/* Provision New Organization Modal */}
       {showCreateModal && (

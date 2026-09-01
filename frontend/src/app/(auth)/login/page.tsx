@@ -45,7 +45,11 @@ export default function LoginPage() {
           }),
         });
 
-        router.push("/dashboard");
+        if (data.user.email === "thefreelancer2076@gmail.com") {
+          router.push("/platform");
+        } else {
+          router.push("/dashboard");
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please verify your credentials.");
