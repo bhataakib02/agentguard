@@ -62,21 +62,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem("agentguard_user");
       if (stored) {
         try {
-          setUser(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.email && parsed.email.toLowerCase() === "thefreelancer2076@gmail.com") {
+            parsed.role = "SUPER_ADMIN";
+            parsed.full_name = "Super Admin Account";
+          }
+          setUser(parsed);
           return;
         } catch (err) {}
       }
     }
 
     if (userEmail) {
-      const nameFromEmail = userEmail.split("@")[0].replace(".", " ").toUpperCase();
+      const isSuperAdmin = userEmail.toLowerCase() === "thefreelancer2076@gmail.com";
+      const nameFromEmail = isSuperAdmin ? "Super Admin Account" : userEmail.split("@")[0].replace(".", " ").toUpperCase();
+      const fallbackRole = isSuperAdmin ? "SUPER_ADMIN" : "USER";
       const fallbackUser: UserProfile = {
         id: authUserId || "usr_session",
         auth_user_id: authUserId,
         email: userEmail,
         full_name: nameFromEmail,
-        role: "USER",
-        org_name: "AgentGuard Control Plane",
+        role: fallbackRole,
+        org_name: isSuperAdmin ? "AgentGuard Control Plane" : "AgentGuard Enterprise",
       };
       setUser(fallbackUser);
     }
