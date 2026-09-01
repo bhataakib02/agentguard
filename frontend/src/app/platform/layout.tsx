@@ -290,7 +290,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
         </aside>
 
         {/* Main Section */}
-        <main className="flex-1 lg:ml-64 flex flex-col overflow-x-hidden">
+        <main className="flex-1 lg:ml-64 flex flex-col overflow-x-hidden bg-[#F4F6F8]">
           {/* Top Header Bar */}
           <header className="bg-[#0F131D] border-b border-[#1E2638] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-30 shadow-sm">
             <div>
@@ -302,6 +302,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
               </div>
               <p className="text-[12px] text-[#64748B] mt-0.5">Global platform administration and monitoring</p>
             </div>
+
 
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
               {/* Search input with ⌘K badge */}
