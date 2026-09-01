@@ -599,7 +599,12 @@ def get_platform_security(
     current_user: models.User = Depends(require_super_admin),
     db: Session = Depends(get_db)
 ):
-    incidents = db.query(models.SecurityIncident).order_by(models.SecurityIncident.timestamp.desc()).all()
+    try:
+        incidents = db.query(models.SecurityIncident).order_by(models.SecurityIncident.created_at.desc()).all()
+    except Exception:
+        db.rollback()
+        incidents = []
+
     inc_list = []
     for i in incidents:
         org = db.query(models.Organization).filter(models.Organization.id == i.org_id).first()
@@ -609,8 +614,9 @@ def get_platform_security(
             "severity": i.severity,
             "status": i.status,
             "org_name": org.name if org else "Unknown",
-            "timestamp": i.timestamp.isoformat() if i.timestamp else None
+            "timestamp": i.created_at.isoformat() if i.created_at else None
         })
+
 
     suspended_agents = db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").all()
     suspended_users = db.query(models.User).filter(models.User.status == "SUSPENDED").all()
@@ -625,6 +631,7 @@ def get_platform_security(
         "suspended_agents": [{"id": str(a.id), "name": a.name, "code": a.agent_code} for a in suspended_agents],
         "suspended_users": [{"id": str(u.id), "name": u.full_name, "email": u.email} for u in suspended_users]
     }
+
 
 @router.get("/audit")
 def list_platform_audit_logs(

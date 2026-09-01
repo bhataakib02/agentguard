@@ -178,7 +178,7 @@ def generate_report(
             fontSize=20,
             leading=24,
             textColor=colors.HexColor("#1F1F1F"),
-            fontName="Helvetica-Bold"
+            fontName="Times-Bold"
         )
         subtitle_style = ParagraphStyle(
             "SubTitle",
@@ -186,7 +186,7 @@ def generate_report(
             fontSize=10,
             leading=13,
             textColor=colors.HexColor("#2E9D50"),
-            fontName="Helvetica-Bold"
+            fontName="Times-Bold"
         )
         meta_style = ParagraphStyle(
             "Meta",
@@ -194,7 +194,7 @@ def generate_report(
             fontSize=9,
             leading=12,
             textColor=colors.HexColor("#666666"),
-            fontName="Helvetica"
+            fontName="Times-Roman"
         )
         heading2_style = ParagraphStyle(
             "DocH2",
@@ -202,10 +202,11 @@ def generate_report(
             fontSize=13,
             leading=16,
             textColor=colors.HexColor("#8064C8"),
-            fontName="Helvetica-Bold",
+            fontName="Times-Bold",
             spaceBefore=12,
             spaceAfter=6
         )
+
 
         # Header Block
         elements.append(Paragraph("AGENTGUARD CONTROL PLANE", title_style))

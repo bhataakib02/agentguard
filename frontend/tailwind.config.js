@@ -18,6 +18,7 @@ module.exports = {
         brandBlue: "#2878D4",
       },
       fontFamily: {
+        sans: ['"Times New Roman"', "Times", "serif"],
         serif: ['"Times New Roman"', "Times", "serif"],
       },
     },

@@ -3,10 +3,22 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    background-color: #FCFCFA;
-    color: #1F1F1F;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  html,
+  body,
+  #__next,
+  * {
+    font-family: "Times New Roman", Times, serif !important;
+  }
+
+  input,
+  textarea,
+  select,
+  button,
+  option,
+  table,
+  th,
+  td {
+    font-family: "Times New Roman", Times, serif !important;
   }
 }
 
