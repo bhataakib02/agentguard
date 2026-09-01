@@ -1,0 +1,6 @@
+id,name,slug,industry,license,status,created_at
+org-001,ACME Technologies,acme-technologies,Technology / SaaS,ENTERPRISE,ACTIVE,2026-01-02T00:00:00+00:00
+org-002,Nexa Financial Services,nexa-financial-services,Financial Services,ENTERPRISE,ACTIVE,2026-01-03T00:00:00+00:00
+org-003,MedCore Health Systems,medcore-health-systems,Healthcare Technology,PROFESSIONAL,ACTIVE,2026-01-04T00:00:00+00:00
+org-004,UrbanGrid Logistics,urbangrid-logistics,Logistics / Supply Chain,PROFESSIONAL,ACTIVE,2026-01-05T00:00:00+00:00
+org-005,EduNova Learning,edunova-learning,Education Technology,STARTER,ACTIVE,2026-01-06T00:00:00+00:00

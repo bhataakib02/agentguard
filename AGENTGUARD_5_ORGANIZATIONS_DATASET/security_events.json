@@ -1,0 +1,137 @@
+[
+  {
+    "id": "security-001",
+    "organization_id": "org-001",
+    "type": "ANOMALY",
+    "severity": "LOW",
+    "status": "RESOLVED",
+    "description": "Synthetic anomaly for testing",
+    "created_at": "2026-07-11T00:00:00+00:00"
+  },
+  {
+    "id": "security-002",
+    "organization_id": "org-001",
+    "type": "SECURITY_INCIDENT",
+    "severity": "MEDIUM",
+    "status": "OPEN",
+    "description": "Synthetic security_incident for testing",
+    "created_at": "2026-07-12T00:00:00+00:00"
+  },
+  {
+    "id": "security-003",
+    "organization_id": "org-001",
+    "type": "RED_TEAM_TEST",
+    "severity": "HIGH",
+    "status": "RESOLVED",
+    "description": "Synthetic red_team_test for testing",
+    "created_at": "2026-07-13T00:00:00+00:00"
+  },
+  {
+    "id": "security-004",
+    "organization_id": "org-002",
+    "type": "ANOMALY",
+    "severity": "LOW",
+    "status": "RESOLVED",
+    "description": "Synthetic anomaly for testing",
+    "created_at": "2026-07-11T00:00:00+00:00"
+  },
+  {
+    "id": "security-005",
+    "organization_id": "org-002",
+    "type": "SECURITY_INCIDENT",
+    "severity": "MEDIUM",
+    "status": "OPEN",
+    "description": "Synthetic security_incident for testing",
+    "created_at": "2026-07-12T00:00:00+00:00"
+  },
+  {
+    "id": "security-006",
+    "organization_id": "org-002",
+    "type": "RED_TEAM_TEST",
+    "severity": "HIGH",
+    "status": "RESOLVED",
+    "description": "Synthetic red_team_test for testing",
+    "created_at": "2026-07-13T00:00:00+00:00"
+  },
+  {
+    "id": "security-007",
+    "organization_id": "org-003",
+    "type": "ANOMALY",
+    "severity": "LOW",
+    "status": "RESOLVED",
+    "description": "Synthetic anomaly for testing",
+    "created_at": "2026-07-11T00:00:00+00:00"
+  },
+  {
+    "id": "security-008",
+    "organization_id": "org-003",
+    "type": "SECURITY_INCIDENT",
+    "severity": "MEDIUM",
+    "status": "OPEN",
+    "description": "Synthetic security_incident for testing",
+    "created_at": "2026-07-12T00:00:00+00:00"
+  },
+  {
+    "id": "security-009",
+    "organization_id": "org-003",
+    "type": "RED_TEAM_TEST",
+    "severity": "HIGH",
+    "status": "RESOLVED",
+    "description": "Synthetic red_team_test for testing",
+    "created_at": "2026-07-13T00:00:00+00:00"
+  },
+  {
+    "id": "security-010",
+    "organization_id": "org-004",
+    "type": "ANOMALY",
+    "severity": "LOW",
+    "status": "RESOLVED",
+    "description": "Synthetic anomaly for testing",
+    "created_at": "2026-07-11T00:00:00+00:00"
+  },
+  {
+    "id": "security-011",
+    "organization_id": "org-004",
+    "type": "SECURITY_INCIDENT",
+    "severity": "MEDIUM",
+    "status": "OPEN",
+    "description": "Synthetic security_incident for testing",
+    "created_at": "2026-07-12T00:00:00+00:00"
+  },
+  {
+    "id": "security-012",
+    "organization_id": "org-004",
+    "type": "RED_TEAM_TEST",
+    "severity": "HIGH",
+    "status": "RESOLVED",
+    "description": "Synthetic red_team_test for testing",
+    "created_at": "2026-07-13T00:00:00+00:00"
+  },
+  {
+    "id": "security-013",
+    "organization_id": "org-005",
+    "type": "ANOMALY",
+    "severity": "LOW",
+    "status": "RESOLVED",
+    "description": "Synthetic anomaly for testing",
+    "created_at": "2026-07-11T00:00:00+00:00"
+  },
+  {
+    "id": "security-014",
+    "organization_id": "org-005",
+    "type": "SECURITY_INCIDENT",
+    "severity": "MEDIUM",
+    "status": "OPEN",
+    "description": "Synthetic security_incident for testing",
+    "created_at": "2026-07-12T00:00:00+00:00"
+  },
+  {
+    "id": "security-015",
+    "organization_id": "org-005",
+    "type": "RED_TEAM_TEST",
+    "severity": "HIGH",
+    "status": "RESOLVED",
+    "description": "Synthetic red_team_test for testing",
+    "created_at": "2026-07-13T00:00:00+00:00"
+  }
+]

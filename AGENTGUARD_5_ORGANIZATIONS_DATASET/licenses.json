@@ -1,0 +1,52 @@
+[
+  {
+    "id": "lic-001",
+    "organization_id": "org-001",
+    "license_type": "ENTERPRISE",
+    "status": "ACTIVE",
+    "start_date": "2026-01-01",
+    "expiry_date": "2027-01-01",
+    "seat_limit": 50,
+    "agent_limit": 100
+  },
+  {
+    "id": "lic-002",
+    "organization_id": "org-002",
+    "license_type": "ENTERPRISE",
+    "status": "ACTIVE",
+    "start_date": "2026-01-01",
+    "expiry_date": "2027-01-01",
+    "seat_limit": 50,
+    "agent_limit": 100
+  },
+  {
+    "id": "lic-003",
+    "organization_id": "org-003",
+    "license_type": "PROFESSIONAL",
+    "status": "ACTIVE",
+    "start_date": "2026-01-01",
+    "expiry_date": "2027-01-01",
+    "seat_limit": 25,
+    "agent_limit": 50
+  },
+  {
+    "id": "lic-004",
+    "organization_id": "org-004",
+    "license_type": "PROFESSIONAL",
+    "status": "ACTIVE",
+    "start_date": "2026-01-01",
+    "expiry_date": "2027-01-01",
+    "seat_limit": 25,
+    "agent_limit": 50
+  },
+  {
+    "id": "lic-005",
+    "organization_id": "org-005",
+    "license_type": "STARTER",
+    "status": "ACTIVE",
+    "start_date": "2026-01-01",
+    "expiry_date": "2027-01-01",
+    "seat_limit": 25,
+    "agent_limit": 50
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "org-001",
+    "name": "ACME Technologies",
+    "slug": "acme-technologies",
+    "industry": "Technology / SaaS",
+    "license": "ENTERPRISE",
+    "status": "ACTIVE",
+    "created_at": "2026-01-02T00:00:00+00:00"
+  },
+  {
+    "id": "org-002",
+    "name": "Nexa Financial Services",
+    "slug": "nexa-financial-services",
+    "industry": "Financial Services",
+    "license": "ENTERPRISE",
+    "status": "ACTIVE",
+    "created_at": "2026-01-03T00:00:00+00:00"
+  },
+  {
+    "id": "org-003",
+    "name": "MedCore Health Systems",
+    "slug": "medcore-health-systems",
+    "industry": "Healthcare Technology",
+    "license": "PROFESSIONAL",
+    "status": "ACTIVE",
+    "created_at": "2026-01-04T00:00:00+00:00"
+  },
+  {
+    "id": "org-004",
+    "name": "UrbanGrid Logistics",
+    "slug": "urbangrid-logistics",
+    "industry": "Logistics / Supply Chain",
+    "license": "PROFESSIONAL",
+    "status": "ACTIVE",
+    "created_at": "2026-01-05T00:00:00+00:00"
+  },
+  {
+    "id": "org-005",
+    "name": "EduNova Learning",
+    "slug": "edunova-learning",
+    "industry": "Education Technology",
+    "license": "STARTER",
+    "status": "ACTIVE",
+    "created_at": "2026-01-06T00:00:00+00:00"
+  }
+]

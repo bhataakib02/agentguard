@@ -1,0 +1,227 @@
+[
+  {
+    "id": "decision-001",
+    "organization_id": "org-001",
+    "agent_id": "agent-001",
+    "requested_action": "read_data",
+    "risk_score": 18,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-01T01:00:00+00:00"
+  },
+  {
+    "id": "decision-002",
+    "organization_id": "org-001",
+    "agent_id": "agent-002",
+    "requested_action": "analyze_risk",
+    "risk_score": 54,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-01T02:00:00+00:00"
+  },
+  {
+    "id": "decision-003",
+    "organization_id": "org-001",
+    "agent_id": "agent-003",
+    "requested_action": "execute_action",
+    "risk_score": 91,
+    "governance_outcome": "REFUSE",
+    "created_at": "2026-06-01T03:00:00+00:00"
+  },
+  {
+    "id": "decision-004",
+    "organization_id": "org-001",
+    "agent_id": "agent-004",
+    "requested_action": "send_notification",
+    "risk_score": 27,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-01T04:00:00+00:00"
+  },
+  {
+    "id": "decision-005",
+    "organization_id": "org-001",
+    "agent_id": "agent-005",
+    "requested_action": "access_sensitive_data",
+    "risk_score": 72,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-01T05:00:00+00:00"
+  },
+  {
+    "id": "decision-006",
+    "organization_id": "org-002",
+    "agent_id": "agent-006",
+    "requested_action": "read_data",
+    "risk_score": 18,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-02T01:00:00+00:00"
+  },
+  {
+    "id": "decision-007",
+    "organization_id": "org-002",
+    "agent_id": "agent-007",
+    "requested_action": "analyze_risk",
+    "risk_score": 54,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-02T02:00:00+00:00"
+  },
+  {
+    "id": "decision-008",
+    "organization_id": "org-002",
+    "agent_id": "agent-008",
+    "requested_action": "execute_action",
+    "risk_score": 91,
+    "governance_outcome": "REFUSE",
+    "created_at": "2026-06-02T03:00:00+00:00"
+  },
+  {
+    "id": "decision-009",
+    "organization_id": "org-002",
+    "agent_id": "agent-009",
+    "requested_action": "send_notification",
+    "risk_score": 27,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-02T04:00:00+00:00"
+  },
+  {
+    "id": "decision-010",
+    "organization_id": "org-002",
+    "agent_id": "agent-010",
+    "requested_action": "access_sensitive_data",
+    "risk_score": 72,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-02T05:00:00+00:00"
+  },
+  {
+    "id": "decision-011",
+    "organization_id": "org-003",
+    "agent_id": "agent-011",
+    "requested_action": "read_data",
+    "risk_score": 18,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-03T01:00:00+00:00"
+  },
+  {
+    "id": "decision-012",
+    "organization_id": "org-003",
+    "agent_id": "agent-012",
+    "requested_action": "analyze_risk",
+    "risk_score": 54,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-03T02:00:00+00:00"
+  },
+  {
+    "id": "decision-013",
+    "organization_id": "org-003",
+    "agent_id": "agent-013",
+    "requested_action": "execute_action",
+    "risk_score": 91,
+    "governance_outcome": "REFUSE",
+    "created_at": "2026-06-03T03:00:00+00:00"
+  },
+  {
+    "id": "decision-014",
+    "organization_id": "org-003",
+    "agent_id": "agent-014",
+    "requested_action": "send_notification",
+    "risk_score": 27,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-03T04:00:00+00:00"
+  },
+  {
+    "id": "decision-015",
+    "organization_id": "org-003",
+    "agent_id": "agent-015",
+    "requested_action": "access_sensitive_data",
+    "risk_score": 72,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-03T05:00:00+00:00"
+  },
+  {
+    "id": "decision-016",
+    "organization_id": "org-004",
+    "agent_id": "agent-016",
+    "requested_action": "read_data",
+    "risk_score": 18,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-04T01:00:00+00:00"
+  },
+  {
+    "id": "decision-017",
+    "organization_id": "org-004",
+    "agent_id": "agent-017",
+    "requested_action": "analyze_risk",
+    "risk_score": 54,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-04T02:00:00+00:00"
+  },
+  {
+    "id": "decision-018",
+    "organization_id": "org-004",
+    "agent_id": "agent-018",
+    "requested_action": "execute_action",
+    "risk_score": 91,
+    "governance_outcome": "REFUSE",
+    "created_at": "2026-06-04T03:00:00+00:00"
+  },
+  {
+    "id": "decision-019",
+    "organization_id": "org-004",
+    "agent_id": "agent-019",
+    "requested_action": "send_notification",
+    "risk_score": 27,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-04T04:00:00+00:00"
+  },
+  {
+    "id": "decision-020",
+    "organization_id": "org-004",
+    "agent_id": "agent-020",
+    "requested_action": "access_sensitive_data",
+    "risk_score": 72,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-04T05:00:00+00:00"
+  },
+  {
+    "id": "decision-021",
+    "organization_id": "org-005",
+    "agent_id": "agent-021",
+    "requested_action": "read_data",
+    "risk_score": 18,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-05T01:00:00+00:00"
+  },
+  {
+    "id": "decision-022",
+    "organization_id": "org-005",
+    "agent_id": "agent-022",
+    "requested_action": "analyze_risk",
+    "risk_score": 54,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-05T02:00:00+00:00"
+  },
+  {
+    "id": "decision-023",
+    "organization_id": "org-005",
+    "agent_id": "agent-023",
+    "requested_action": "execute_action",
+    "risk_score": 91,
+    "governance_outcome": "REFUSE",
+    "created_at": "2026-06-05T03:00:00+00:00"
+  },
+  {
+    "id": "decision-024",
+    "organization_id": "org-005",
+    "agent_id": "agent-024",
+    "requested_action": "send_notification",
+    "risk_score": 27,
+    "governance_outcome": "ALLOW",
+    "created_at": "2026-06-05T04:00:00+00:00"
+  },
+  {
+    "id": "decision-025",
+    "organization_id": "org-005",
+    "agent_id": "agent-025",
+    "requested_action": "access_sensitive_data",
+    "risk_score": 72,
+    "governance_outcome": "REVIEW",
+    "created_at": "2026-06-05T05:00:00+00:00"
+  }
+]

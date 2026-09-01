@@ -1,0 +1,107 @@
+[
+  {
+    "id": "notification-001",
+    "organization_id": "org-001",
+    "type": "APPROVAL_REQUIRED",
+    "message": "Synthetic notification: Approval required",
+    "status": "UNREAD"
+  },
+  {
+    "id": "notification-002",
+    "organization_id": "org-001",
+    "type": "SECURITY_REVIEW_COMPLETED",
+    "message": "Synthetic notification: Security review completed",
+    "status": "READ"
+  },
+  {
+    "id": "notification-003",
+    "organization_id": "org-001",
+    "type": "REPORT_GENERATED",
+    "message": "Synthetic notification: Report generated",
+    "status": "READ"
+  },
+  {
+    "id": "notification-004",
+    "organization_id": "org-002",
+    "type": "APPROVAL_REQUIRED",
+    "message": "Synthetic notification: Approval required",
+    "status": "UNREAD"
+  },
+  {
+    "id": "notification-005",
+    "organization_id": "org-002",
+    "type": "SECURITY_REVIEW_COMPLETED",
+    "message": "Synthetic notification: Security review completed",
+    "status": "READ"
+  },
+  {
+    "id": "notification-006",
+    "organization_id": "org-002",
+    "type": "REPORT_GENERATED",
+    "message": "Synthetic notification: Report generated",
+    "status": "READ"
+  },
+  {
+    "id": "notification-007",
+    "organization_id": "org-003",
+    "type": "APPROVAL_REQUIRED",
+    "message": "Synthetic notification: Approval required",
+    "status": "UNREAD"
+  },
+  {
+    "id": "notification-008",
+    "organization_id": "org-003",
+    "type": "SECURITY_REVIEW_COMPLETED",
+    "message": "Synthetic notification: Security review completed",
+    "status": "READ"
+  },
+  {
+    "id": "notification-009",
+    "organization_id": "org-003",
+    "type": "REPORT_GENERATED",
+    "message": "Synthetic notification: Report generated",
+    "status": "READ"
+  },
+  {
+    "id": "notification-010",
+    "organization_id": "org-004",
+    "type": "APPROVAL_REQUIRED",
+    "message": "Synthetic notification: Approval required",
+    "status": "UNREAD"
+  },
+  {
+    "id": "notification-011",
+    "organization_id": "org-004",
+    "type": "SECURITY_REVIEW_COMPLETED",
+    "message": "Synthetic notification: Security review completed",
+    "status": "READ"
+  },
+  {
+    "id": "notification-012",
+    "organization_id": "org-004",
+    "type": "REPORT_GENERATED",
+    "message": "Synthetic notification: Report generated",
+    "status": "READ"
+  },
+  {
+    "id": "notification-013",
+    "organization_id": "org-005",
+    "type": "APPROVAL_REQUIRED",
+    "message": "Synthetic notification: Approval required",
+    "status": "UNREAD"
+  },
+  {
+    "id": "notification-014",
+    "organization_id": "org-005",
+    "type": "SECURITY_REVIEW_COMPLETED",
+    "message": "Synthetic notification: Security review completed",
+    "status": "READ"
+  },
+  {
+    "id": "notification-015",
+    "organization_id": "org-005",
+    "type": "REPORT_GENERATED",
+    "message": "Synthetic notification: Report generated",
+    "status": "READ"
+  }
+]

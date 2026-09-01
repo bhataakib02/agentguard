@@ -1,0 +1,16 @@
+id,organization_id,type,severity,status,description,created_at
+security-001,org-001,ANOMALY,LOW,RESOLVED,Synthetic anomaly for testing,2026-07-11T00:00:00+00:00
+security-002,org-001,SECURITY_INCIDENT,MEDIUM,OPEN,Synthetic security_incident for testing,2026-07-12T00:00:00+00:00
+security-003,org-001,RED_TEAM_TEST,HIGH,RESOLVED,Synthetic red_team_test for testing,2026-07-13T00:00:00+00:00
+security-004,org-002,ANOMALY,LOW,RESOLVED,Synthetic anomaly for testing,2026-07-11T00:00:00+00:00
+security-005,org-002,SECURITY_INCIDENT,MEDIUM,OPEN,Synthetic security_incident for testing,2026-07-12T00:00:00+00:00
+security-006,org-002,RED_TEAM_TEST,HIGH,RESOLVED,Synthetic red_team_test for testing,2026-07-13T00:00:00+00:00
+security-007,org-003,ANOMALY,LOW,RESOLVED,Synthetic anomaly for testing,2026-07-11T00:00:00+00:00
+security-008,org-003,SECURITY_INCIDENT,MEDIUM,OPEN,Synthetic security_incident for testing,2026-07-12T00:00:00+00:00
+security-009,org-003,RED_TEAM_TEST,HIGH,RESOLVED,Synthetic red_team_test for testing,2026-07-13T00:00:00+00:00
+security-010,org-004,ANOMALY,LOW,RESOLVED,Synthetic anomaly for testing,2026-07-11T00:00:00+00:00
+security-011,org-004,SECURITY_INCIDENT,MEDIUM,OPEN,Synthetic security_incident for testing,2026-07-12T00:00:00+00:00
+security-012,org-004,RED_TEAM_TEST,HIGH,RESOLVED,Synthetic red_team_test for testing,2026-07-13T00:00:00+00:00
+security-013,org-005,ANOMALY,LOW,RESOLVED,Synthetic anomaly for testing,2026-07-11T00:00:00+00:00
+security-014,org-005,SECURITY_INCIDENT,MEDIUM,OPEN,Synthetic security_incident for testing,2026-07-12T00:00:00+00:00
+security-015,org-005,RED_TEAM_TEST,HIGH,RESOLVED,Synthetic red_team_test for testing,2026-07-13T00:00:00+00:00

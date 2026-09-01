@@ -1,0 +1,252 @@
+[
+  {
+    "id": "passport-001",
+    "agent_id": "agent-001",
+    "organization_id": "org-001",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "HIGH"
+  },
+  {
+    "id": "passport-002",
+    "agent_id": "agent-002",
+    "organization_id": "org-001",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-003",
+    "agent_id": "agent-003",
+    "organization_id": "org-001",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-004",
+    "agent_id": "agent-004",
+    "organization_id": "org-001",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-005",
+    "agent_id": "agent-005",
+    "organization_id": "org-001",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-006",
+    "agent_id": "agent-006",
+    "organization_id": "org-002",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-007",
+    "agent_id": "agent-007",
+    "organization_id": "org-002",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-008",
+    "agent_id": "agent-008",
+    "organization_id": "org-002",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-009",
+    "agent_id": "agent-009",
+    "organization_id": "org-002",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-010",
+    "agent_id": "agent-010",
+    "organization_id": "org-002",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "HIGH"
+  },
+  {
+    "id": "passport-011",
+    "agent_id": "agent-011",
+    "organization_id": "org-003",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-012",
+    "agent_id": "agent-012",
+    "organization_id": "org-003",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-013",
+    "agent_id": "agent-013",
+    "organization_id": "org-003",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-014",
+    "agent_id": "agent-014",
+    "organization_id": "org-003",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "HIGH"
+  },
+  {
+    "id": "passport-015",
+    "agent_id": "agent-015",
+    "organization_id": "org-003",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-016",
+    "agent_id": "agent-016",
+    "organization_id": "org-004",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-017",
+    "agent_id": "agent-017",
+    "organization_id": "org-004",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-018",
+    "agent_id": "agent-018",
+    "organization_id": "org-004",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "HIGH"
+  },
+  {
+    "id": "passport-019",
+    "agent_id": "agent-019",
+    "organization_id": "org-004",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-020",
+    "agent_id": "agent-020",
+    "organization_id": "org-004",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-021",
+    "agent_id": "agent-021",
+    "organization_id": "org-005",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-022",
+    "agent_id": "agent-022",
+    "organization_id": "org-005",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "HIGH"
+  },
+  {
+    "id": "passport-023",
+    "agent_id": "agent-023",
+    "organization_id": "org-005",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "MEDIUM"
+  },
+  {
+    "id": "passport-024",
+    "agent_id": "agent-024",
+    "organization_id": "org-005",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  },
+  {
+    "id": "passport-025",
+    "agent_id": "agent-025",
+    "organization_id": "org-005",
+    "status": "ACTIVE",
+    "allowed_tasks": "read, analyze, execute approved workflow",
+    "allowed_data": "organization-scoped synthetic operational data",
+    "allowed_tools": "dashboard, policy-engine, notification",
+    "autonomy_level": "LOW"
+  }
+]

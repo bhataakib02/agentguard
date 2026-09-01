@@ -1,0 +1,752 @@
+[
+  {
+    "id": "cap-001",
+    "agent_id": "agent-001",
+    "organization_id": "org-001",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-002",
+    "agent_id": "agent-001",
+    "organization_id": "org-001",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-003",
+    "agent_id": "agent-001",
+    "organization_id": "org-001",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-004",
+    "agent_id": "agent-002",
+    "organization_id": "org-001",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-005",
+    "agent_id": "agent-002",
+    "organization_id": "org-001",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-006",
+    "agent_id": "agent-002",
+    "organization_id": "org-001",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-007",
+    "agent_id": "agent-003",
+    "organization_id": "org-001",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-008",
+    "agent_id": "agent-003",
+    "organization_id": "org-001",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-009",
+    "agent_id": "agent-003",
+    "organization_id": "org-001",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-010",
+    "agent_id": "agent-004",
+    "organization_id": "org-001",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-011",
+    "agent_id": "agent-004",
+    "organization_id": "org-001",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-012",
+    "agent_id": "agent-004",
+    "organization_id": "org-001",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-013",
+    "agent_id": "agent-005",
+    "organization_id": "org-001",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-014",
+    "agent_id": "agent-005",
+    "organization_id": "org-001",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-015",
+    "agent_id": "agent-005",
+    "organization_id": "org-001",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-016",
+    "agent_id": "agent-006",
+    "organization_id": "org-002",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-017",
+    "agent_id": "agent-006",
+    "organization_id": "org-002",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-018",
+    "agent_id": "agent-006",
+    "organization_id": "org-002",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-019",
+    "agent_id": "agent-007",
+    "organization_id": "org-002",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-020",
+    "agent_id": "agent-007",
+    "organization_id": "org-002",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-021",
+    "agent_id": "agent-007",
+    "organization_id": "org-002",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-022",
+    "agent_id": "agent-008",
+    "organization_id": "org-002",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-023",
+    "agent_id": "agent-008",
+    "organization_id": "org-002",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-024",
+    "agent_id": "agent-008",
+    "organization_id": "org-002",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-025",
+    "agent_id": "agent-009",
+    "organization_id": "org-002",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-026",
+    "agent_id": "agent-009",
+    "organization_id": "org-002",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-027",
+    "agent_id": "agent-009",
+    "organization_id": "org-002",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-028",
+    "agent_id": "agent-010",
+    "organization_id": "org-002",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-029",
+    "agent_id": "agent-010",
+    "organization_id": "org-002",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-030",
+    "agent_id": "agent-010",
+    "organization_id": "org-002",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-031",
+    "agent_id": "agent-011",
+    "organization_id": "org-003",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-032",
+    "agent_id": "agent-011",
+    "organization_id": "org-003",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-033",
+    "agent_id": "agent-011",
+    "organization_id": "org-003",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-034",
+    "agent_id": "agent-012",
+    "organization_id": "org-003",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-035",
+    "agent_id": "agent-012",
+    "organization_id": "org-003",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-036",
+    "agent_id": "agent-012",
+    "organization_id": "org-003",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-037",
+    "agent_id": "agent-013",
+    "organization_id": "org-003",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-038",
+    "agent_id": "agent-013",
+    "organization_id": "org-003",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-039",
+    "agent_id": "agent-013",
+    "organization_id": "org-003",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-040",
+    "agent_id": "agent-014",
+    "organization_id": "org-003",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-041",
+    "agent_id": "agent-014",
+    "organization_id": "org-003",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-042",
+    "agent_id": "agent-014",
+    "organization_id": "org-003",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-043",
+    "agent_id": "agent-015",
+    "organization_id": "org-003",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-044",
+    "agent_id": "agent-015",
+    "organization_id": "org-003",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-045",
+    "agent_id": "agent-015",
+    "organization_id": "org-003",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-046",
+    "agent_id": "agent-016",
+    "organization_id": "org-004",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-047",
+    "agent_id": "agent-016",
+    "organization_id": "org-004",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-048",
+    "agent_id": "agent-016",
+    "organization_id": "org-004",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-049",
+    "agent_id": "agent-017",
+    "organization_id": "org-004",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-050",
+    "agent_id": "agent-017",
+    "organization_id": "org-004",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-051",
+    "agent_id": "agent-017",
+    "organization_id": "org-004",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-052",
+    "agent_id": "agent-018",
+    "organization_id": "org-004",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-053",
+    "agent_id": "agent-018",
+    "organization_id": "org-004",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-054",
+    "agent_id": "agent-018",
+    "organization_id": "org-004",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-055",
+    "agent_id": "agent-019",
+    "organization_id": "org-004",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-056",
+    "agent_id": "agent-019",
+    "organization_id": "org-004",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-057",
+    "agent_id": "agent-019",
+    "organization_id": "org-004",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-058",
+    "agent_id": "agent-020",
+    "organization_id": "org-004",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-059",
+    "agent_id": "agent-020",
+    "organization_id": "org-004",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-060",
+    "agent_id": "agent-020",
+    "organization_id": "org-004",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-061",
+    "agent_id": "agent-021",
+    "organization_id": "org-005",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-062",
+    "agent_id": "agent-021",
+    "organization_id": "org-005",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-063",
+    "agent_id": "agent-021",
+    "organization_id": "org-005",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-064",
+    "agent_id": "agent-022",
+    "organization_id": "org-005",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-065",
+    "agent_id": "agent-022",
+    "organization_id": "org-005",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-066",
+    "agent_id": "agent-022",
+    "organization_id": "org-005",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-067",
+    "agent_id": "agent-023",
+    "organization_id": "org-005",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-068",
+    "agent_id": "agent-023",
+    "organization_id": "org-005",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-069",
+    "agent_id": "agent-023",
+    "organization_id": "org-005",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-070",
+    "agent_id": "agent-024",
+    "organization_id": "org-005",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-071",
+    "agent_id": "agent-024",
+    "organization_id": "org-005",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-072",
+    "agent_id": "agent-024",
+    "organization_id": "org-005",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-073",
+    "agent_id": "agent-025",
+    "organization_id": "org-005",
+    "capability": "read_data",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-074",
+    "agent_id": "agent-025",
+    "organization_id": "org-005",
+    "capability": "analyze_risk",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  },
+  {
+    "id": "cap-075",
+    "agent_id": "agent-025",
+    "organization_id": "org-005",
+    "capability": "send_notification",
+    "scope": "organization",
+    "status": "ACTIVE",
+    "issued_at": "2026-01-10T00:00:00+00:00",
+    "expires_at": "2027-01-10T00:00:00+00:00"
+  }
+]

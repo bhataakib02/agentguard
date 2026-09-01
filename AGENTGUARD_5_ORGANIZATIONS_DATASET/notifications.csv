@@ -1,0 +1,16 @@
+id,organization_id,type,message,status
+notification-001,org-001,APPROVAL_REQUIRED,Synthetic notification: Approval required,UNREAD
+notification-002,org-001,SECURITY_REVIEW_COMPLETED,Synthetic notification: Security review completed,READ
+notification-003,org-001,REPORT_GENERATED,Synthetic notification: Report generated,READ
+notification-004,org-002,APPROVAL_REQUIRED,Synthetic notification: Approval required,UNREAD
+notification-005,org-002,SECURITY_REVIEW_COMPLETED,Synthetic notification: Security review completed,READ
+notification-006,org-002,REPORT_GENERATED,Synthetic notification: Report generated,READ
+notification-007,org-003,APPROVAL_REQUIRED,Synthetic notification: Approval required,UNREAD
+notification-008,org-003,SECURITY_REVIEW_COMPLETED,Synthetic notification: Security review completed,READ
+notification-009,org-003,REPORT_GENERATED,Synthetic notification: Report generated,READ
+notification-010,org-004,APPROVAL_REQUIRED,Synthetic notification: Approval required,UNREAD
+notification-011,org-004,SECURITY_REVIEW_COMPLETED,Synthetic notification: Security review completed,READ
+notification-012,org-004,REPORT_GENERATED,Synthetic notification: Report generated,READ
+notification-013,org-005,APPROVAL_REQUIRED,Synthetic notification: Approval required,UNREAD
+notification-014,org-005,SECURITY_REVIEW_COMPLETED,Synthetic notification: Security review completed,READ
+notification-015,org-005,REPORT_GENERATED,Synthetic notification: Report generated,READ

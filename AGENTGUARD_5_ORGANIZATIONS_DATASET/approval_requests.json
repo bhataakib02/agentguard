@@ -1,0 +1,137 @@
+[
+  {
+    "id": "approval-001",
+    "organization_id": "org-001",
+    "requester_user_id": "user-006",
+    "agent_id": "agent-002",
+    "action": "high_risk_operation",
+    "status": "PENDING",
+    "created_at": "2026-07-01T00:00:00+00:00"
+  },
+  {
+    "id": "approval-002",
+    "organization_id": "org-001",
+    "requester_user_id": "user-006",
+    "agent_id": "agent-002",
+    "action": "high_risk_operation",
+    "status": "APPROVED",
+    "created_at": "2026-07-02T00:00:00+00:00"
+  },
+  {
+    "id": "approval-003",
+    "organization_id": "org-001",
+    "requester_user_id": "user-006",
+    "agent_id": "agent-002",
+    "action": "high_risk_operation",
+    "status": "REJECTED",
+    "created_at": "2026-07-03T00:00:00+00:00"
+  },
+  {
+    "id": "approval-004",
+    "organization_id": "org-002",
+    "requester_user_id": "user-014",
+    "agent_id": "agent-007",
+    "action": "high_risk_operation",
+    "status": "PENDING",
+    "created_at": "2026-07-01T00:00:00+00:00"
+  },
+  {
+    "id": "approval-005",
+    "organization_id": "org-002",
+    "requester_user_id": "user-014",
+    "agent_id": "agent-007",
+    "action": "high_risk_operation",
+    "status": "APPROVED",
+    "created_at": "2026-07-02T00:00:00+00:00"
+  },
+  {
+    "id": "approval-006",
+    "organization_id": "org-002",
+    "requester_user_id": "user-014",
+    "agent_id": "agent-007",
+    "action": "high_risk_operation",
+    "status": "REJECTED",
+    "created_at": "2026-07-03T00:00:00+00:00"
+  },
+  {
+    "id": "approval-007",
+    "organization_id": "org-003",
+    "requester_user_id": "user-022",
+    "agent_id": "agent-012",
+    "action": "high_risk_operation",
+    "status": "PENDING",
+    "created_at": "2026-07-01T00:00:00+00:00"
+  },
+  {
+    "id": "approval-008",
+    "organization_id": "org-003",
+    "requester_user_id": "user-022",
+    "agent_id": "agent-012",
+    "action": "high_risk_operation",
+    "status": "APPROVED",
+    "created_at": "2026-07-02T00:00:00+00:00"
+  },
+  {
+    "id": "approval-009",
+    "organization_id": "org-003",
+    "requester_user_id": "user-022",
+    "agent_id": "agent-012",
+    "action": "high_risk_operation",
+    "status": "REJECTED",
+    "created_at": "2026-07-03T00:00:00+00:00"
+  },
+  {
+    "id": "approval-010",
+    "organization_id": "org-004",
+    "requester_user_id": "user-030",
+    "agent_id": "agent-017",
+    "action": "high_risk_operation",
+    "status": "PENDING",
+    "created_at": "2026-07-01T00:00:00+00:00"
+  },
+  {
+    "id": "approval-011",
+    "organization_id": "org-004",
+    "requester_user_id": "user-030",
+    "agent_id": "agent-017",
+    "action": "high_risk_operation",
+    "status": "APPROVED",
+    "created_at": "2026-07-02T00:00:00+00:00"
+  },
+  {
+    "id": "approval-012",
+    "organization_id": "org-004",
+    "requester_user_id": "user-030",
+    "agent_id": "agent-017",
+    "action": "high_risk_operation",
+    "status": "REJECTED",
+    "created_at": "2026-07-03T00:00:00+00:00"
+  },
+  {
+    "id": "approval-013",
+    "organization_id": "org-005",
+    "requester_user_id": "user-038",
+    "agent_id": "agent-022",
+    "action": "high_risk_operation",
+    "status": "PENDING",
+    "created_at": "2026-07-01T00:00:00+00:00"
+  },
+  {
+    "id": "approval-014",
+    "organization_id": "org-005",
+    "requester_user_id": "user-038",
+    "agent_id": "agent-022",
+    "action": "high_risk_operation",
+    "status": "APPROVED",
+    "created_at": "2026-07-02T00:00:00+00:00"
+  },
+  {
+    "id": "approval-015",
+    "organization_id": "org-005",
+    "requester_user_id": "user-038",
+    "agent_id": "agent-022",
+    "action": "high_risk_operation",
+    "status": "REJECTED",
+    "created_at": "2026-07-03T00:00:00+00:00"
+  }
+]

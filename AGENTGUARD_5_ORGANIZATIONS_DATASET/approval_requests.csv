@@ -1,0 +1,16 @@
+id,organization_id,requester_user_id,agent_id,action,status,created_at
+approval-001,org-001,user-006,agent-002,high_risk_operation,PENDING,2026-07-01T00:00:00+00:00
+approval-002,org-001,user-006,agent-002,high_risk_operation,APPROVED,2026-07-02T00:00:00+00:00
+approval-003,org-001,user-006,agent-002,high_risk_operation,REJECTED,2026-07-03T00:00:00+00:00
+approval-004,org-002,user-014,agent-007,high_risk_operation,PENDING,2026-07-01T00:00:00+00:00
+approval-005,org-002,user-014,agent-007,high_risk_operation,APPROVED,2026-07-02T00:00:00+00:00
+approval-006,org-002,user-014,agent-007,high_risk_operation,REJECTED,2026-07-03T00:00:00+00:00
+approval-007,org-003,user-022,agent-012,high_risk_operation,PENDING,2026-07-01T00:00:00+00:00
+approval-008,org-003,user-022,agent-012,high_risk_operation,APPROVED,2026-07-02T00:00:00+00:00
+approval-009,org-003,user-022,agent-012,high_risk_operation,REJECTED,2026-07-03T00:00:00+00:00
+approval-010,org-004,user-030,agent-017,high_risk_operation,PENDING,2026-07-01T00:00:00+00:00
+approval-011,org-004,user-030,agent-017,high_risk_operation,APPROVED,2026-07-02T00:00:00+00:00
+approval-012,org-004,user-030,agent-017,high_risk_operation,REJECTED,2026-07-03T00:00:00+00:00
+approval-013,org-005,user-038,agent-022,high_risk_operation,PENDING,2026-07-01T00:00:00+00:00
+approval-014,org-005,user-038,agent-022,high_risk_operation,APPROVED,2026-07-02T00:00:00+00:00
+approval-015,org-005,user-038,agent-022,high_risk_operation,REJECTED,2026-07-03T00:00:00+00:00

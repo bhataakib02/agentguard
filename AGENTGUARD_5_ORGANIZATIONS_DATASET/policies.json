@@ -1,0 +1,107 @@
+[
+  {
+    "id": "policy-001",
+    "organization_id": "org-001",
+    "name": "ACME Technologies - Data Access Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-002",
+    "organization_id": "org-001",
+    "name": "ACME Technologies - Agent Runtime Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-003",
+    "organization_id": "org-001",
+    "name": "ACME Technologies - High Risk Action Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-004",
+    "organization_id": "org-002",
+    "name": "Nexa Financial Services - Data Access Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-005",
+    "organization_id": "org-002",
+    "name": "Nexa Financial Services - Agent Runtime Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-006",
+    "organization_id": "org-002",
+    "name": "Nexa Financial Services - High Risk Action Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-007",
+    "organization_id": "org-003",
+    "name": "MedCore Health Systems - Data Access Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-008",
+    "organization_id": "org-003",
+    "name": "MedCore Health Systems - Agent Runtime Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-009",
+    "organization_id": "org-003",
+    "name": "MedCore Health Systems - High Risk Action Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-010",
+    "organization_id": "org-004",
+    "name": "UrbanGrid Logistics - Data Access Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-011",
+    "organization_id": "org-004",
+    "name": "UrbanGrid Logistics - Agent Runtime Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-012",
+    "organization_id": "org-004",
+    "name": "UrbanGrid Logistics - High Risk Action Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-013",
+    "organization_id": "org-005",
+    "name": "EduNova Learning - Data Access Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-014",
+    "organization_id": "org-005",
+    "name": "EduNova Learning - Agent Runtime Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  },
+  {
+    "id": "policy-015",
+    "organization_id": "org-005",
+    "name": "EduNova Learning - High Risk Action Policy",
+    "status": "ACTIVE",
+    "rule": "ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions"
+  }
+]

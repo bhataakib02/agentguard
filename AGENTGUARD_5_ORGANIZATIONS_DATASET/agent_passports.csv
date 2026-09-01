@@ -1,0 +1,26 @@
+id,agent_id,organization_id,status,allowed_tasks,allowed_data,allowed_tools,autonomy_level
+passport-001,agent-001,org-001,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",HIGH
+passport-002,agent-002,org-001,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-003,agent-003,org-001,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-004,agent-004,org-001,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-005,agent-005,org-001,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-006,agent-006,org-002,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-007,agent-007,org-002,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-008,agent-008,org-002,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-009,agent-009,org-002,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-010,agent-010,org-002,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",HIGH
+passport-011,agent-011,org-003,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-012,agent-012,org-003,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-013,agent-013,org-003,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-014,agent-014,org-003,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",HIGH
+passport-015,agent-015,org-003,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-016,agent-016,org-004,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-017,agent-017,org-004,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-018,agent-018,org-004,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",HIGH
+passport-019,agent-019,org-004,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-020,agent-020,org-004,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-021,agent-021,org-005,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-022,agent-022,org-005,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",HIGH
+passport-023,agent-023,org-005,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",MEDIUM
+passport-024,agent-024,org-005,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW
+passport-025,agent-025,org-005,ACTIVE,"read, analyze, execute approved workflow",organization-scoped synthetic operational data,"dashboard, policy-engine, notification",LOW

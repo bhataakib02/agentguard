@@ -1,0 +1,16 @@
+id,organization_id,name,status,rule
+policy-001,org-001,ACME Technologies - Data Access Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-002,org-001,ACME Technologies - Agent Runtime Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-003,org-001,ACME Technologies - High Risk Action Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-004,org-002,Nexa Financial Services - Data Access Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-005,org-002,Nexa Financial Services - Agent Runtime Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-006,org-002,Nexa Financial Services - High Risk Action Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-007,org-003,MedCore Health Systems - Data Access Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-008,org-003,MedCore Health Systems - Agent Runtime Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-009,org-003,MedCore Health Systems - High Risk Action Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-010,org-004,UrbanGrid Logistics - Data Access Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-011,org-004,UrbanGrid Logistics - Agent Runtime Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-012,org-004,UrbanGrid Logistics - High Risk Action Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-013,org-005,EduNova Learning - Data Access Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-014,org-005,EduNova Learning - Agent Runtime Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
+policy-015,org-005,EduNova Learning - High Risk Action Policy,ACTIVE,ALLOW low risk; REVIEW medium/high risk; REFUSE unauthorized actions
