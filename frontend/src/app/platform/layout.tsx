@@ -97,15 +97,16 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
 
   const navGovernance = [
     { label: "Security", href: "/platform/security", icon: ShieldAlert },
-    { label: "Governance Policies", href: "/policies", icon: Shield },
-    { label: "Decision Black Box", href: "/decisions", icon: Activity },
+    { label: "Governance Policies", href: "/platform/governance", icon: Shield },
+    { label: "Decision Black Box", href: "/platform/decisions", icon: Activity },
+    { label: "Risk Scoring", href: "/platform/risk", icon: Activity },
     { label: "Audit Logs", href: "/platform/audit", icon: FileSearch },
     { label: "Reports", href: "/platform/reports", icon: FileText },
   ];
 
   const navSystem = [
-    { label: "API / Integrations", href: "/platform/integrations", icon: Cpu },
-    { label: "System Health", href: "/platform/system-health", icon: Server },
+    { label: "API / Integrations", href: "/platform/api", icon: Cpu },
+    { label: "System Health", href: "/platform/health", icon: Server },
     { label: "Platform Settings", href: "/platform/settings", icon: Settings },
   ];
 
@@ -352,12 +353,31 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
         </aside>
 
         {/* Main Section */}
-        <main className="flex-1 lg:ml-64 flex flex-col overflow-x-hidden bg-[#F4F6F8]">
+        <main className="flex-1 lg:ml-64 flex flex-col overflow-x-hidden bg-[#0A0D14]">
           {/* Top Header Bar */}
           <header className="bg-[#0F131D] border-b border-[#1E2638] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-30 shadow-sm">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-[20px] font-bold text-white tracking-tight">Platform Overview</h1>
+                <h1 className="text-[20px] font-bold text-white tracking-tight">
+                  {pathname === "/platform" && "Platform Overview"}
+                  {pathname === "/platform/organizations" && "Organization Directory"}
+                  {pathname === "/platform/users" && "Platform Users"}
+                  {pathname === "/platform/agents" && "AI Agent Directory"}
+                  {pathname === "/platform/licenses" && "Platform Licenses"}
+                  {pathname === "/platform/billing" && "Billing & Licenses"}
+                  {pathname === "/platform/analytics" && "Usage & Telemetry Analytics"}
+                  {pathname === "/platform/security" && "Platform Security"}
+                  {pathname === "/platform/governance" && "Governance Policies"}
+                  {pathname === "/platform/decisions" && "Decision Black Box"}
+                  {pathname === "/platform/risk" && "Platform Risk Scoring"}
+                  {pathname === "/platform/audit" && "Platform Audit Logs"}
+                  {pathname === "/platform/reports" && "Platform Reports"}
+                  {(pathname === "/platform/api" || pathname === "/platform/integrations") && "Platform API & Integrations"}
+                  {(pathname === "/platform/health" || pathname === "/platform/system-health" || pathname === "/platform/system") && "System Health"}
+                  {pathname === "/platform/settings" && "Platform Settings"}
+                  {pathname === "/platform/profile" && "Super Admin Platform Profile"}
+                  {!["/platform", "/platform/organizations", "/platform/users", "/platform/agents", "/platform/licenses", "/platform/billing", "/platform/analytics", "/platform/security", "/platform/governance", "/platform/decisions", "/platform/risk", "/platform/audit", "/platform/reports", "/platform/api", "/platform/integrations", "/platform/health", "/platform/system-health", "/platform/system", "/platform/settings", "/platform/profile"].includes(pathname) && "Platform Control Center"}
+                </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40 font-mono">
                   GLOBAL PLATFORM
                 </span>
