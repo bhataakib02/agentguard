@@ -91,19 +91,19 @@ export default function LoginPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[24px] font-bold text-[#1F1F1F]">Sign In to AgentGuard</h1>
-        <p className="text-[13px] text-[#666666]">
+        <h1 className="text-[20px] sm:text-[24px] font-bold text-[#1F1F1F] tracking-tight">Sign In to AgentGuard</h1>
+        <p className="text-[12px] sm:text-[13px] text-[#666666] mt-0.5">
           Access the Runtime Control Plane for Autonomous AI Employees
         </p>
       </div>
 
       {/* Auth Mode Toggle */}
-      <div className="flex bg-[#FCFCFA] p-1 border border-[#E8E8E4] rounded-[8px] text-[12px] font-bold">
+      <div className="flex bg-[#FCFCFA] p-1 border border-[#E8E8E4] rounded-[8px] text-[11px] sm:text-[12px] font-bold select-none">
         <button
           type="button"
           onClick={() => { setAuthMode("PASSWORD"); setError(null); setMessage(null); }}
-          className={`flex-1 py-1.5 rounded-[6px] transition-colors ${
-            authMode === "PASSWORD" ? "bg-white text-[#2E9D50] shadow-sm" : "text-[#666666]"
+          className={`flex-1 py-1.5 px-1 text-center rounded-[6px] transition-colors ${
+            authMode === "PASSWORD" ? "bg-white text-[#2E9D50] shadow-sm font-bold" : "text-[#666666]"
           }`}
         >
           Password Login
@@ -111,8 +111,8 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={() => { setAuthMode("OTP"); setError(null); setMessage(null); }}
-          className={`flex-1 py-1.5 rounded-[6px] transition-colors ${
-            authMode === "OTP" ? "bg-white text-[#2E9D50] shadow-sm" : "text-[#666666]"
+          className={`flex-1 py-1.5 px-1 text-center rounded-[6px] transition-colors ${
+            authMode === "OTP" ? "bg-white text-[#2E9D50] shadow-sm font-bold" : "text-[#666666]"
           }`}
         >
           Email OTP Passcode
