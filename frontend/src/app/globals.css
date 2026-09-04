@@ -6,10 +6,9 @@
   html,
   body,
   #__next,
-  * {
-    font-family: "Times New Roman", Times, serif !important;
-  }
-
+  *,
+  *::before,
+  *::after,
   input,
   textarea,
   select,
@@ -17,7 +16,13 @@
   option,
   table,
   th,
-  td {
+  td,
+  pre,
+  code,
+  kbd,
+  .font-sans,
+  .font-mono,
+  .font-serif {
     font-family: "Times New Roman", Times, serif !important;
   }
 }

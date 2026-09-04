@@ -266,32 +266,6 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
               })}
             </div>
 
-            {/* TENANT MANAGEMENT */}
-            <div className="space-y-1">
-              <div className="px-3 py-1 text-[10px] font-bold text-[#64748B] uppercase tracking-wider font-mono">
-                TENANT MANAGEMENT
-              </div>
-              {navTenant.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href + item.label}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-[8px] font-bold transition-all ${
-                      isActive
-                        ? "bg-[#173B25] text-white border border-[#2E9D50]/50"
-                        : "text-[#94A3B8] hover:bg-[#161C2A] hover:text-white"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 text-[#64748B]" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-
             {/* ACCOUNT */}
             <div className="space-y-1">
               <div className="px-3 py-1 text-[10px] font-bold text-[#64748B] uppercase tracking-wider font-mono">
@@ -307,16 +281,25 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-3 py-2 rounded-[8px] font-bold transition-all ${
                       isActive
-                        ? "bg-[#173B25] text-white border border-[#2E9D50]/50"
+                        ? "bg-[#173B25] text-white border border-[#2E9D50]/50 shadow-sm"
                         : "text-[#94A3B8] hover:bg-[#161C2A] hover:text-white"
                     }`}
                   >
-
-                    <Icon className="w-4 h-4 text-[#64748B]" />
+                    <Icon className={`w-4 h-4 ${isActive ? "text-[#2E9D50]" : "text-[#64748B]"}`} />
                     <span>{item.label}</span>
                   </Link>
                 );
               })}
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[8px] font-bold text-[#E53935] hover:bg-[#3B1516] transition-all text-left"
+              >
+                <LogOut className="w-4 h-4 text-[#E53935]" />
+                <span>Logout</span>
+              </button>
             </div>
           </div>
 
@@ -529,7 +512,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
           </header>
 
           {/* Main Dashboard Body */}
-          <div className="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
+          <div className="flex-1 p-3 sm:p-6 space-y-6 max-w-[1600px] w-full mx-auto">
             {children}
           </div>
         </main>
