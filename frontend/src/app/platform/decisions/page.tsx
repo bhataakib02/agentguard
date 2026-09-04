@@ -70,13 +70,13 @@ export default function PlatformDecisionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1E2638] pb-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-[22px] font-bold text-white tracking-tight">Decision Black Box</h1>
+            <h1 className="text-[22px] font-bold text-white tracking-tight">Decision Black Box Stream</h1>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40 font-mono">
               IMMUTABLE LEDGER
             </span>
           </div>
           <p className="text-[12px] text-[#94A3B8] mt-0.5">
-            Immutable log of governance decisions and intent evaluation records across all AI agents.
+            Immutable Log of Governance Decisions & Intent Evaluation Records
           </p>
         </div>
 
@@ -256,9 +256,46 @@ export default function PlatformDecisionsPage() {
                 </div>
               </div>
 
+              {/* Decision Provenance Flow Diagram */}
+              <div className="bg-[#161C2A] p-4 rounded-[8px] border border-[#232F48] space-y-3">
+                <h4 className="font-bold text-white text-[12px] uppercase font-mono text-[#2E9D50]">Provenance Evaluation Chain</h4>
+                <div className="flex flex-col items-center gap-2 py-2 text-[12px] font-mono">
+                  <div className="w-full p-2 bg-[#0A0D14] border border-[#2E9D50]/40 rounded text-center font-bold text-white flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#2E9D50]" />
+                    AI Agent: <span className="text-[#2E9D50]">{selectedTrace.agent_name}</span>
+                  </div>
+                  <div className="text-[#64748B] font-bold">↓</div>
+                  <div className="w-full p-2 bg-[#0A0D14] border border-[#1E2638] rounded text-center font-bold text-white">
+                    Requested Action: <span className="text-[#F59A23]">{selectedTrace.action}</span>
+                  </div>
+                  <div className="text-[#64748B] font-bold">↓</div>
+                  <div className="w-full p-2 bg-[#0A0D14] border border-[#1E2638] rounded text-center font-bold text-white">
+                    Policy Evaluation: <span className="text-[#94A3B8]">{selectedTrace.policy_applied}</span>
+                  </div>
+                  <div className="text-[#64748B] font-bold">↓</div>
+                  <div className="w-full p-2 bg-[#0A0D14] border border-[#1E2638] rounded text-center font-bold text-white">
+                    Risk Evaluation: Score <span className="text-[#2E9D50]">{selectedTrace.risk_score}</span>
+                  </div>
+                  <div className="text-[#64748B] font-bold">↓</div>
+                  <div className="w-full p-2 bg-[#0A0D14] border border-[#1E2638] rounded text-center font-bold text-white">
+                    Governance Rules Engine
+                  </div>
+                  <div className="text-[#64748B] font-bold">↓</div>
+                  <div className={`w-full p-2.5 rounded text-center font-bold text-[13px] border ${
+                    selectedTrace.decision === "ALLOW"
+                      ? "bg-[#173B25] text-[#2E9D50] border-[#2E9D50]"
+                      : selectedTrace.decision === "REVIEW"
+                      ? "bg-[#3D2910] text-[#F59A23] border-[#F59A23]"
+                      : "bg-[#3B1516] text-[#E53935] border-[#E53935]"
+                  }`}>
+                    Final Decision: {selectedTrace.decision}
+                  </div>
+                </div>
+              </div>
+
               {selectedTrace.provenance ? (
                 <div className="bg-[#161C2A] p-4 rounded-[8px] border border-[#232F48] space-y-2">
-                  <h4 className="font-bold text-white text-[12px] uppercase font-mono text-[#2E9D50]">Causal Chain Tree</h4>
+                  <h4 className="font-bold text-white text-[12px] uppercase font-mono text-[#2E9D50]">Causal Chain Ledger Record</h4>
                   <pre className="text-[11px] text-[#94A3B8] font-mono whitespace-pre-wrap overflow-x-auto p-2 bg-[#0A0D14] rounded border border-[#1E2638]">
                     {JSON.stringify(selectedTrace.provenance, null, 2)}
                   </pre>

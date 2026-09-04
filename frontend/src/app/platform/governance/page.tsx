@@ -99,14 +99,15 @@ export default function PlatformGovernancePage() {
                 <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4 text-center">Rules Count</th>
                 <th className="py-3.5 px-4">Enforcement Mode</th>
-                <th className="py-3.5 px-4">Created Date</th>
+                <th className="py-3.5 px-4">Created</th>
+                <th className="py-3.5 px-4">Updated</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E2638]">
               {policies.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-[#64748B] font-mono">
+                  <td colSpan={8} className="py-8 text-center text-[#64748B] font-mono">
                     No governance policies found matching current scope filter.
                   </td>
                 </tr>
@@ -142,9 +143,12 @@ export default function PlatformGovernancePage() {
                     <td className="py-3.5 px-4 font-mono text-[#64748B] text-[11px]">
                       {p.created_at ? new Date(p.created_at).toLocaleDateString() : "2026-08-15"}
                     </td>
+                    <td className="py-3.5 px-4 font-mono text-[#64748B] text-[11px]">
+                      {p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "2026-09-02"}
+                    </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
-                        onClick={() => alert(`Policy Details:\n${p.name}\nScope: ${p.org_name}\nRules: ${p.rules_count}`)}
+                        onClick={() => alert(`Policy Details:\n${p.name}\nScope: ${p.org_name}\nRules: ${p.rules_count}\nEnforcement: ${p.enforcement_mode}`)}
                         className="px-2.5 py-1 bg-[#161C2A] border border-[#232F48] text-[#94A3B8] hover:text-white rounded-[6px] text-[11px] font-bold transition-colors"
                       >
                         Inspect
