@@ -36,8 +36,8 @@ export default function ForgotPasswordPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[24px] font-bold text-[#1F1F1F]">Reset Password</h1>
-        <p className="text-[13px] text-[#666666]">
+        <h1 className="text-[20px] sm:text-[24px] font-bold text-[#1F1F1F] tracking-tight">Reset Password</h1>
+        <p className="text-[12px] sm:text-[13px] text-[#666666] mt-0.5">
           Enter your email address to receive password recovery link
         </p>
       </div>

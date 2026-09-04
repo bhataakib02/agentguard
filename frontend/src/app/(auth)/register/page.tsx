@@ -69,8 +69,8 @@ export default function RegisterPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[24px] font-bold text-[#1F1F1F]">Register Account</h1>
-        <p className="text-[13px] text-[#666666]">
+        <h1 className="text-[20px] sm:text-[24px] font-bold text-[#1F1F1F] tracking-tight">Register Account</h1>
+        <p className="text-[12px] sm:text-[13px] text-[#666666] mt-0.5">
           Initialize your AgentGuard Runtime Control Plane workspace
         </p>
       </div>
