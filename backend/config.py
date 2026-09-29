@@ -17,9 +17,23 @@ class Settings:
     # Environment configuration
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production").lower()
 
+    # CORS configuration
+    cors_origins_env: str = os.getenv("CORS_ORIGINS", "")
+    if cors_origins_env:
+        CORS_ORIGINS: list = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    else:
+        CORS_ORIGINS: list = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "https://agentguard.vercel.app",
+        ]
+
     # Supabase PostgreSQL Configuration
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "https://xjragvyzlailmtfwjfnm.supabase.co")
     SUPABASE_PUBLISHABLE_KEY: str = os.getenv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_ShxAT_hZy_0hMbhdceiw0A_7zB8Xjmq")
+    SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")
 
     # DATABASE_URL for Supabase PostgreSQL
     raw_db_url: str = os.getenv("DATABASE_URL", "")

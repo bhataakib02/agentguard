@@ -29,7 +29,7 @@ class InviteUserRequest(BaseModel):
     role: str  # USER, VIEWER, ANALYST, OPERATOR, SECURITY_ANALYST, MANAGER, DEVELOPER, ADMIN
     department: Optional[str] = "General"
     job_title: Optional[str] = None
-    password: Optional[str] = "Blackbird@12."
+    password: Optional[str] = None
 
 def get_org_initials(name: str) -> str:
     parts = name.strip().split(" ")

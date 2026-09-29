@@ -1,9 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from core.deps import get_current_user
+import models
 
 router = APIRouter(prefix="/impact", tags=["Impact Analysis"])
 
 @router.get("/metrics")
-def get_impact_metrics():
+def get_impact_metrics(
+    current_user: models.User = Depends(get_current_user)
+):
     return {
         "prevented_fraud_amount": "₹4,85,000.00",
         "autonomous_efficiency_gain": "94.2%",

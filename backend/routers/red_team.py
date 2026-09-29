@@ -1,23 +1,35 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
+from core.deps import get_current_user
 import models, schemas
 from engines.red_team_engine import red_team_engine
 
 router = APIRouter(prefix="/red-team", tags=["AgentGuard Red-Team Lab"])
 
 @router.get("/tests")
-def list_security_tests(db: Session = Depends(get_db)):
-    return db.query(models.SecurityTest).all()
+def list_security_tests(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.SecurityTest)
+    if current_user.role != "SUPER_ADMIN":
+        query = query.join(models.Agent).filter(models.Agent.org_id == current_user.org_id)
+    return query.all()
 
 @router.post("/run")
-def run_security_test(req: schemas.RedTeamRunRequest, db: Session = Depends(get_db)):
-    agent = db.query(models.Agent).filter((models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id)).first()
-    if not agent:
-        agent = db.query(models.Agent).first()
+def run_security_test(
+    req: schemas.RedTeamRunRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Agent).filter((models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id))
+    if current_user.role != "SUPER_ADMIN":
+        query = query.filter(models.Agent.org_id == current_user.org_id)
+    agent = query.first()
 
     if not agent:
-        raise HTTPException(status_code=404, detail="No registered AI agent available to test.")
+        raise HTTPException(status_code=404, detail="No authorized registered AI agent available to test.")
 
     res = red_team_engine.execute_test(agent_id=agent.id, attack_type=req.attack_type)
 

@@ -41,10 +41,10 @@ function VerifyOtpForm() {
       }
 
       if (data.session) {
-        document.cookie = `agentguard_token=${data.session.access_token}; path=/; max-age=86400`;
+        document.cookie = `agentguard_token=${data.session.access_token}; path=/; max-age=86400; SameSite=Lax`;
         localStorage.setItem("agentguard_token", data.session.access_token);
 
-        await fetchApi("/auth/login", {
+        const backendUser = await fetchApi("/auth/login", {
           method: "POST",
           body: JSON.stringify({
             email: data.user?.email || email,
@@ -52,7 +52,11 @@ function VerifyOtpForm() {
           }),
         });
 
-        router.push("/dashboard");
+        if (backendUser?.role === "SUPER_ADMIN") {
+          router.push("/platform");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         router.push("/login");
       }

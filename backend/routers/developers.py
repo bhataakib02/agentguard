@@ -1,9 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from core.deps import get_current_user
+import models
 
 router = APIRouter(prefix="/developers", tags=["Developer Platform & APIs"])
 
 @router.get("/docs-summary")
-def get_api_docs_summary():
+def get_api_docs_summary(
+    current_user: models.User = Depends(get_current_user)
+):
     return {
         "title": "AgentGuard Runtime Control Plane REST API",
         "version": "v1.0.0",

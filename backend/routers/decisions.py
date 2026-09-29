@@ -13,8 +13,14 @@ from core.deps import get_current_user
 router = APIRouter(prefix="/decisions", tags=["Decision Engine & Black Box"])
 
 @router.get("", response_model=list[schemas.DecisionSchema])
-def list_decisions(db: Session = Depends(get_db)):
-    return db.query(models.Decision).order_by(models.Decision.timestamp.desc()).all()
+def list_decisions(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Decision)
+    if current_user.role != "SUPER_ADMIN":
+        query = query.join(models.Agent).filter(models.Agent.org_id == current_user.org_id)
+    return query.order_by(models.Decision.timestamp.desc()).all()
 
 @router.post("/evaluate", response_model=schemas.DecisionSchema)
 async def evaluate_decision(
@@ -142,10 +148,18 @@ async def evaluate_decision(
     return decision
 
 @router.get("/{id}")
-def get_decision_detail(id: str, db: Session = Depends(get_db)):
+def get_decision_detail(
+    id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     dec = db.query(models.Decision).filter(models.Decision.id == id).first()
     if not dec:
         raise HTTPException(status_code=404, detail="Decision record not found")
+    
+    agent = db.query(models.Agent).filter(models.Agent.id == dec.agent_id).first()
+    if agent and current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+        raise HTTPException(status_code=403, detail="Forbidden: Decision record belongs to another organization")
     
     prov = db.query(models.ProvenanceEvent).filter(models.ProvenanceEvent.decision_id == dec.id).first()
     app_req = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.decision_id == dec.id).first()

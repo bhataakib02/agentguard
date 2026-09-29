@@ -80,7 +80,7 @@ export default function PlatformProfilePage() {
               </div>
               <div className="flex items-center gap-2 text-[13px] text-[#94A3B8] font-mono">
                 <Mail className="w-3.5 h-3.5 text-[#64748B]" />
-                <span>{profile?.email || "thefreelancer2076@gmail.com"}</span>
+                <span>{profile?.email || "—"}</span>
               </div>
             </div>
           </div>

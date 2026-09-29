@@ -39,94 +39,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const profile = await fetchApi("/auth/me");
       if (profile && profile.email) {
-        const isSuperAdminEmail = profile.email?.toLowerCase() === "thefreelancer2076@gmail.com";
         const fullProfile: UserProfile = {
           id: profile.id,
           auth_user_id: profile.auth_user_id || authUserId,
           email: profile.email,
           full_name: profile.full_name,
-          role: isSuperAdminEmail ? "SUPER_ADMIN" : (profile.role || "USER"),
+          role: profile.role || "USER",
           department: profile.department || "General",
-          org_name: profile.org_name || (isSuperAdminEmail ? "AgentGuard Control Plane" : "AgentGuard Enterprise"),
+          org_name: profile.org_name || (profile.role === "SUPER_ADMIN" ? "AgentGuard Control Plane" : "AgentGuard Enterprise"),
         };
         setUser(fullProfile);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("agentguard_user", JSON.stringify(fullProfile));
-        }
         return;
       }
     } catch (e) {
       console.warn("Backend profile sync notice:", e);
     }
 
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("agentguard_user");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (parsed && parsed.email && parsed.email.toLowerCase() === "thefreelancer2076@gmail.com") {
-            parsed.role = "SUPER_ADMIN";
-            parsed.full_name = "Super Admin Account";
-          }
-          setUser(parsed);
-          return;
-        } catch (err) {}
-      }
-    }
-
-    if (userEmail) {
-      const isSuperAdmin = userEmail.toLowerCase() === "thefreelancer2076@gmail.com";
-      const nameFromEmail = isSuperAdmin ? "Super Admin Account" : userEmail.split("@")[0].replace(".", " ").toUpperCase();
-      const fallbackRole = isSuperAdmin ? "SUPER_ADMIN" : "USER";
-      const fallbackUser: UserProfile = {
-        id: authUserId || "usr_session",
-        auth_user_id: authUserId,
-        email: userEmail,
-        full_name: nameFromEmail,
-        role: fallbackRole,
-        org_name: isSuperAdmin ? "AgentGuard Control Plane" : "AgentGuard Enterprise",
-      };
-      setUser(fallbackUser);
-    }
+    // No valid backend profile found: unauthenticated
+    setUser(null);
   };
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
       setSession(session);
       if (session?.user) {
-        document.cookie = `agentguard_token=${session.access_token}; path=/; max-age=86400`;
+        document.cookie = `agentguard_token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`;
         localStorage.setItem("agentguard_token", session.access_token);
-        fetchUserProfile(session.user.id, session.user.email);
+        await fetchUserProfile(session.user.id, session.user.email);
       } else {
         document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        if (typeof window !== "undefined") {
-          const stored = localStorage.getItem("agentguard_user");
-          if (stored) {
-            try {
-              const parsed = JSON.parse(stored);
-              if (parsed && (parsed.role === "SUPER_ADMIN" || parsed.email?.toLowerCase() === "thefreelancer2076@gmail.com")) {
-                setUser(parsed);
-                setLoading(false);
-                return;
-              }
-            } catch (e) {}
-          }
-          // Default Super Admin fallback for local QA & verification
-          const saUser: UserProfile = {
-            id: "sa-00000-00000-00001",
-            email: "thefreelancer2076@gmail.com",
-            full_name: "Super Admin Account",
-            role: "SUPER_ADMIN",
-            org_name: "AgentGuard Control Plane"
-          };
-          localStorage.setItem("agentguard_user", JSON.stringify(saUser));
-          setUser(saUser);
-        } else {
-          setUser(null);
-        }
+        localStorage.removeItem("agentguard_token");
+        localStorage.removeItem("agentguard_user");
+        setUser(null);
       }
       setLoading(false);
     });
@@ -137,9 +84,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
         if (session?.user) {
-          document.cookie = `agentguard_token=${session.access_token}; path=/; max-age=86400`;
+          document.cookie = `agentguard_token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`;
           localStorage.setItem("agentguard_token", session.access_token);
           await fetchUserProfile(session.user.id, session.user.email);
+        } else {
+          document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          localStorage.removeItem("agentguard_token");
+          localStorage.removeItem("agentguard_user");
+          setUser(null);
         }
       } else if (event === "SIGNED_OUT") {
         document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -159,13 +111,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setLoading(true);
     try {
+      await fetchApi("/auth/logout", { method: "POST" }).catch(() => {});
       await supabase.auth.signOut();
     } catch (e) {
-      console.warn("Supabase signOut notice:", e);
+      console.warn("Sign out notice:", e);
     } finally {
       document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
       localStorage.removeItem("agentguard_token");
       localStorage.removeItem("agentguard_user");
+      localStorage.removeItem("agentguard_selected_org_id");
       setUser(null);
       setSession(null);
       setLoading(false);

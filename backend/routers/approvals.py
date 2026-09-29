@@ -1,15 +1,23 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
 from ws_manager import manager as ws_manager
+from core.deps import get_current_user
 
 router = APIRouter(prefix="/approvals", tags=["Human Approvals"])
 
 @router.get("")
-def list_approvals(db: Session = Depends(get_db)):
-    reqs = db.query(models.ApprovalRequest).all()
+def list_approvals(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.ApprovalRequest)
+    if current_user.role != "SUPER_ADMIN":
+        query = query.join(models.Agent).filter(models.Agent.org_id == current_user.org_id)
+    reqs = query.all()
+
     res = []
     for r in reqs:
         agent = db.query(models.Agent).filter(models.Agent.id == r.agent_id).first()
@@ -28,10 +36,20 @@ def list_approvals(db: Session = Depends(get_db)):
     return res
 
 @router.post("/{id}/act")
-async def act_on_approval(id: str, req: schemas.ApprovalActionRequest, db: Session = Depends(get_db)):
+async def act_on_approval(
+    id: str,
+    req: schemas.ApprovalActionRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     app_req = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.id == id).first()
     if not app_req:
         raise HTTPException(status_code=404, detail="Approval request not found")
+
+    # Org isolation check
+    agent = db.query(models.Agent).filter(models.Agent.id == app_req.agent_id).first()
+    if agent and current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Approval belongs to another organization")
 
     new_status = "APPROVED" if req.action == "APPROVE" else "REJECTED"
     app_req.status = new_status

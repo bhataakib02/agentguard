@@ -2,25 +2,39 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
+from core.deps import get_current_user
 import models
 
 router = APIRouter(prefix="/analytics", tags=["Analytics & Intelligence"])
 
 @router.get("/overview")
-def get_analytics_overview(db: Session = Depends(get_db)):
-    total_agents = db.query(models.Agent).count()
-    active_agents = db.query(models.Agent).filter(models.Agent.status == "NORMAL").count()
-    suspended_agents = db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").count()
-    high_risk_agents = db.query(models.Agent).filter(models.Agent.risk_score > 60).count()
+def get_analytics_overview(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    agent_query = db.query(models.Agent)
+    dec_query = db.query(models.Decision)
+    app_query = db.query(models.ApprovalRequest)
 
-    total_decisions = db.query(models.Decision).count()
-    allowed_decisions = db.query(models.Decision).filter(models.Decision.decision == "ALLOW").count()
-    review_decisions = db.query(models.Decision).filter(models.Decision.decision == "REVIEW").count()
-    blocked_decisions = db.query(models.Decision).filter(models.Decision.decision == "REFUSE").count()
-    pending_approvals = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.status == "PENDING").count()
+    if current_user.role != "SUPER_ADMIN":
+        agent_query = agent_query.filter(models.Agent.org_id == current_user.org_id)
+        dec_query = dec_query.join(models.Agent).filter(models.Agent.org_id == current_user.org_id)
+        app_query = app_query.join(models.Agent).filter(models.Agent.org_id == current_user.org_id)
 
-    avg_risk = db.query(func.avg(models.Agent.risk_score)).scalar()
-    avg_trust = db.query(func.avg(models.Agent.trust_score)).scalar()
+    total_agents = agent_query.count()
+    active_agents = agent_query.filter(models.Agent.status == "NORMAL").count()
+    suspended_agents = agent_query.filter(models.Agent.status == "SUSPENDED").count()
+    high_risk_agents = agent_query.filter(models.Agent.risk_score > 60).count()
+
+    total_decisions = dec_query.count()
+    allowed_decisions = dec_query.filter(models.Decision.decision == "ALLOW").count()
+    review_decisions = dec_query.filter(models.Decision.decision == "REVIEW").count()
+    blocked_decisions = dec_query.filter(models.Decision.decision == "REFUSE").count()
+    pending_approvals = app_query.filter(models.ApprovalRequest.status == "PENDING").count()
+
+    agents = agent_query.all()
+    avg_risk = sum(a.risk_score for a in agents) / total_agents if total_agents > 0 else 0
+    avg_trust = sum(a.trust_score for a in agents) / total_agents if total_agents > 0 else 0
 
     return {
         "total_agents": total_agents,
@@ -32,6 +46,6 @@ def get_analytics_overview(db: Session = Depends(get_db)):
         "review_decisions": review_decisions,
         "blocked_decisions": blocked_decisions,
         "pending_approvals": pending_approvals,
-        "avg_risk_score": round(float(avg_risk), 1) if avg_risk is not None else 0,
-        "avg_trust_score": round(float(avg_trust), 1) if avg_trust is not None else 0
+        "avg_risk_score": round(float(avg_risk), 1),
+        "avg_trust_score": round(float(avg_trust), 1)
     }
