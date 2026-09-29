@@ -9,6 +9,7 @@ import re
 from database import get_db, engine
 from core.deps import get_current_user, require_super_admin, HUMAN_ROLES
 from core import security
+from core.supabase_admin import supabase_admin
 import models
 
 def slugify(text_val: str) -> str:
@@ -343,13 +344,23 @@ def create_organization(
 
     existing_admin = db.query(models.User).filter(models.User.email == payload.admin_email).first()
     if not existing_admin:
+        admin_plain_password = payload.admin_password or "Blackbird@12."
+
+        # Register in Supabase Auth first — gives us the auth_user_id
+        auth_uid = supabase_admin.create_user(
+            email=payload.admin_email,
+            password=admin_plain_password,
+            full_name=payload.admin_full_name,
+        )
+
         admin_user = models.User(
             org_id=org.id,
             email=payload.admin_email,
             full_name=payload.admin_full_name,
             role="ADMIN",
             department="Executive Management",
-            password_hash=security.get_password_hash(payload.admin_password or "Blackbird@12."),
+            password_hash=security.get_password_hash(admin_plain_password),
+            auth_user_id=auth_uid,   # None if service role key not configured — local-login fallback still works
             status="ACTIVE"
         )
         db.add(admin_user)

@@ -12,7 +12,11 @@ export default function ActivityFeedPage() {
     let ws: WebSocket | null = null;
 
     try {
-      ws = new WebSocket("ws://localhost:8000/ws");
+      const defaultWsUrl = typeof window !== "undefined" && window.location.protocol === "https:"
+        ? `wss://${window.location.host}/ws`
+        : "ws://localhost:8000/ws";
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || defaultWsUrl;
+      ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         setWsConnected(true);

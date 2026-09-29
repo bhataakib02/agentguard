@@ -1,10 +1,6 @@
 const getBaseApiUrl = () => {
-  if (typeof window !== "undefined") {
-    if (process.env.NEXT_PUBLIC_API_URL) {
-      return process.env.NEXT_PUBLIC_API_URL;
-    }
-  }
-  return "http://localhost:8000/api";
+  const url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  return url.replace(/\/+$/, "");
 };
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
@@ -20,7 +16,8 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     };
 
     const baseUrl = getBaseApiUrl();
-    const res = await fetch(`${baseUrl}${endpoint}`, {
+    const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const res = await fetch(`${baseUrl}${cleanEndpoint}`, {
       ...options,
       headers,
     });
