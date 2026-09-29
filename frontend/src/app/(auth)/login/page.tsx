@@ -24,20 +24,18 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      // 1. Supabase Auth Sign In
+      // 1. Try Supabase Auth first (covers users registered via the signup flow)
       const { data, error: authErr } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (authErr) throw new Error(authErr.message);
-
-      if (data.session) {
+      if (!authErr && data.session) {
+        // Supabase Auth succeeded — standard path
         document.cookie = `agentguard_token=${data.session.access_token}; path=/; max-age=86400`;
         localStorage.setItem("agentguard_token", data.session.access_token);
 
-        // 2. Sync user profile with FastAPI backend
-        await fetchApi("/auth/login", {
+        const backendUser = await fetchApi("/auth/login", {
           method: "POST",
           body: JSON.stringify({
             email: data.user.email,
@@ -45,18 +43,55 @@ export default function LoginPage() {
           }),
         });
 
-        if (data.user.email === "thefreelancer2076@gmail.com") {
+        if (backendUser?.role === "SUPER_ADMIN") {
           router.push("/platform");
         } else {
           router.push("/dashboard");
         }
+        return;
       }
+
+      // 2. Supabase Auth failed — try local password_hash fallback
+      //    (covers demo/seeded users who have a password_hash in the DB
+      //     but were never registered in Supabase Auth)
+      try {
+        const localUser = await fetchApi("/auth/local-login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (localUser?.access_token) {
+          document.cookie = `agentguard_token=${localUser.access_token}; path=/; max-age=86400`;
+          localStorage.setItem("agentguard_token", localUser.access_token);
+          localStorage.setItem("agentguard_user", JSON.stringify({
+            id: localUser.user_id,
+            email: localUser.email,
+            full_name: localUser.full_name,
+            role: localUser.role,
+            org_name: localUser.org_name,
+          }));
+
+          if (localUser.role === "SUPER_ADMIN") {
+            router.push("/platform");
+          } else {
+            router.push("/dashboard");
+          }
+          return;
+        }
+      } catch {
+        // local login also failed — fall through to show original Supabase error
+      }
+
+      // Both paths failed — show the original Supabase error
+      throw new Error(authErr?.message || "Invalid login credentials");
+
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please verify your credentials.");
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -15,6 +15,10 @@ class LoginRequest(BaseModel):
     password: Optional[str] = None
     auth_user_id: Optional[str] = None
 
+class LocalLoginRequest(BaseModel):
+    email: str
+    password: str
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

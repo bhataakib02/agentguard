@@ -69,7 +69,40 @@ app.include_router(system.router, prefix=settings.API_V1_STR)
 app.include_router(settings_router.router, prefix=settings.API_V1_STR)
 app.include_router(notifications.router, prefix=settings.API_V1_STR)
 
+import logging
+from core.supabase_admin import supabase_admin
+from database import SessionLocal
+import models
+
+logger = logging.getLogger("agentguard.startup")
+
+@app.on_event("startup")
+def validate_auth_and_config():
+    if supabase_admin.is_configured:
+        logger.info("[AgentGuard] Supabase Admin Auth: ACTIVE (Service Role Key configured)")
+    else:
+        logger.warning(
+            "[AgentGuard] Supabase Admin Auth: SUPABASE_SERVICE_ROLE_KEY not configured. "
+            "New org/invite users will have local password fallback only."
+        )
+
+    try:
+        db = SessionLocal()
+        users_count = db.query(models.User).count()
+        users_with_supabase = db.query(models.User).filter(models.User.auth_user_id != None).count()
+        users_with_local_hash = db.query(models.User).filter(models.User.password_hash != None).count()
+        logger.info(
+            f"[AgentGuard] Auth Audit: {users_count} total users | "
+            f"{users_with_supabase} linked to Supabase Auth | "
+            f"{users_with_local_hash} with local password hash"
+        )
+        db.close()
+    except Exception as e:
+        logger.warning(f"[AgentGuard] Startup user audit notice: {e}")
+
 @app.get("/")
+@app.get("/health")
+@app.get(f"{settings.API_V1_STR}/health")
 def root():
     return {
         "platform": settings.PROJECT_NAME,

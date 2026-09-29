@@ -7,6 +7,7 @@ import datetime
 from database import get_db
 from core.deps import get_current_user, require_admin, check_org_isolation, check_license_limit, get_effective_org_id, HUMAN_ROLES
 from core import security
+from core.supabase_admin import supabase_admin
 import models
 
 router = APIRouter(prefix="/organization", tags=["Organization Tenant Administration"])
@@ -294,7 +295,14 @@ def invite_user_to_organization(
         else:
             raise HTTPException(status_code=400, detail="User with this email already belongs to another organization")
 
-    # 4. Create User
+    # 4. Create User — register in Supabase Auth first, then in app DB
+    plain_password = payload.password or "Blackbird@12."
+    auth_uid = supabase_admin.create_user(
+        email=payload.email,
+        password=plain_password,
+        full_name=payload.full_name,
+    )
+
     new_user = models.User(
         org_id=current_user.org_id,
         email=payload.email,
@@ -302,7 +310,8 @@ def invite_user_to_organization(
         role=target_role,
         department=payload.department or "General",
         job_title=payload.job_title,
-        password_hash=security.get_password_hash(payload.password or "Blackbird@12."),
+        password_hash=security.get_password_hash(plain_password),
+        auth_user_id=auth_uid,   # None if service role key not configured — local-login fallback still works
         status="ACTIVE"
     )
     db.add(new_user)

@@ -39,14 +39,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const profile = await fetchApi("/auth/me");
       if (profile && profile.email) {
+        const isSuperAdminEmail = profile.email?.toLowerCase() === "thefreelancer2076@gmail.com";
         const fullProfile: UserProfile = {
           id: profile.id,
           auth_user_id: profile.auth_user_id || authUserId,
           email: profile.email,
           full_name: profile.full_name,
-          role: (profile.email?.toLowerCase() === "thefreelancer2076@gmail.com") ? "SUPER_ADMIN" : (profile.role || "USER"),
+          role: isSuperAdminEmail ? "SUPER_ADMIN" : (profile.role || "USER"),
           department: profile.department || "General",
-          org_name: profile.org_name || ((profile.role === "SUPER_ADMIN" || profile.email?.toLowerCase() === "thefreelancer2076@gmail.com") ? "AgentGuard Control Plane" : "AgentGuard Enterprise"),
+          org_name: profile.org_name || (isSuperAdminEmail ? "AgentGuard Control Plane" : "AgentGuard Enterprise"),
         };
         setUser(fullProfile);
         if (typeof window !== "undefined") {

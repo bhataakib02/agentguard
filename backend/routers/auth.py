@@ -125,6 +125,57 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
         org_name=org_name
     )
 
+@router.post("/local-login", response_model=schemas.TokenResponse)
+def local_login(req: schemas.LocalLoginRequest, db: Session = Depends(get_db)):
+    """
+    Fallback login for users who have a local password_hash but no Supabase Auth account.
+    This covers demo/seeded users created directly in the database by seed scripts.
+    """
+    user = db.query(models.User).filter(models.User.email == req.email).first()
+
+    if not user or not user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+    if not security.verify_password(req.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+    if user.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is suspended or inactive"
+        )
+
+    org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
+    org_name = org.name if org else "AgentGuard Enterprise"
+
+    user.last_login_at = security.utcnow()
+    db.commit()
+
+    token = security.create_access_token(user.id)
+    session = models.Session(
+        user_id=user.id,
+        token=token,
+        expires_at=security.utcnow() + security.timedelta(hours=24)
+    )
+    db.add(session)
+    db.commit()
+
+    return schemas.TokenResponse(
+        access_token=token,
+        user_id=user.id,
+        auth_user_id=user.auth_user_id,
+        role=user.role,
+        full_name=user.full_name,
+        email=user.email,
+        org_name=org_name
+    )
+
 @router.get("/me", response_model=schemas.UserSchema)
 def get_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     org = db.query(models.Organization).filter(models.Organization.id == current_user.org_id).first()

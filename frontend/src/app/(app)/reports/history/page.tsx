@@ -25,8 +25,9 @@ export default function ReportHistoryPage() {
   }, []);
 
   const handleDownload = (reportId: string, filename: string) => {
-    const token = localStorage.getItem("token");
-    const downloadUrl = `http://localhost:8000/api/v1/reports/download/${reportId}`;
+    const token = localStorage.getItem("agentguard_token") || localStorage.getItem("token");
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/+$/, "");
+    const downloadUrl = `${baseUrl}/reports/download/${reportId}`;
 
     fetch(downloadUrl, {
       headers: { Authorization: `Bearer ${token}` },
