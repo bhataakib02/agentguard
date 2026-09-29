@@ -1,7 +1,7 @@
 import datetime
 import uuid
 from sqlalchemy import (
-    Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON
+    Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON, Index
 )
 from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects.postgresql import UUID
@@ -379,13 +379,20 @@ class SecurityIncident(Base):
     __tablename__ = "security_incidents"
 
     id = Column(GUID(), primary_key=True, default=gen_uuid)
-    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False, index=True)
     agent_id = Column(GUID(), ForeignKey("agents.id"), nullable=True)
     title = Column(String, nullable=False)
-    severity = Column(String, default="HIGH")
-    status = Column(String, default="OPEN")
+    description = Column(Text, nullable=True)
+    severity = Column(String, default="HIGH")  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+    status = Column(String, default="OPEN")    # OPEN, INVESTIGATING, CONTAINED, RESOLVED, CLOSED
+    source = Column(String, default="SYSTEM")  # SYSTEM, POLICY_ENGINE, CIRCUIT_BREAKER, ANOMALY_DETECTOR, AUDIT, MANUAL
+    affected_user_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
+    assigned_to_user_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
+    resolution_notes = Column(Text, nullable=True)
     timeline_json = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
 
 
 class CircuitBreaker(Base):
@@ -421,14 +428,15 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(GUID(), primary_key=True, default=gen_uuid)
-    event_type = Column(String, nullable=False)
-    actor_type = Column(String, default="AGENT")
-    actor_id = Column(String, nullable=False)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=True, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    actor_type = Column(String, default="AGENT")  # USER, AGENT, SYSTEM, API_KEY
+    actor_id = Column(String, nullable=False, index=True)
     action = Column(String, nullable=False)
     resource = Column(String, nullable=False)
-    result = Column(String, nullable=False)
+    result = Column(String, nullable=False)  # SUCCESS, DENIED, FAILED, BLOCKED
     metadata_json = Column(JSON, default=dict)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
 
 
 class AgentRelationship(Base):
@@ -445,13 +453,34 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     id = Column(GUID(), primary_key=True, default=gen_uuid)
-    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False, index=True)
+    owner_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
-    key_prefix = Column(String, nullable=False)
-    key_hash = Column(String, nullable=False)
+    key_prefix = Column(String, nullable=False, index=True)  # e.g. "ag_live_1234"
+    key_hash = Column(String, nullable=False, unique=True, index=True)  # SHA-256 of raw secret
     scopes = Column(String, default="read,write")
+    is_revoked = Column(Boolean, default=False, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    revoked_by_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
+    last_used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)
+
+
+class UserInvitation(Base):
+    """Secure, cryptographic, one-time-use tenant user invitation."""
+    __tablename__ = "user_invitations"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False, index=True)
+    email = Column(String, nullable=False, index=True)
+    role = Column(String, default="USER", nullable=False)
+    invited_by_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String, nullable=False, unique=True, index=True)  # SHA-256 hash of random invite token
+    status = Column(String, default="PENDING", nullable=False)  # PENDING, ACCEPTED, EXPIRED, REVOKED
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    accepted_at = Column(DateTime, nullable=True)
 
 
 class AiModel(Base):
@@ -536,8 +565,16 @@ class Notification(Base):
     title = Column(String, nullable=False)
     message = Column(String, nullable=False)
     severity = Column(String, default="INFO")
-    read = Column(Boolean, default=False)
+    is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    @property
+    def read(self) -> bool:
+        return bool(self.is_read)
+
+    @read.setter
+    def read(self, val: bool):
+        self.is_read = bool(val)
 
 
 class ReportHistory(Base):
@@ -570,5 +607,160 @@ class ScheduledReport(Base):
     last_run_at = Column(DateTime, nullable=True)
     next_run_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class WebhookEndpoint(Base):
+    __tablename__ = "webhook_endpoints"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False)
+    name = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    secret_hash = Column(String, nullable=False)  # SHA256 hashed secret for verification
+    secret_preview = Column(String, nullable=True)  # Masked preview e.g. "whsec_****12ab"
+    secret_key = Column(String, nullable=True)  # Securely stored signing key
+    is_active = Column(Boolean, default=True)
+    event_types = Column(JSON, default=list)  # ["*"] or specific events
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    organization = relationship("Organization")
+    deliveries = relationship("WebhookDelivery", back_populates="endpoint", cascade="all, delete-orphan")
+
+
+class WebhookDelivery(Base):
+    __tablename__ = "webhook_deliveries"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    webhook_id = Column(GUID(), ForeignKey("webhook_endpoints.id"), nullable=False)
+    event_type = Column(String, nullable=False)
+    status = Column(String, default="PENDING")  # PENDING, DELIVERING, DELIVERED, SUCCESS, RETRYING, FAILED, DEAD_LETTER
+    response_code = Column(Integer, nullable=True)
+    attempt_count = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+    payload_json = Column(JSON, default=dict)
+    response_body_preview = Column(String(500), nullable=True)  # First 500 chars of response for debugging
+    next_attempt_at = Column(DateTime, nullable=True)            # Scheduled retry time
+    delivered_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    endpoint = relationship("WebhookEndpoint", back_populates="deliveries")
+
+    __table_args__ = (
+        Index("ix_webhook_delivery_status_next", "status", "next_attempt_at"),
+    )
+
+
+# ============================================================================
+# PHASE 4: Runtime Telemetry, Cost Governance & Risk Signals
+# ============================================================================
+
+class AgentExecution(Base):
+    """Tracks individual agent execution/invocation events with token/cost telemetry."""
+    __tablename__ = "agent_executions"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False)
+    agent_id = Column(GUID(), ForeignKey("agents.id"), nullable=False)
+    request_id = Column(String, nullable=True, index=True)          # correlation ID
+    execution_id = Column(String, nullable=False, index=True)       # unique execution trace
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    action = Column(String, nullable=True)                          # intent / action
+    resource = Column(String, nullable=True)                        # target resource
+    outcome = Column(String, nullable=False, default="EXECUTED")    # EXECUTED, BLOCKED, PENDING_APPROVAL, ERROR
+    risk_score = Column(Integer, default=0)
+    policy_decision = Column(String, nullable=True)                 # ALLOW, REVIEW, REFUSE
+    policy_id = Column(GUID(), nullable=True)
+    policy_rule_id = Column(GUID(), nullable=True)
+    decision_id = Column(GUID(), ForeignKey("decisions.id"), nullable=True)
+    input_token_count = Column(Integer, default=0)
+    output_token_count = Column(Integer, default=0)
+    total_token_count = Column(Integer, default=0)
+    estimated_cost = Column(Float, default=0.0)
+    provider = Column(String, nullable=True)                        # OpenAI, Anthropic, Google, etc.
+    model_name = Column(String, nullable=True)
+    latency_ms = Column(Integer, default=0)
+    status = Column(String, default="COMPLETED")                    # COMPLETED, ERROR, TIMEOUT
+    error_code = Column(String, nullable=True)
+    metadata_json = Column(JSON, default=dict)                      # safe non-sensitive metadata
+
+    __table_args__ = (
+        Index("ix_agent_executions_org_ts", "org_id", "timestamp"),
+        Index("ix_agent_executions_agent_ts", "agent_id", "timestamp"),
+    )
+
+
+class ModelPricing(Base):
+    """Configurable pricing for AI model providers. Used for deterministic cost calculation."""
+    __tablename__ = "model_pricing"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    provider = Column(String, nullable=False)                       # e.g. "openai", "anthropic", "google"
+    model = Column(String, nullable=False)                          # e.g. "gpt-4o", "claude-3-opus"
+    input_cost_per_1k = Column(Float, nullable=False, default=0.0)  # cost per 1000 input tokens
+    output_cost_per_1k = Column(Float, nullable=False, default=0.0) # cost per 1000 output tokens
+    currency = Column(String, default="USD")
+    effective_from = Column(DateTime, default=datetime.datetime.utcnow)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_model_pricing_provider_model", "provider", "model"),
+    )
+
+
+class AgentBudgetConfig(Base):
+    """Configurable budget limits and thresholds for agent/org cost governance."""
+    __tablename__ = "agent_budget_configs"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False)
+    agent_id = Column(GUID(), ForeignKey("agents.id"), nullable=True)  # NULL = org-level default
+    daily_token_limit = Column(Integer, nullable=True)
+    monthly_token_limit = Column(Integer, nullable=True)
+    daily_cost_limit = Column(Float, nullable=True)
+    monthly_cost_limit = Column(Float, nullable=True)
+    execution_count_limit = Column(Integer, nullable=True)           # daily execution cap
+    warning_threshold_pct = Column(Float, default=80.0)              # 80% → WARNING
+    exceeded_threshold_pct = Column(Float, default=100.0)            # 100% → EXCEEDED
+    auto_suspend_on_exceeded = Column(Boolean, default=False)        # optionally suspend agent
+    budget_state = Column(String, default="NORMAL")                  # NORMAL, WARNING, EXCEEDED, SUSPENDED
+    current_daily_tokens = Column(Integer, default=0)
+    current_monthly_tokens = Column(Integer, default=0)
+    current_daily_cost = Column(Float, default=0.0)
+    current_monthly_cost = Column(Float, default=0.0)
+    current_daily_executions = Column(Integer, default=0)
+    last_reset_daily = Column(DateTime, default=datetime.datetime.utcnow)
+    last_reset_monthly = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_budget_config_org_agent", "org_id", "agent_id"),
+    )
+
+
+class RuntimeRiskSignal(Base):
+    """Deterministic runtime risk signals derived from telemetry and policy decisions."""
+    __tablename__ = "runtime_risk_signals"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False)
+    agent_id = Column(GUID(), ForeignKey("agents.id"), nullable=True)
+    signal_type = Column(String, nullable=False)                    # REPEATED_REFUSALS, HIGH_RISK_VOLUME, BUDGET_EXCEEDED, etc.
+    severity = Column(String, default="MEDIUM")                     # LOW, MEDIUM, HIGH, CRITICAL
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    evidence_json = Column(JSON, default=dict)                      # factual data backing the signal
+    status = Column(String, default="ACTIVE")                       # ACTIVE, ACKNOWLEDGED, RESOLVED, DISMISSED
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by = Column(GUID(), nullable=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_risk_signals_org_ts", "org_id", "timestamp"),
+        Index("ix_risk_signals_agent_ts", "agent_id", "timestamp"),
+        Index("ix_risk_signals_status", "status"),
+    )
 
 

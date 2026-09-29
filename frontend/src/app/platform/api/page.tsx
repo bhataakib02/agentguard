@@ -75,20 +75,20 @@ export default function PlatformApiIntegrationsPage() {
         <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Gateway Status</span>
           <h2 className="text-[24px] font-bold text-[#2E9D50] flex items-center gap-2">
-            <CheckCircle className="w-5 h-5" /> {apiData?.api_status || "Operational"}
+            <CheckCircle className="w-5 h-5" /> {loading ? "Loading..." : (apiData?.api_status || "Operational")}
           </h2>
         </div>
         <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Total Platform Keys</span>
-          <h2 className="text-[28px] font-bold text-white">{apiData?.total_api_keys ?? 18}</h2>
+          <h2 className="text-[28px] font-bold text-white">{loading ? "Loading..." : (apiData?.total_api_keys ?? 0)}</h2>
         </div>
         <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Active Webhooks</span>
-          <h2 className="text-[28px] font-bold text-white">{apiData?.active_webhooks ?? 14}</h2>
+          <h2 className="text-[28px] font-bold text-white">{loading ? "Loading..." : (apiData?.active_webhooks ?? 0)}</h2>
         </div>
         <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Delivery Success Rate</span>
-          <h2 className="text-[28px] font-bold text-[#2E9D50]">{apiData?.webhook_delivery_rate || "99.94%"}</h2>
+          <h2 className="text-[28px] font-bold text-[#2E9D50]">{loading ? "Loading..." : (apiData?.webhook_delivery_rate || "No data available")}</h2>
         </div>
       </div>
 
@@ -104,16 +104,12 @@ export default function PlatformApiIntegrationsPage() {
             </h3>
 
             <div className="space-y-3 text-[12px]">
-              {(apiData?.api_gateways || [
-                { name: "REST API Gateway (FastAPI)", status: "Operational", requests_24h: "1,420,890", error_rate: "0.01%" },
-                { name: "WebSocket Live Stream", status: "Operational", active_connections: 42, error_rate: "0.00%" },
-                { name: "Supabase Realtime Sync", status: "Operational", latency: "14ms", error_rate: "0.00%" }
-              ]).map((gw: any, idx: number) => (
+              {(apiData?.api_gateways || []).map((gw: any, idx: number) => (
                 <div key={idx} className="p-3.5 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between">
                   <div>
                     <span className="font-bold text-white block">{gw.name}</span>
                     <span className="text-[11px] text-[#64748B] font-mono">
-                      {gw.requests_24h ? `Requests (24h): ${gw.requests_24h}` : `Latency: ${gw.latency}`} • Error Rate: {gw.error_rate}
+                      {gw.requests_24h ? `Requests (24h): ${gw.requests_24h}` : `Latency: ${gw.latency || "Live"}`} • Error Rate: {gw.error_rate || "0.00%"}
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40 font-mono">
@@ -132,12 +128,7 @@ export default function PlatformApiIntegrationsPage() {
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
-              {(apiData?.connected_services || [
-                { name: "Database (Supabase PostgreSQL)", type: "Database", status: "Connected", last_sync: "Just now" },
-                { name: "Policy Engine Service", type: "Rules Engine", status: "Connected", last_sync: "Just now" },
-                { name: "Intent Engine (NLP Parser)", type: "AI Engine", status: "Connected", last_sync: "Just now" },
-                { name: "Provenance Ledger Engine", type: "Audit Trail", status: "Connected", last_sync: "Just now" }
-              ]).map((srv: any, idx: number) => (
+              {(apiData?.connected_services || []).map((srv: any, idx: number) => (
                 <div key={idx} className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white text-[13px]">{srv.name}</span>

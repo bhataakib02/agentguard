@@ -56,6 +56,17 @@ class AgentCreateRequest(BaseModel):
     org_id: Optional[str] = None
     owner_id: Optional[str] = None
 
+class AgentUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    department: Optional[str] = None
+    purpose: Optional[str] = None
+    model_name: Optional[str] = None
+    model_version: Optional[str] = None
+    environment: Optional[str] = None
+    autonomy_level: Optional[str] = None
+    daily_budget: Optional[float] = None
+    owner_id: Optional[str] = None
+
 class AgentSchema(BaseModel):
     id: str
     agent_code: str
@@ -140,3 +151,119 @@ class AssistantQueryResponse(BaseModel):
     answer: str
     data: Optional[Any] = None
     recommendations: Optional[List[str]] = None
+
+# --- Policy & Policy Rule Schemas ---
+
+class PolicyRuleCreateRequest(BaseModel):
+    condition_expression: str
+    decision_output: str = "REVIEW"  # ALLOW, REVIEW, REFUSE
+    risk_delta: int = 0
+    description: Optional[str] = None
+
+class PolicyRuleUpdateRequest(BaseModel):
+    condition_expression: Optional[str] = None
+    decision_output: Optional[str] = None
+    risk_delta: Optional[int] = None
+    description: Optional[str] = None
+
+class PolicyRuleSchema(BaseModel):
+    id: str
+    policy_id: str
+    condition_expression: str
+    decision_output: str
+    risk_delta: int
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class PolicyCreateRequest(BaseModel):
+    name: str
+    category: str = "GOVERNANCE"
+    priority: int = 1
+    status: str = "ACTIVE"
+    version: str = "1.0.0"
+    rules: Optional[List[PolicyRuleCreateRequest]] = None
+
+class PolicyUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    priority: Optional[int] = None
+    status: Optional[str] = None
+    version: Optional[str] = None
+
+class PolicySchema(BaseModel):
+    id: str
+    org_id: str
+    name: str
+    category: str
+    priority: int
+    status: str
+    version: str
+    created_at: datetime.datetime
+    rules: List[PolicyRuleSchema] = []
+    rules_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+# --- Webhook Schemas ---
+
+class WebhookCreateRequest(BaseModel):
+    name: str
+    url: str
+    event_types: Optional[List[str]] = ["*"]
+
+class WebhookUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = None
+    is_active: Optional[bool] = None
+    event_types: Optional[List[str]] = None
+
+class WebhookEndpointSchema(BaseModel):
+    id: str
+    org_id: str
+    name: str
+    url: str
+    secret_preview: Optional[str] = None
+    is_active: bool
+    event_types: List[str]
+    created_at: datetime.datetime
+    updated_at: Optional[datetime.datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class WebhookCreatedResponse(WebhookEndpointSchema):
+    secret: str  # Only returned once upon creation!
+
+class WebhookDeliverySchema(BaseModel):
+    id: str
+    webhook_id: str
+    event_type: str
+    status: str
+    response_code: Optional[int] = None
+    attempt_count: int
+    error_message: Optional[str] = None
+    delivered_at: Optional[datetime.datetime] = None
+    created_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Notification Schemas ---
+
+class NotificationSchema(BaseModel):
+    id: str
+    user_id: Optional[str] = None
+    type: str
+    title: str
+    message: str
+    severity: str
+    is_read: bool
+    created_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+

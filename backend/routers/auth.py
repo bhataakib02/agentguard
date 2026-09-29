@@ -1,3 +1,5 @@
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from database import get_db
@@ -286,3 +288,147 @@ def resend_verification_email(req: dict, db: Session = Depends(get_db)):
     db.commit()
 
     return {"status": "SUCCESS", "message": f"Verification email request recorded for {email}"}
+
+
+# ============================================================================
+# PHASE 5: INVITATION ACCEPTANCE & VERIFICATION
+# ============================================================================
+
+class AcceptInvitationRequest(BaseModel):
+    full_name: str
+    password: Optional[str] = None
+
+
+def _is_token_expired(dt):
+    if not dt:
+        return False
+    import datetime as _dt
+    now = _dt.datetime.utcnow()
+    if getattr(dt, 'tzinfo', None) is not None:
+        dt = dt.replace(tzinfo=None)
+    return dt < now
+
+
+@router.get("/invitations/{token}/verify")
+def verify_invitation(token: str, db: Session = Depends(get_db)):
+    """Validates an invitation token without consuming it."""
+    import hashlib
+    token_hash = hashlib.sha256(token.strip().encode("utf-8")).hexdigest()
+    inv = db.query(models.UserInvitation).filter(models.UserInvitation.token_hash == token_hash).first()
+    if not inv:
+        return {"valid": False, "error": "Invalid invitation token"}
+
+    if inv.status != "PENDING":
+        return {"valid": False, "error": f"Invitation is no longer valid (status: {inv.status})"}
+
+    if _is_token_expired(inv.expires_at):
+        inv.status = "EXPIRED"
+        db.commit()
+        return {"valid": False, "error": "Invitation token has expired"}
+
+    org = db.query(models.Organization).filter(models.Organization.id == inv.org_id).first()
+    return {
+        "valid": True,
+        "email": inv.email,
+        "role": inv.role,
+        "org_name": org.name if org else "AgentGuard Enterprise",
+        "expires_at": inv.expires_at.isoformat() if inv.expires_at else None
+    }
+
+
+@router.post("/invitations/{token}/accept", response_model=schemas.TokenResponse)
+def accept_invitation(
+    token: str,
+    req: AcceptInvitationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Accepts an organization invitation. Validates token hash, enforces one-time use,
+    activates/creates user in organization with assigned role, and returns access token.
+    """
+    import hashlib
+    token_hash = hashlib.sha256(token.strip().encode("utf-8")).hexdigest()
+    inv = db.query(models.UserInvitation).filter(models.UserInvitation.token_hash == token_hash).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invalid or non-existent invitation token")
+
+    if inv.status != "PENDING":
+        raise HTTPException(status_code=400, detail=f"Invitation has already been {inv.status.lower()}")
+
+    if _is_token_expired(inv.expires_at):
+        inv.status = "EXPIRED"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invitation token has expired")
+
+    org = db.query(models.Organization).filter(models.Organization.id == inv.org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization associated with invitation no longer exists")
+
+    # Find or create user
+    user = db.query(models.User).filter(models.User.email == inv.email).first()
+    if user:
+        user.org_id = inv.org_id
+        user.role = inv.role
+        user.status = "ACTIVE"
+        if req.full_name:
+            user.full_name = req.full_name
+        if req.password:
+            user.password_hash = security.get_password_hash(req.password)
+    else:
+        hashed_pw = security.get_password_hash(req.password) if req.password else None
+        user = models.User(
+            org_id=inv.org_id,
+            email=inv.email,
+            password_hash=hashed_pw,
+            full_name=req.full_name,
+            role=inv.role,
+            department="General",
+            status="ACTIVE"
+        )
+        db.add(user)
+
+    # Invalidate invitation (ONE-TIME USE)
+    inv.status = "ACCEPTED"
+    inv.accepted_at = security.utcnow()
+
+    db.commit()
+    db.refresh(user)
+
+    # Issue access token
+    access_token = security.create_access_token(user.id, email=user.email, role=user.role)
+    session = models.Session(
+        user_id=user.id,
+        token=access_token,
+        expires_at=security.utcnow() + security.timedelta(hours=24)
+    )
+    db.add(session)
+
+    # Transactional audit
+    audit = models.AuditLog(
+        org_id=user.org_id,
+        event_type="INVITATION_ACCEPTED",
+        actor_type="USER",
+        actor_id=str(user.id),
+        action="ACCEPT_INVITATION",
+        resource=f"invitation:{inv.id}",
+        result="SUCCESS",
+        metadata_json={
+            "user_id": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "org_id": str(user.org_id)
+        }
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.TokenResponse(
+        access_token=access_token,
+        user_id=user.id,
+        auth_user_id=user.auth_user_id,
+        role=user.role,
+        full_name=user.full_name,
+        email=user.email,
+        org_name=org.name
+    )
+

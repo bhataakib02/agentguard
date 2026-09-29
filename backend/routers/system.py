@@ -1,9 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from core.deps import get_current_user
+import models
 
 router = APIRouter(prefix="/system", tags=["System Health & Monitoring"])
 
 @router.get("/health")
-def get_system_health():
+def get_system_health(
+    current_user: models.User = Depends(get_current_user)
+):
     return {
         "status": "HEALTHY",
         "services": {

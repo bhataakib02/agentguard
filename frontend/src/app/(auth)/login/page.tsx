@@ -47,7 +47,13 @@ export default function LoginPage() {
         }),
       });
 
-      // 4. Authoritative routing based purely on backend database role
+      // 4. Update session token with backend-issued JWT containing role claims
+      if (backendUser?.access_token) {
+        document.cookie = `agentguard_token=${backendUser.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        localStorage.setItem("agentguard_token", backendUser.access_token);
+      }
+
+      // 5. Authoritative routing based purely on backend database role
       if (backendUser?.role === "SUPER_ADMIN") {
         router.push("/platform");
       } else {

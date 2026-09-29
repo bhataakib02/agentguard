@@ -5,7 +5,7 @@ import datetime
 import urllib.request
 import urllib.parse
 import logging
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, List, Set, Any
 from fastapi import Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -81,19 +81,77 @@ def verify_supabase_token(token: str) -> Optional[Tuple[str, str]]:
 
     return None
 
-HUMAN_ROLES = [
-    "USER",
-    "VIEWER",
-    "ANALYST",
-    "OPERATOR",
-    "SECURITY_ANALYST",
-    "MANAGER",
-    "DEVELOPER",
-    "ADMIN",
-    "SUPER_ADMIN"
-]
-
-MACHINE_ROLES = ["AGENT"]
+from core.permissions import (
+    HUMAN_ROLES,
+    MACHINE_ROLES,
+    ROLE_SUPER_ADMIN,
+    ROLE_ADMIN,
+    ROLE_DEVELOPER,
+    ROLE_MANAGER,
+    ROLE_SECURITY_ANALYST,
+    ROLE_OPERATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+    ROLE_USER,
+    ROLE_AGENT,
+    ROLE_LEVELS,
+    ROLE_PERMISSIONS_MATRIX,
+    get_role_level,
+    can_manage_role,
+    has_permission,
+    get_user_permissions,
+    # Permissions
+    PERM_ORGANIZATION_VIEW,
+    PERM_ORGANIZATION_UPDATE,
+    PERM_ORGANIZATION_SECURITY_UPDATE,
+    PERM_USER_VIEW,
+    PERM_USER_CREATE,
+    PERM_USER_UPDATE,
+    PERM_USER_SUSPEND,
+    PERM_USER_DELETE,
+    PERM_USER_ROLE_ASSIGN,
+    PERM_USER_INVITE,
+    PERM_AGENT_VIEW,
+    PERM_AGENT_CREATE,
+    PERM_AGENT_UPDATE,
+    PERM_AGENT_SUSPEND,
+    PERM_AGENT_RESUME,
+    PERM_AGENT_DELETE,
+    PERM_AGENT_BUDGET_UPDATE,
+    PERM_AGENT_POLICY_UPDATE,
+    PERM_POLICY_VIEW,
+    PERM_POLICY_CREATE,
+    PERM_POLICY_UPDATE,
+    PERM_POLICY_DELETE,
+    PERM_POLICY_ENABLE,
+    PERM_POLICY_DISABLE,
+    PERM_DECISION_VIEW,
+    PERM_DECISION_CREATE,
+    PERM_DECISION_REVIEW,
+    PERM_DECISION_APPROVE,
+    PERM_DECISION_REJECT,
+    PERM_AUDIT_VIEW,
+    PERM_AUDIT_EXPORT,
+    PERM_SECURITY_VIEW,
+    PERM_SECURITY_INCIDENT_CREATE,
+    PERM_SECURITY_INCIDENT_UPDATE,
+    PERM_SECURITY_INCIDENT_RESOLVE,
+    PERM_REPORT_VIEW,
+    PERM_REPORT_GENERATE,
+    PERM_REPORT_DOWNLOAD,
+    PERM_WEBHOOK_VIEW,
+    PERM_WEBHOOK_CREATE,
+    PERM_WEBHOOK_UPDATE,
+    PERM_WEBHOOK_DELETE,
+    PERM_WEBHOOK_RETRY,
+    PERM_TELEMETRY_VIEW,
+    PERM_TELEMETRY_EXPORT,
+    PERM_API_KEY_VIEW,
+    PERM_API_KEY_CREATE,
+    PERM_API_KEY_REVOKE,
+    PERM_PLATFORM_VIEW,
+    PERM_PLATFORM_ADMIN,
+)
 
 ROLE_PERMISSIONS = {
     "USER": ["dashboard:read", "profile:read", "profile:write"],
@@ -109,8 +167,66 @@ ROLE_PERMISSIONS = {
 
 def get_current_user(
     authorization: str = Header(None),
+    x_api_key: str = Header(None, alias="X-API-Key"),
     db: Session = Depends(get_db)
 ) -> models.User:
+    # -------------------------------------------------------------
+    # 1. API Key Authentication (X-API-Key or Bearer ag_live_...)
+    # -------------------------------------------------------------
+    raw_api_key = x_api_key
+    if not raw_api_key and authorization:
+        candidate = authorization.replace("Bearer ", "").strip()
+        if candidate.startswith("ag_live_"):
+            raw_api_key = candidate
+
+    if raw_api_key:
+        import hashlib
+        key_hash = hashlib.sha256(raw_api_key.strip().encode("utf-8")).hexdigest()
+        api_key = db.query(models.ApiKey).filter(models.ApiKey.key_hash == key_hash).first()
+        if not api_key:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid, revoked, or expired API key"
+            )
+        if api_key.is_revoked:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key has been revoked"
+            )
+        now_dt = datetime.datetime.utcnow()
+        if api_key.expires_at and api_key.expires_at < now_dt:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key has expired"
+            )
+
+        api_key.last_used_at = now_dt
+        db.commit()
+
+        if api_key.owner_id:
+            user = db.query(models.User).filter(models.User.id == api_key.owner_id).first()
+            if user:
+                if user.status != "ACTIVE":
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Forbidden: Account status is {user.status}"
+                    )
+                return user
+
+        # Virtual proxy user identity bound strictly to API key's organization
+        proxy_user = models.User(
+            id=api_key.id,
+            org_id=api_key.org_id,
+            email=f"apikey-{api_key.key_prefix}@agentguard.internal",
+            full_name=f"API Key: {api_key.name}",
+            role="DEVELOPER",
+            status="ACTIVE"
+        )
+        return proxy_user
+
+    # -------------------------------------------------------------
+    # 2. Bearer JWT Authentication
+    # -------------------------------------------------------------
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -196,6 +312,14 @@ def require_admin(current_user: models.User = Depends(get_current_user)) -> mode
         )
     return current_user
 
+def require_org_admin(current_user: models.User = Depends(get_current_user)) -> models.User:
+    if current_user.role not in ["ADMIN", "SUPER_ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Organization administrator privileges required"
+        )
+    return current_user
+
 def require_super_admin(current_user: models.User = Depends(get_current_user)) -> models.User:
     if current_user.role != "SUPER_ADMIN":
         raise HTTPException(
@@ -203,6 +327,31 @@ def require_super_admin(current_user: models.User = Depends(get_current_user)) -
             detail="Forbidden: Only SUPER_ADMIN can perform this action"
         )
     return current_user
+
+def require_permission(permission: str):
+    """Centralized dependency checking if the user's role grants the requested formal permission."""
+    def dependency(current_user: models.User = Depends(get_current_user)) -> models.User:
+        if current_user.role == "SUPER_ADMIN":
+            return current_user
+        perms = get_user_permissions(current_user.role)
+        if "*" in perms or permission in perms:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Missing required permission '{permission}'"
+        )
+    return dependency
+
+def require_role(allowed_roles: List[str]):
+    """Centralized dependency checking if the user belongs to one of allowed_roles (or SUPER_ADMIN)."""
+    def dependency(current_user: models.User = Depends(get_current_user)) -> models.User:
+        if current_user.role == "SUPER_ADMIN" or current_user.role in allowed_roles:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Requires one of roles: {', '.join(allowed_roles)}"
+        )
+    return dependency
 
 def check_org_isolation(current_user: models.User, target_org_id: str):
     if current_user.role == "SUPER_ADMIN":

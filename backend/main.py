@@ -10,7 +10,8 @@ from routers import (
     risk, trust, behavior, security, runtime, approvals, agent_network,
     provenance, audit, red_team, digital_twin, economics, impact,
     optimization, analytics, assistant, developers, integrations, system,
-    settings as settings_router, notifications, platform, organization, reports
+    settings as settings_router, notifications, platform, organization, reports, webhooks,
+    telemetry
 )
 
 # Initialize DB Tables
@@ -33,41 +34,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount all domain routers
-app.include_router(auth.router, prefix=settings.API_V1_STR)
-app.include_router(profile.router, prefix=settings.API_V1_STR)
-app.include_router(platform.router, prefix=settings.API_V1_STR)
-app.include_router(organization.router, prefix=settings.API_V1_STR)
-app.include_router(reports.router, prefix=settings.API_V1_STR)
-app.include_router(admin.router, prefix=settings.API_V1_STR)
-app.include_router(agents.router, prefix=settings.API_V1_STR)
-app.include_router(iam.router, prefix=settings.API_V1_STR)
-app.include_router(permissions.router, prefix=settings.API_V1_STR)
-app.include_router(capabilities.router, prefix=settings.API_V1_STR)
-app.include_router(policies.router, prefix=settings.API_V1_STR)
-app.include_router(ai.router, prefix=settings.API_V1_STR)
-app.include_router(decisions.router, prefix=settings.API_V1_STR)
-app.include_router(risk.router, prefix=settings.API_V1_STR)
-app.include_router(trust.router, prefix=settings.API_V1_STR)
-app.include_router(behavior.router, prefix=settings.API_V1_STR)
-app.include_router(security.router, prefix=settings.API_V1_STR)
-app.include_router(runtime.router, prefix=settings.API_V1_STR)
-app.include_router(approvals.router, prefix=settings.API_V1_STR)
-app.include_router(agent_network.router, prefix=settings.API_V1_STR)
-app.include_router(provenance.router, prefix=settings.API_V1_STR)
-app.include_router(audit.router, prefix=settings.API_V1_STR)
-app.include_router(red_team.router, prefix=settings.API_V1_STR)
-app.include_router(digital_twin.router, prefix=settings.API_V1_STR)
-app.include_router(economics.router, prefix=settings.API_V1_STR)
-app.include_router(impact.router, prefix=settings.API_V1_STR)
-app.include_router(optimization.router, prefix=settings.API_V1_STR)
-app.include_router(analytics.router, prefix=settings.API_V1_STR)
-app.include_router(assistant.router, prefix=settings.API_V1_STR)
-app.include_router(developers.router, prefix=settings.API_V1_STR)
-app.include_router(integrations.router, prefix=settings.API_V1_STR)
-app.include_router(system.router, prefix=settings.API_V1_STR)
-app.include_router(settings_router.router, prefix=settings.API_V1_STR)
-app.include_router(notifications.router, prefix=settings.API_V1_STR)
+# Mount all domain routers with both /api and /api/v1
+DOMAIN_ROUTERS = [
+    auth.router, profile.router, platform.router, organization.router,
+    reports.router, admin.router, agents.router, iam.router,
+    permissions.router, capabilities.router, policies.router, ai.router,
+    decisions.router, risk.router, trust.router, behavior.router,
+    security.router, runtime.router, approvals.router, agent_network.router,
+    provenance.router, audit.router, red_team.router, digital_twin.router,
+    economics.router, impact.router, optimization.router, analytics.router,
+    assistant.router, developers.router, integrations.router, system.router,
+    settings_router.router, notifications.router, webhooks.router,
+    telemetry.router
+]
+
+for r in DOMAIN_ROUTERS:
+    app.include_router(r, prefix=settings.API_V1_STR)
+    if settings.API_V1_STR != "/api/v1":
+        app.include_router(r, prefix="/api/v1")
 
 import logging
 from core.supabase_admin import supabase_admin
@@ -114,7 +98,10 @@ def root():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await ws_manager.connect(websocket)
+    # Accept org_id and role from query params for tenant-isolated streaming
+    org_id = websocket.query_params.get("org_id")
+    role = websocket.query_params.get("role", "USER")
+    await ws_manager.connect(websocket, org_id=org_id, role=role)
     try:
         while True:
             data = await websocket.receive_text()
@@ -126,3 +113,4 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
     except Exception:
         ws_manager.disconnect(websocket)
+
