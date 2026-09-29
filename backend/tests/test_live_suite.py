@@ -11,7 +11,7 @@ from main import app
 from database import engine, SessionLocal
 from config import settings
 import models
-from clean_demo_data import clean_all_demo_data
+from scripts.clean_demo_data import clean_all_demo_data
 
 def run_live_test_suite():
     print("==================================================")
