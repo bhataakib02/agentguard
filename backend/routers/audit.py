@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import get_db
+from core.deps import get_current_user
 import models
 
 router = APIRouter(prefix="/audit", tags=["Global Audit Center"])
 
 @router.get("/logs")
-def list_audit_logs(db: Session = Depends(get_db)):
-    return db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).all()
+def list_audit_logs(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.AuditLog)
+    if current_user.role != "SUPER_ADMIN":
+        query = query.filter(models.AuditLog.resource.contains(str(current_user.org_id)))
+    return query.order_by(models.AuditLog.timestamp.desc()).all()

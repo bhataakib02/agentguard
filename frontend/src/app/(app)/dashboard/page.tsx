@@ -52,7 +52,7 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    if (user?.role === "SUPER_ADMIN" || user?.email === "thefreelancer2076@gmail.com") {
+    if (user?.role === "SUPER_ADMIN") {
       router.push("/platform");
     } else {
       loadData();

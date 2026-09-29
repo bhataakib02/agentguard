@@ -1,9 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from core.deps import get_current_user
+import models
 
 router = APIRouter(prefix="/integrations", tags=["Integrations Hub"])
 
 @router.get("")
-def list_integrations():
+def list_integrations(
+    current_user: models.User = Depends(get_current_user)
+):
     return [
         {"name": "OpenAI LLM API", "category": "LLM Provider", "status": "CONNECTED", "health": "HEALTHY"},
         {"name": "Anthropic Claude API", "category": "LLM Provider", "status": "CONNECTED", "health": "HEALTHY"},

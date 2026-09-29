@@ -9,25 +9,12 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=schemas.TokenResponse)
 def register_organization(req: schemas.RegisterRequest, db: Session = Depends(get_db)):
-    # 1. Duplicate email check
+    # 1. Duplicate email check: Reject duplicate registrations to prevent account takeover
     existing_user = db.query(models.User).filter(models.User.email == req.email).first()
     if existing_user:
-        if req.auth_user_id and not existing_user.auth_user_id:
-            existing_user.auth_user_id = req.auth_user_id
-            db.commit()
-
-        org = db.query(models.Organization).filter(models.Organization.id == existing_user.org_id).first()
-        org_name = org.name if org else req.org_name
-
-        token = security.create_access_token(existing_user.id)
-        return schemas.TokenResponse(
-            access_token=token,
-            user_id=existing_user.id,
-            auth_user_id=existing_user.auth_user_id,
-            role=existing_user.role,
-            full_name=existing_user.full_name,
-            email=existing_user.email,
-            org_name=org_name
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email address already exists. Please log in."
         )
 
     # 2. Transactional Organization Creation
@@ -36,7 +23,7 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
     db.commit()
     db.refresh(org)
 
-    # 3. Transactional User Creation
+    # 3. Transactional User Creation (Strictly default to USER role)
     hashed_pw = security.get_password_hash(req.password) if req.password else None
     user = models.User(
         org_id=org.id,
@@ -45,14 +32,15 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
         password_hash=hashed_pw,
         full_name=req.full_name,
         role="USER",
-        department="General"
+        department="General",
+        status="ACTIVE"
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
     # 4. Session & Access Token Creation
-    token = security.create_access_token(user.id)
+    token = security.create_access_token(user.id, email=user.email, role=user.role)
     session = models.Session(
         user_id=user.id,
         token=token,
@@ -72,7 +60,55 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
     )
 
 @router.post("/login", response_model=schemas.TokenResponse)
-def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
+def login(
+    req: schemas.LoginRequest,
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+):
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token required"
+        )
+
+    token = authorization.replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token required"
+        )
+
+    verified_user_id = None
+    verified_email = None
+
+    from config import settings
+    from jose import jwt, JWTError
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        verified_user_id = payload.get("sub")
+        verified_email = payload.get("email")
+    except JWTError:
+        from core.deps import verify_supabase_token
+        verified = verify_supabase_token(token)
+        if not verified:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid, expired, or unverified authentication token"
+            )
+        verified_user_id, verified_email = verified
+
+    # Validate that verified token matches the requested login account
+    if verified_email and verified_email.lower() != req.email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authentication token does not match requested email"
+        )
+    if verified_user_id and req.auth_user_id and str(verified_user_id) != str(req.auth_user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authentication token does not match requested auth_user_id"
+        )
+
     user = db.query(models.User).filter(models.User.email == req.email).first()
 
     if not user and req.auth_user_id:
@@ -87,7 +123,7 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
 
         user = models.User(
             org_id=org.id,
-            auth_user_id=req.auth_user_id,
+            auth_user_id=req.auth_user_id or verified_user_id,
             email=req.email,
             full_name=req.email.split('@')[0].replace('.', ' ').title(),
             role="USER",
@@ -100,23 +136,29 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
         user.auth_user_id = req.auth_user_id
         db.commit()
 
+    if user.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Account status is {user.status}"
+        )
+
     org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
     org_name = org.name if org else "AgentGuard Enterprise"
 
     user.last_login_at = security.utcnow()
     db.commit()
 
-    token = security.create_access_token(user.id)
+    session_token = security.create_access_token(user.id, email=user.email, role=user.role)
     session = models.Session(
         user_id=user.id,
-        token=token,
+        token=session_token,
         expires_at=security.utcnow() + security.timedelta(hours=24)
     )
     db.add(session)
     db.commit()
 
     return schemas.TokenResponse(
-        access_token=token,
+        access_token=session_token,
         user_id=user.id,
         auth_user_id=user.auth_user_id,
         role=user.role,
@@ -157,7 +199,7 @@ def local_login(req: schemas.LocalLoginRequest, db: Session = Depends(get_db)):
     user.last_login_at = security.utcnow()
     db.commit()
 
-    token = security.create_access_token(user.id)
+    token = security.create_access_token(user.id, email=user.email, role=user.role)
     session = models.Session(
         user_id=user.id,
         token=token,
@@ -193,6 +235,34 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
         created_at=current_user.created_at,
         org_name=org_name
     )
+
+@router.post("/logout")
+def logout(
+    authorization: str = Header(None),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if authorization:
+        token = authorization.replace("Bearer ", "").strip()
+        db_session = db.query(models.Session).filter(models.Session.token == token).first()
+        if db_session:
+            db_session.revoked = True
+            db.commit()
+
+    # Log audit entry
+    audit = models.AuditLog(
+        event_type="USER_LOGOUT",
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action="Logged out and revoked session",
+        resource="sessions",
+        result="SUCCESS",
+        metadata_json={"user_id": str(current_user.id), "email": current_user.email}
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"status": "SUCCESS", "message": "Logged out successfully and session revoked"}
 
 @router.post("/resend-verification")
 def resend_verification_email(req: dict, db: Session = Depends(get_db)):

@@ -224,7 +224,7 @@ export default function PlatformSettingsPage() {
               <div className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between">
                 <div>
                   <span className="font-bold text-white block">Email Alerts</span>
-                  <span className="text-[11px] text-[#64748B]">Send critical security alerts to thefreelancer2076@gmail.com</span>
+                  <span className="text-[11px] text-[#64748B]">Send critical security alerts to platform administrator</span>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] font-mono">ACTIVE</span>
               </div>

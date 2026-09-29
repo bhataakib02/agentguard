@@ -9,6 +9,7 @@ const PUBLIC_AUTH_ROUTES = [
   "/reset-password",
   "/verify-otp",
   "/verify-email",
+  "/403",
   "/unauthorized",
 ];
 
@@ -32,7 +33,6 @@ export function middleware(request: NextRequest) {
 
   const token =
     request.cookies.get("agentguard_token")?.value ||
-    request.cookies.get("sb-xjragvyzlailmtfwjfnm-auth-token")?.value ||
     supabaseCookie;
 
   const isPublicRoute = PUBLIC_AUTH_ROUTES.some((route) => {
@@ -42,9 +42,43 @@ export function middleware(request: NextRequest) {
     return pathname === route || pathname.startsWith(`${route}/`);
   });
 
-  // Redirect unauthenticated users accessing protected routes to the landing page '/'
+  // Redirect unauthenticated users accessing protected routes to /login
   if (!token && !isPublicRoute) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Helper to safely parse JWT claims on the Edge runtime
+  function parseJwtPayload(jwtStr: string): any {
+    try {
+      const parts = jwtStr.split(".");
+      if (parts.length < 2) return null;
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      return JSON.parse(jsonPayload);
+    } catch {
+      return null;
+    }
+  }
+
+  // Edge-level protection for /platform control plane routes
+  if (pathname === "/platform" || pathname.startsWith("/platform/")) {
+    if (!token) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    const claims = parseJwtPayload(token);
+    if (claims && claims.role && claims.role !== "SUPER_ADMIN") {
+      return NextResponse.redirect(new URL("/403", request.url));
+    }
   }
 
   // Redirect logged-in users attempting to access login/register pages to '/dashboard'

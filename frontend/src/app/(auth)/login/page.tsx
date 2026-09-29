@@ -24,67 +24,35 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      // 1. Try Supabase Auth first (covers users registered via the signup flow)
+      // 1. Authenticate via Supabase Auth
       const { data, error: authErr } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (!authErr && data.session) {
-        // Supabase Auth succeeded — standard path
-        document.cookie = `agentguard_token=${data.session.access_token}; path=/; max-age=86400`;
-        localStorage.setItem("agentguard_token", data.session.access_token);
-
-        const backendUser = await fetchApi("/auth/login", {
-          method: "POST",
-          body: JSON.stringify({
-            email: data.user.email,
-            auth_user_id: data.user.id,
-          }),
-        });
-
-        if (backendUser?.role === "SUPER_ADMIN") {
-          router.push("/platform");
-        } else {
-          router.push("/dashboard");
-        }
-        return;
+      if (authErr || !data.session) {
+        throw new Error(authErr?.message || "Invalid login credentials");
       }
 
-      // 2. Supabase Auth failed — try local password_hash fallback
-      //    (covers demo/seeded users who have a password_hash in the DB
-      //     but were never registered in Supabase Auth)
-      try {
-        const localUser = await fetchApi("/auth/local-login", {
-          method: "POST",
-          body: JSON.stringify({ email, password }),
-        });
+      // 2. Set authenticated token in cookie and localStorage
+      document.cookie = `agentguard_token=${data.session.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      localStorage.setItem("agentguard_token", data.session.access_token);
 
-        if (localUser?.access_token) {
-          document.cookie = `agentguard_token=${localUser.access_token}; path=/; max-age=86400`;
-          localStorage.setItem("agentguard_token", localUser.access_token);
-          localStorage.setItem("agentguard_user", JSON.stringify({
-            id: localUser.user_id,
-            email: localUser.email,
-            full_name: localUser.full_name,
-            role: localUser.role,
-            org_name: localUser.org_name,
-          }));
+      // 3. Sync with backend authoritative profile
+      const backendUser = await fetchApi("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: data.user.email,
+          auth_user_id: data.user.id,
+        }),
+      });
 
-          if (localUser.role === "SUPER_ADMIN") {
-            router.push("/platform");
-          } else {
-            router.push("/dashboard");
-          }
-          return;
-        }
-      } catch {
-        // local login also failed — fall through to show original Supabase error
+      // 4. Authoritative routing based purely on backend database role
+      if (backendUser?.role === "SUPER_ADMIN") {
+        router.push("/platform");
+      } else {
+        router.push("/dashboard");
       }
-
-      // Both paths failed — show the original Supabase error
-      throw new Error(authErr?.message || "Invalid login credentials");
-
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please verify your credentials.");
     } finally {

@@ -26,7 +26,7 @@ class CreateOrgRequest(BaseModel):
     plan_id: Optional[str] = "STARTER"
     admin_email: str
     admin_full_name: str
-    admin_password: Optional[str] = "Blackbird@12."
+    admin_password: Optional[str] = None
 
 class UpdateOrgStatusRequest(BaseModel):
     status: str  # ACTIVE, SUSPENDED, RESTRICTED, DEACTIVATED
@@ -162,7 +162,7 @@ def get_platform_overview(
 
 @router.get("/plans")
 def list_plans(
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_super_admin),
     db: Session = Depends(get_db)
 ):
     plans = db.query(models.Plan).all()
@@ -892,7 +892,7 @@ def get_platform_settings(
             "platform_name": "AGENTGUARD Platform Control Center",
             "platform_description": "Enterprise AI Agent Security, Governance & Multi-Tenant Control Plane",
             "platform_timezone": "UTC (Coordinated Universal Time)",
-            "admin_alert_email": "thefreelancer2076@gmail.com"
+            "admin_alert_email": current_user.email
         },
         "security": {
             "session_ttl_minutes": 480,
