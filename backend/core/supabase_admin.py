@@ -5,6 +5,9 @@ Centralised module for all server-side Supabase Auth operations that require
 the Service Role Key (e.g. creating users without email confirmation, setting
 passwords server-side, deleting auth accounts).
 
+This module uses Python's standard library `urllib` exclusively so it has
+ZERO external dependencies and will NEVER fail with ModuleNotFoundError.
+
 Usage
 -----
 from core.supabase_admin import supabase_admin
@@ -21,20 +24,23 @@ It should ONLY be set in the backend environment (Render.com environment variabl
 """
 
 import os
+import json
 import logging
-import requests
-from typing import Optional
+import urllib.request
+import urllib.parse
+import urllib.error
+from typing import Optional, Any, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class SupabaseAdminClient:
     """
-    Thin HTTP wrapper around the Supabase Auth Admin API.
+    HTTP wrapper around the Supabase Auth Admin API using Python's standard library.
 
-    If SUPABASE_SERVICE_ROLE_KEY is not set, all operations are no-ops
-    (return None) so that local development without the key doesn't crash.
-    In production this key MUST be set for full auth sync to work.
+    If SUPABASE_SERVICE_ROLE_KEY is not set, all operations are safe no-ops
+    (return None/False) so that local development without the key doesn't crash.
+    In production this key can be set for full Supabase Auth sync.
     """
 
     def __init__(self):
@@ -42,7 +48,7 @@ class SupabaseAdminClient:
             "SUPABASE_URL",
             "https://xjragvyzlailmtfwjfnm.supabase.co"
         ).rstrip("/")
-        self.service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+        self.service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
         self.admin_api = f"{self.supabase_url}/auth/v1/admin/users"
 
         if not self.service_role_key:
@@ -55,16 +61,43 @@ class SupabaseAdminClient:
             )
 
     @property
-    def _headers(self) -> dict:
-        return {
+    def is_configured(self) -> bool:
+        return bool(self.service_role_key)
+
+    def _request(self, method: str, url: str, data: Optional[Dict[str, Any]] = None) -> Tuple[int, Any]:
+        """
+        Execute an HTTP request using Python standard library urllib.
+        Returns (status_code, parsed_json_or_body).
+        """
+        if not self.is_configured:
+            return 0, None
+
+        headers = {
             "apikey": self.service_role_key,
             "Authorization": f"Bearer {self.service_role_key}",
             "Content-Type": "application/json",
+            "User-Agent": "AgentGuard-Backend/1.0"
         }
+        body = json.dumps(data).encode("utf-8") if data is not None else None
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
 
-    @property
-    def is_configured(self) -> bool:
-        return bool(self.service_role_key)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                resp_bytes = resp.read()
+                try:
+                    return resp.status, json.loads(resp_bytes.decode("utf-8"))
+                except Exception:
+                    return resp.status, resp_bytes.decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            err_bytes = e.read()
+            try:
+                parsed = json.loads(err_bytes.decode("utf-8"))
+            except Exception:
+                parsed = err_bytes.decode("utf-8", errors="replace")
+            return e.code, parsed
+        except Exception as e:
+            logger.error(f"[SupabaseAdmin] Network error calling {url}: {e}")
+            return 0, str(e)
 
     def create_user(
         self,
@@ -76,17 +109,6 @@ class SupabaseAdminClient:
         """
         Create a user in Supabase Auth and return their auth_user_id (UUID).
         Returns None if the service role key is not configured or if the call fails.
-
-        Parameters
-        ----------
-        email         : User's email address
-        password      : Plain-text password (Supabase hashes it internally)
-        full_name     : Optional display name stored in user_metadata
-        email_confirm : If True, marks email as pre-confirmed (no email sent)
-
-        Returns
-        -------
-        str | None : Supabase auth_user_id on success, None on failure
         """
         if not self.is_configured:
             logger.debug(
@@ -94,7 +116,7 @@ class SupabaseAdminClient:
             )
             return None
 
-        payload = {
+        payload: Dict[str, Any] = {
             "email": email,
             "password": password,
             "email_confirm": email_confirm,
@@ -102,44 +124,30 @@ class SupabaseAdminClient:
         if full_name:
             payload["user_metadata"] = {"full_name": full_name}
 
-        try:
-            resp = requests.post(
-                self.admin_api,
-                json=payload,
-                headers=self._headers,
-                timeout=10,
-            )
+        status_code, resp_data = self._request("POST", self.admin_api, payload)
 
-            if resp.status_code == 200:
-                data = resp.json()
-                auth_id = data.get("id")
+        if status_code in (200, 201) and isinstance(resp_data, dict):
+            auth_id = resp_data.get("id")
+            logger.info(
+                "[SupabaseAdmin] Created Supabase Auth user for %s (id=%s)", email, auth_id
+            )
+            return auth_id
+
+        # 422 = user already exists in Supabase Auth
+        if status_code == 422:
+            existing_id = self._get_existing_user_id(email)
+            if existing_id:
                 logger.info(
-                    "[SupabaseAdmin] Created Supabase Auth user for %s (id=%s)", email, auth_id
+                    "[SupabaseAdmin] Supabase Auth user already exists for %s (id=%s)",
+                    email, existing_id
                 )
-                return auth_id
+                return existing_id
 
-            # 422 = user already exists in Supabase Auth
-            if resp.status_code == 422:
-                existing_id = self._get_existing_user_id(email)
-                if existing_id:
-                    logger.info(
-                        "[SupabaseAdmin] Supabase Auth user already exists for %s (id=%s)",
-                        email, existing_id
-                    )
-                    return existing_id
-
-            logger.warning(
-                "[SupabaseAdmin] Failed to create Supabase Auth user for %s: %s %s",
-                email, resp.status_code, resp.text
-            )
-            return None
-
-        except requests.RequestException as exc:
-            logger.error(
-                "[SupabaseAdmin] Network error creating Supabase Auth user for %s: %s",
-                email, exc
-            )
-            return None
+        logger.warning(
+            "[SupabaseAdmin] Failed to create Supabase Auth user for %s: %s %s",
+            email, status_code, resp_data
+        )
+        return None
 
     def _get_existing_user_id(self, email: str) -> Optional[str]:
         """
@@ -148,20 +156,15 @@ class SupabaseAdminClient:
         """
         if not self.is_configured:
             return None
-        try:
-            resp = requests.get(
-                f"{self.admin_api}?email={email}",
-                headers=self._headers,
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                users = data.get("users", [])
-                for u in users:
-                    if u.get("email", "").lower() == email.lower():
-                        return u.get("id")
-        except requests.RequestException:
-            pass
+
+        url = f"{self.admin_api}?email={urllib.parse.quote(email)}"
+        status_code, resp_data = self._request("GET", url)
+
+        if status_code == 200 and isinstance(resp_data, dict):
+            users = resp_data.get("users", [])
+            for u in users:
+                if u.get("email", "").lower() == email.lower():
+                    return u.get("id")
         return None
 
     def update_user_password(self, auth_user_id: str, new_password: str) -> bool:
@@ -171,16 +174,10 @@ class SupabaseAdminClient:
         """
         if not self.is_configured:
             return False
-        try:
-            resp = requests.put(
-                f"{self.admin_api}/{auth_user_id}",
-                json={"password": new_password},
-                headers=self._headers,
-                timeout=10,
-            )
-            return resp.status_code == 200
-        except requests.RequestException:
-            return False
+
+        url = f"{self.admin_api}/{auth_user_id}"
+        status_code, _ = self._request("PUT", url, {"password": new_password})
+        return status_code == 200
 
     def delete_user(self, auth_user_id: str) -> bool:
         """
@@ -189,15 +186,10 @@ class SupabaseAdminClient:
         """
         if not self.is_configured:
             return False
-        try:
-            resp = requests.delete(
-                f"{self.admin_api}/{auth_user_id}",
-                headers=self._headers,
-                timeout=10,
-            )
-            return resp.status_code in (200, 204)
-        except requests.RequestException:
-            return False
+
+        url = f"{self.admin_api}/{auth_user_id}"
+        status_code, _ = self._request("DELETE", url)
+        return status_code in (200, 204)
 
 
 # Singleton instance — import this everywhere
