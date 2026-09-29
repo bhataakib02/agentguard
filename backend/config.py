@@ -10,7 +10,15 @@ class Settings:
     PROJECT_NAME: str = "AGENTGUARD"
     TAGLINE: str = "Runtime Control Plane for Autonomous AI"
     API_V1_STR: str = "/api"
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "agentguard-super-secret-production-key-2026")
+    raw_secret: str = os.getenv("SECRET_KEY", "").strip()
+    if not raw_secret or raw_secret == "agentguard-super-secret-production-key-2026":
+        import logging, secrets
+        _cfg_logger = logging.getLogger("agentguard.config")
+        _cfg_logger.warning("[SECURITY WARNING] SECRET_KEY is using a default or empty value. Set a secure random SECRET_KEY in production.")
+        SECRET_KEY: str = raw_secret or secrets.token_hex(32)
+    else:
+        SECRET_KEY: str = raw_secret
+
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 

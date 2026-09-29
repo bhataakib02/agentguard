@@ -2,8 +2,16 @@
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+# Environment files & Secrets
+*.env
+*.env.*
+*.env.local
+.env
+.env.*
+.env.local
 frontend/.env.local
 frontend/.env*.local
+backend/.env
 
 # Python / FastAPI
 backend/__pycache__/
@@ -11,7 +19,6 @@ backend/*/__pycache__/
 backend/*/*/__pycache__/
 backend/*.pyc
 backend/*.db
-backend/.env
 backend/venv/
 backend/.venv/
 

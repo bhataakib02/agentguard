@@ -52,6 +52,11 @@ function VerifyOtpForm() {
           }),
         });
 
+        if (backendUser?.access_token) {
+          document.cookie = `agentguard_token=${backendUser.access_token}; path=/; max-age=86400; SameSite=Lax`;
+          localStorage.setItem("agentguard_token", backendUser.access_token);
+        }
+
         if (backendUser?.role === "SUPER_ADMIN") {
           router.push("/platform");
         } else {

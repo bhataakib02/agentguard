@@ -84,9 +84,8 @@ class TestPhase1AuthHardening(unittest.TestCase):
         cls.db.refresh(cls.tenant_admin)
         cls.db.refresh(cls.suspended_user)
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.db.close()
+    def setUp(self):
+        self.db.rollback()
 
     def get_token(self, user_obj):
         return security.create_access_token(user_obj.id, email=user_obj.email, role=user_obj.role)
@@ -327,5 +326,153 @@ class TestPhase1AuthHardening(unittest.TestCase):
             self.assertNotEqual(u["role"], "SUPER_ADMIN", "SUPER_ADMIN must never appear in tenant user list")
 
 
+    # ==========================================================
+    # EXACT 13 SECURITY TESTS REQUIRED BY PHASE 1 SPECIFICATION
+    # ==========================================================
+
+    def test_spec_01_unauthenticated_to_protected_endpoint(self):
+        """TEST 1: Unauthenticated -> protected endpoint | EXPECTED: 401/403"""
+        resp = client.get("/api/auth/me")
+        self.assertIn(resp.status_code, [401, 403], f"Unauthenticated request must return 401/403, got {resp.status_code}")
+
+    def test_spec_02_normal_user_to_super_admin_endpoint(self):
+        """TEST 2: Normal USER -> SUPER_ADMIN endpoint | EXPECTED: 403"""
+        user_token = self.get_token(self.normal_user)
+        resp = client.get("/api/platform/overview", headers={"Authorization": f"Bearer {user_token}"})
+        self.assertEqual(resp.status_code, 403, f"Normal USER accessing SUPER_ADMIN endpoint must return 403, got {resp.status_code}")
+
+    def test_spec_03_org_admin_to_platform_endpoint(self):
+        """TEST 3: Organization ADMIN -> platform endpoint | EXPECTED: 403"""
+        admin_token = self.get_token(self.tenant_admin)
+        resp = client.get("/api/platform/overview", headers={"Authorization": f"Bearer {admin_token}"})
+        self.assertEqual(resp.status_code, 403, f"Org ADMIN accessing platform endpoint must return 403, got {resp.status_code}")
+
+    def test_spec_04_super_admin_to_platform_endpoint(self):
+        """TEST 4: SUPER_ADMIN -> platform endpoint | EXPECTED: success (200)"""
+        sa_token = self.get_token(self.super_admin)
+        resp = client.get("/api/platform/overview", headers={"Authorization": f"Bearer {sa_token}"})
+        self.assertEqual(resp.status_code, 200, f"SUPER_ADMIN accessing platform endpoint must succeed, got {resp.status_code}")
+
+    def test_spec_05_org_a_user_to_org_b_resource(self):
+        """TEST 5: Organization A user -> Organization B resource | EXPECTED: 403/404"""
+        # Create an agent in platform_org (Org B)
+        org_b_agent = self.db.query(models.Agent).filter(models.Agent.org_id == self.platform_org.id).first()
+        if not org_b_agent:
+            org_b_agent = models.Agent(
+                org_id=self.platform_org.id,
+                owner_id=self.super_admin.id,
+                agent_code=f"AG-{uuid.uuid4().hex[:4]}",
+                name="Org B Confidential Agent",
+                department="Operations",
+                purpose="Cross-org security isolation test",
+                model_name="gpt-4o",
+                model_version="1.0.0",
+                environment="PRODUCTION",
+                autonomy_level="LOW",
+                status="NORMAL",
+                daily_budget=1000.0
+            )
+            self.db.add(org_b_agent)
+            self.db.commit()
+            self.db.refresh(org_b_agent)
+
+        user_a_token = self.get_token(self.normal_user)
+        # Normal user in Org A attempts to access Org B's agent
+        resp = client.get(f"/api/agents/{org_b_agent.id}", headers={"Authorization": f"Bearer {user_a_token}"})
+        self.assertIn(resp.status_code, [403, 404], f"Cross-org resource access must return 403/404, got {resp.status_code}")
+
+    def test_spec_06_tampered_org_id_rejected(self):
+        """TEST 6: Tampered org_id | EXPECTED: rejected / ignored"""
+        user_a_token = self.get_token(self.normal_user)
+        # User in Org A sends X-Organization-Context for Org B
+        resp = client.get("/api/organization/dashboard", headers={
+            "Authorization": f"Bearer {user_a_token}",
+            "X-Organization-Context": str(self.platform_org.id)
+        })
+        self.assertEqual(resp.status_code, 200)
+        # Server must derive org from user identity, not from client header
+        self.assertEqual(resp.json()["org_id"], str(self.tenant_org.id), "Server must not trust client-provided org_id")
+
+    def test_spec_07_tampered_role_rejected(self):
+        """TEST 7: Tampered role | EXPECTED: rejected"""
+        # Attacker signs token with their own secret claiming SUPER_ADMIN
+        tampered_token = jwt.encode(
+            {"sub": str(self.normal_user.id), "email": self.normal_user.email, "role": "SUPER_ADMIN"},
+            "attacker_key",
+            algorithm="HS256"
+        )
+        resp = client.get("/api/platform/overview", headers={"Authorization": f"Bearer {tampered_token}"})
+        self.assertEqual(resp.status_code, 401, "Tampered signature/role must be rejected with 401")
+
+        # Also test profile update attempting to escalate role
+        user_token = self.get_token(self.normal_user)
+        resp_esc = client.patch("/api/profile/me", json={"role": "SUPER_ADMIN"}, headers={"Authorization": f"Bearer {user_token}"})
+        self.assertEqual(resp_esc.status_code, 403, "Privilege escalation attempt must be rejected with 403")
+
+    def test_spec_08_invalid_token(self):
+        """TEST 8: Invalid token | EXPECTED: 401"""
+        resp = client.get("/api/auth/me", headers={"Authorization": "Bearer invalid_garbage_token_value_xyz"})
+        self.assertEqual(resp.status_code, 401, "Invalid token must return 401")
+
+    def test_spec_09_expired_token_or_session(self):
+        """TEST 9: Expired token/session | EXPECTED: 401"""
+        from datetime import datetime, timedelta, timezone
+        expired_dt = datetime.now(timezone.utc) - timedelta(hours=2)
+        expired_token = jwt.encode(
+            {"sub": str(self.normal_user.id), "email": self.normal_user.email, "role": "USER", "exp": expired_dt},
+            security.settings.SECRET_KEY,
+            algorithm=security.settings.ALGORITHM
+        )
+        resp = client.get("/api/auth/me", headers={"Authorization": f"Bearer {expired_token}"})
+        self.assertEqual(resp.status_code, 401, "Expired token must return 401")
+
+    def test_spec_10_logout_then_protected_request(self):
+        """TEST 10: Logout -> protected request | EXPECTED: rejected (401)"""
+        token = self.get_token(self.normal_user)
+        session = models.Session(
+            user_id=self.normal_user.id,
+            token=token,
+            expires_at=security.utcnow() + security.timedelta(hours=1),
+            revoked=False
+        )
+        self.db.add(session)
+        self.db.commit()
+
+        # Logout
+        resp_logout = client.post("/api/auth/logout", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(resp_logout.status_code, 200)
+
+        # Protected request after logout
+        resp_protected = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(resp_protected.status_code, 401, "Request with revoked session must be rejected with 401")
+
+    def test_spec_11_direct_platform_api_call_without_auth(self):
+        """TEST 11: Direct /platform API call without authentication | EXPECTED: rejected (401)"""
+        resp = client.get("/api/platform/overview")
+        self.assertEqual(resp.status_code, 401, "Unauthenticated direct call to /platform must return 401")
+
+    def test_spec_12_cors_preflight_from_allowed_origin(self):
+        """TEST 12: CORS preflight from allowed origin | EXPECTED: successful"""
+        resp = client.options("/api/auth/me", headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET"
+        })
+        self.assertEqual(resp.headers.get("access-control-allow-origin"), "http://localhost:3000")
+        self.assertEqual(resp.headers.get("access-control-allow-credentials"), "true")
+
+    def test_spec_13_cors_request_from_unauthorized_origin(self):
+        """TEST 13: CORS request from unauthorized origin | EXPECTED: rejected / not allowed"""
+        resp = client.options("/api/auth/me", headers={
+            "Origin": "https://unauthorized-attacker-site.com",
+            "Access-Control-Request-Method": "GET"
+        })
+        self.assertNotEqual(
+            resp.headers.get("access-control-allow-origin"),
+            "https://unauthorized-attacker-site.com",
+            "Unauthorized origin must not receive Access-Control-Allow-Origin"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
+

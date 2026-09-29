@@ -38,17 +38,7 @@ export default function PlatformHealthPage() {
     loadHealth();
   }, []);
 
-  const services = healthData?.services || [
-    { id: "s1", name: "Backend Services (FastAPI Core)", category: "Core API", status: "Operational", uptime: "99.99%", latency_ms: 12 },
-    { id: "s2", name: "API Gateway & Router", category: "Network", status: "Operational", uptime: "99.98%", latency_ms: 15 },
-    { id: "s3", name: "Database (Supabase PostgreSQL)", category: "Database", status: "Operational", uptime: "99.99%", latency_ms: 18 },
-    { id: "s4", name: "Supabase Auth Engine", category: "IAM & Auth", status: "Operational", uptime: "100.0%", latency_ms: 24 },
-    { id: "s5", name: "Background Jobs & Worker Queue", category: "Async Workers", status: "Operational", uptime: "99.90%", latency_ms: 8 },
-    { id: "s6", name: "Audit & Security Log Engine", category: "Security", status: "Operational", uptime: "100.0%", latency_ms: 10 },
-    { id: "s7", name: "Policy Engine Service", category: "Governance", status: "Operational", uptime: "99.95%", latency_ms: 14 },
-    { id: "s8", name: "Decision Engine & Intent Evaluator", category: "AI Guardrails", status: "Operational", uptime: "99.92%", latency_ms: 22 },
-    { id: "s9", name: "Notification Service", category: "Alerts", status: "Operational", uptime: "99.97%", latency_ms: 11 }
-  ];
+  const services = healthData?.services || [];
 
   return (
     <div className="space-y-6 text-[#E1E7F0]">
@@ -57,12 +47,16 @@ export default function PlatformHealthPage() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-[22px] font-bold text-white tracking-tight">System Health</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40 font-mono flex items-center gap-1">
-              <CheckCircle className="w-3 h-3" /> ALL SYSTEMS OPERATIONAL
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono flex items-center gap-1 ${
+              healthData?.overall_status === "Operational"
+                ? "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
+                : "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
+            }`}>
+              <CheckCircle className="w-3 h-3" /> {loading ? "CHECKING HEALTH..." : (healthData?.overall_status || "OPERATIONAL").toUpperCase()}
             </span>
           </div>
           <p className="text-[12px] text-[#94A3B8] mt-0.5">
-            Real-time health, latency, uptime, and status of all AgentGuard platform services.
+            Real-time health, latency, live telemetry, and status of AgentGuard core subsystem services.
           </p>
         </div>
 
@@ -75,43 +69,53 @@ export default function PlatformHealthPage() {
         </button>
       </div>
 
-      {/* 9 CORE SERVICE HEALTH CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {services.map((srv: any) => (
-          <div
-            key={srv.id}
-            className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-3 shadow-sm hover:border-[#2E9D50]/50 transition-colors"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">{srv.category}</span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
-                srv.status === "Operational"
-                  ? "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
-                  : "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
-              }`}>
-                {srv.status}
-              </span>
-            </div>
+      {/* CORE SERVICE HEALTH CARDS */}
+      {loading ? (
+        <div className="p-8 text-center text-[#64748B] text-[13px] bg-[#121722] border border-[#1E2638] rounded-[12px]">
+          Loading subsystem health and live database telemetry...
+        </div>
+      ) : services.length === 0 ? (
+        <div className="p-8 text-center text-[#64748B] text-[13px] bg-[#121722] border border-[#1E2638] rounded-[12px]">
+          No health telemetry available.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {services.map((srv: any) => (
+            <div
+              key={srv.id || srv.name}
+              className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-3 shadow-sm hover:border-[#2E9D50]/50 transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">{srv.category || "Core"}</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                  srv.status === "Operational"
+                    ? "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
+                    : "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
+                }`}>
+                  {srv.status}
+                </span>
+              </div>
 
-            <h3 className="font-bold text-white text-[15px]">{srv.name}</h3>
+              <h3 className="font-bold text-white text-[15px]">{srv.name}</h3>
 
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#1E2638] text-[11px] font-mono">
-              <div>
-                <span className="text-[#64748B] block">Uptime</span>
-                <span className="text-white font-bold">{srv.uptime}</span>
-              </div>
-              <div>
-                <span className="text-[#64748B] block">Response</span>
-                <span className="text-[#2E9D50] font-bold">{srv.latency_ms} ms</span>
-              </div>
-              <div>
-                <span className="text-[#64748B] block">Checked</span>
-                <span className="text-white font-bold">Just now</span>
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#1E2638] text-[11px] font-mono">
+                <div>
+                  <span className="text-[#64748B] block">Telemetry</span>
+                  <span className="text-white font-bold">{srv.telemetry || "Active"}</span>
+                </div>
+                <div>
+                  <span className="text-[#64748B] block">Response</span>
+                  <span className="text-[#2E9D50] font-bold">{srv.latency_ms} ms</span>
+                </div>
+                <div>
+                  <span className="text-[#64748B] block">Checked</span>
+                  <span className="text-white font-bold">Just now</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* RECENT SYSTEM EVENTS LOG */}
       <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-4 shadow-sm">
@@ -121,21 +125,23 @@ export default function PlatformHealthPage() {
         </h3>
 
         <div className="space-y-2 text-[12px]">
-          {(healthData?.recent_system_events || [
-            { time: "10m ago", event: "Database connection pool health check passed", level: "INFO", source: "PostgreSQL Pool" },
-            { time: "45m ago", event: "Policy Engine rules pre-compiled successfully", level: "INFO", source: "PolicyEngine" },
-            { time: "2h ago", event: "Background log rotation completed", level: "INFO", source: "AuditQueue" }
-          ]).map((evt: any, idx: number) => (
-            <div key={idx} className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between font-mono">
-              <div className="flex items-center gap-3">
-                <span className="text-[#64748B] text-[11px]">{evt.time}</span>
-                <span className="font-bold text-white text-[12px]">{evt.event}</span>
+          {(healthData?.recent_system_events && healthData.recent_system_events.length > 0) ? (
+            healthData.recent_system_events.map((evt: any, idx: number) => (
+              <div key={idx} className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between font-mono">
+                <div className="flex items-center gap-3">
+                  <span className="text-[#64748B] text-[11px]">{evt.time}</span>
+                  <span className="font-bold text-white text-[12px]">{evt.event}</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] px-2 py-0.5 rounded border border-[#2E9D50]/30">
+                  {evt.source}
+                </span>
               </div>
-              <span className="text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] px-2 py-0.5 rounded border border-[#2E9D50]/30">
-                {evt.source}
-              </span>
+            ))
+          ) : (
+            <div className="p-4 text-center text-[#64748B] text-[12px] font-mono">
+              No recent operational events recorded.
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
