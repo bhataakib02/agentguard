@@ -6,13 +6,20 @@ connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
-engine = create_engine(
-    settings.DATABASE_URL, 
-    connect_args=connect_args,
-    pool_pre_ping=True,
-    pool_recycle=300,
-    echo=False
-)
+engine_kwargs = {
+    "connect_args": connect_args,
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+    "echo": False
+}
+if not settings.DATABASE_URL.startswith("sqlite"):
+    engine_kwargs.update({
+        "pool_size": getattr(settings, "DB_POOL_SIZE", 10),
+        "max_overflow": getattr(settings, "DB_MAX_OVERFLOW", 20),
+        "pool_timeout": getattr(settings, "DB_POOL_TIMEOUT", 30)
+    })
+
+engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
 if settings.DATABASE_URL.startswith("sqlite"):
     from sqlalchemy import event

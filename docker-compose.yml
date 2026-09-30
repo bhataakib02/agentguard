@@ -35,6 +35,12 @@ services:
         condition: service_healthy
     volumes:
       - report_storage:/app/storage/reports
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   worker:
     build:
@@ -52,6 +58,8 @@ services:
       - SECRET_KEY=${SECRET_KEY}
     depends_on:
       redis:
+        condition: service_healthy
+      api:
         condition: service_healthy
     volumes:
       - report_storage:/app/storage/reports
@@ -72,6 +80,8 @@ services:
       - SECRET_KEY=${SECRET_KEY}
     depends_on:
       redis:
+        condition: service_healthy
+      api:
         condition: service_healthy
 
 volumes:
