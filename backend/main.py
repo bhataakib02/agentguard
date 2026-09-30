@@ -14,8 +14,10 @@ from routers import (
     telemetry
 )
 
-# Initialize DB Tables
-Base.metadata.create_all(bind=engine)
+from bootstrap import bootstrap_database
+
+# Initialize DB Tables and Canonical Reference Data
+bootstrap_database()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

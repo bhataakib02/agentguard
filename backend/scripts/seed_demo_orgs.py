@@ -15,11 +15,16 @@ def slugify(text_val: str) -> str:
     clean = re.sub(r'[^a-zA-Z0-9]+', '-', text_val.strip()).lower().strip('-')
     return clean or "unnamed-org"
 
+from bootstrap import bootstrap_database
+
 def seed_five_demo_organizations():
+    bootstrap_database()
     db = SessionLocal()
     print("Starting provisioning of 5 real Multi-Tenant Demo Organizations...")
 
-    pwd_hash = security.get_password_hash("Blackbird@12.")
+    # Configurable seed password with fallback
+    seed_password = os.getenv("DEMO_ACCOUNTS_PASSWORD", "DemoSecurePass2026!")
+    pwd_hash = security.get_password_hash(seed_password)
 
     demo_orgs_data = [
         {
@@ -263,6 +268,27 @@ def seed_five_demo_organizations():
                 models.Agent.org_id == org.id,
                 models.Agent.name == adata["name"]
             ).first()
+
+            if not existing_agent:
+                existing_agent = models.Agent(
+                    org_id=org.id,
+                    owner_id=admin_user.id if admin_user else None,
+                    agent_code=f"AGT-{org.slug[:6].upper()}-{idx+1:03d}",
+                    name=adata["name"],
+                    department="Operations",
+                    purpose=adata["purpose"],
+                    model_name="gpt-4o",
+                    model_version="1.0.0",
+                    environment="PRODUCTION",
+                    autonomy_level=adata["autonomy"],
+                    status="NORMAL",
+                    risk_score=adata["risk"],
+                    trust_score=95,
+                    daily_budget=10000.00
+                )
+                db.add(existing_agent)
+                db.commit()
+                db.refresh(existing_agent)
 
             passport = db.query(models.AgentPassport).filter(models.AgentPassport.agent_id == existing_agent.id).first()
             if not passport:

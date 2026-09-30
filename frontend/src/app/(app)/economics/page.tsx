@@ -3,35 +3,92 @@
 import React, { useEffect, useState } from "react";
 import { fetchApi } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { DollarSign } from "lucide-react";
+import { DollarSign, TrendingUp, AlertCircle, CheckCircle, Info, Zap } from "lucide-react";
 
 export default function EconomicsPage() {
   const [budgets, setBudgets] = useState<any[]>([]);
+  const [optimData, setOptimData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadBudgets() {
+    async function loadData() {
       try {
-        const data = await fetchApi("/economics/budgets").catch(() => []);
-        setBudgets(data || []);
+        const [bData, oData] = await Promise.all([
+          fetchApi("/economics/budgets").catch(() => []),
+          fetchApi("/optimization/recommendations").catch(() => null)
+        ]);
+        setBudgets(bData || []);
+        setOptimData(oData);
       } catch (err) {
-        console.error("Budgets fetch error:", err);
+        console.error("Economics fetch error:", err);
       } finally {
         setLoading(false);
       }
     }
-    loadBudgets();
+    loadData();
   }, []);
 
   return (
     <div className="space-y-6">
       <div className="border-b border-[#E8E8E4] pb-5">
-        <h1 className="text-[24px] font-bold text-[#1F1F1F]">Agent Economics & Financial Budgets</h1>
+        <h1 className="text-[24px] font-bold text-[#1F1F1F]">Agent Economics & Cost Governance</h1>
         <p className="text-[13px] text-[#666666]">
-          Daily Financial Caps & Transaction Limits
+          Daily Financial Caps, Transaction Limits & Real Telemetry Cost Optimization
         </p>
       </div>
 
+      {/* COST OPTIMIZATION RECOMMENDATIONS SECTION */}
+      <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[12px] p-5 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-[#E8E8E4] pb-3">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-[#8064C8]" />
+            <h2 className="text-[16px] font-bold text-[#1F1F1F]">Cost Optimization Recommendations</h2>
+          </div>
+          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono ${
+            optimData?.status === "SUFFICIENT DATA"
+              ? "bg-[#EAF7EE] text-[#2E9D50] border border-[#2E9D50]/30"
+              : "bg-[#FFFDF5] text-[#F59A23] border border-[#F59A23]/30"
+          }`}>
+            {optimData?.data_sufficiency === "SUFFICIENT" ? "DERIVED FROM REAL TELEMETRY" : "INSUFFICIENT DATA"}
+          </span>
+        </div>
+
+        {optimData?.status === "INSUFFICIENT DATA" ? (
+          <div className="p-4 bg-[#FFFDF5] border border-[#F59A23]/30 rounded-[8px] flex items-start gap-3 text-[12px] text-[#666666]">
+            <Info className="w-4 h-4 text-[#F59A23] shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-[#1F1F1F] block">Zero Fabricated Recommendations</span>
+              {optimData?.message || "Insufficient execution telemetry observed to derive statistically valid optimization recommendations."}
+            </div>
+          </div>
+        ) : optimData?.recommendations && optimData.recommendations.length > 0 ? (
+          <div className="space-y-3">
+            {optimData.recommendations.map((rec: any, idx: number) => (
+              <div key={idx} className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-[14px] text-[#1F1F1F]">{rec.title}</h3>
+                  <span className="text-[10px] font-bold uppercase bg-[#EAF7EE] text-[#2E9D50] px-2 py-0.5 rounded font-mono">
+                    CONFIDENCE: {rec.confidence}
+                  </span>
+                </div>
+                <p className="text-[12px] text-[#666666]">
+                  <strong>Supporting Metric:</strong> {rec.supporting_metric}
+                </p>
+                <div className="flex items-center justify-between text-[11px] font-mono text-[#8064C8] pt-1">
+                  <span>Impact: {rec.estimated_impact}</span>
+                  <span>Model: {rec.affected_model}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-[12px] text-[#666666] p-4 bg-[#FCFCFA] rounded-[8px]">
+            No cost anomalies or optimization actions detected across active telemetry.
+          </div>
+        )}
+      </div>
+
+      {/* FINANCIAL BUDGETS TABLE */}
       {budgets.length === 0 ? (
         <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[12px] p-12 text-center space-y-3">
           <DollarSign className="w-10 h-10 text-[#666666] mx-auto opacity-40" />

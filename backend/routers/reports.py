@@ -147,10 +147,19 @@ def generate_report(
     x_org_context: Optional[str] = Header(None, alias="X-Organization-Context"),
     db: Session = Depends(get_db)
 ):
+    if x_org_context and x_org_context != "ALL" and current_user.role != "SUPER_ADMIN" and str(x_org_context) != str(current_user.org_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cross-organization access is strictly prohibited"
+        )
     target_org_id = get_effective_org_id(current_user, x_org_context)
     check_org_isolation(current_user, target_org_id)
 
     org = db.query(models.Organization).filter(models.Organization.id == target_org_id).first()
+    if not org and current_user.role == "SUPER_ADMIN":
+        org = db.query(models.Organization).first()
+        if org:
+            target_org_id = str(org.id)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
@@ -501,6 +510,44 @@ def generate_report(
         "file_size_bytes": file_size,
         "filename": filename
     }
+
+@router.get("/export/{format}")
+def export_report_direct(
+    format: str,
+    type: str = "EXECUTIVE",
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user: models.User = Depends(get_current_user),
+    x_org_context: Optional[str] = Header(None, alias="X-Organization-Context"),
+    db: Session = Depends(get_db)
+):
+    fmt = format.upper()
+    if fmt == "XLSX":
+        fmt = "EXCEL"
+    elif fmt not in ["EXCEL", "CSV", "PDF"]:
+        raise HTTPException(status_code=400, detail=f"Unsupported export format: {format}. Supported: pdf, excel, csv")
+
+    req = GenerateReportRequest(
+        report_type=type.upper(),
+        file_format=fmt,
+        date_from=date_from,
+        date_to=date_to
+    )
+    result = generate_report(payload=req, current_user=current_user, x_org_context=x_org_context, db=db)
+    rec = db.query(models.ReportHistory).filter(models.ReportHistory.id == result["report_id"]).first()
+    if not rec or not os.path.exists(rec.file_path):
+        raise HTTPException(status_code=500, detail="Generated report file could not be read")
+
+    media_types = {
+        "PDF": "application/pdf",
+        "EXCEL": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "CSV": "text/csv"
+    }
+    return FileResponse(
+        rec.file_path,
+        media_type=media_types.get(fmt, "application/octet-stream"),
+        filename=os.path.basename(rec.file_path)
+    )
 
 @router.get("/download/{report_id}")
 def download_report(

@@ -1,0 +1,7 @@
+AGENTGUARD CONTROL PLANE REPORT,GOVERNANCE
+Organization,Phase 3 Org Alpha 6153,Domain,alpha.p3
+Generated At,2026-09-29T17:19:45.604537
+
+Decision ID,Timestamp,Agent ID,Action,Decision,Risk Score,Amount,Policy
+d2dcc07c-ccc4-4a8c-aa76-af481af0d082,2026-09-29T16:19:35.327349,a36f6282-ebba-4414-8c82-d8aebd29b8bc,wire_transfer,REFUSE,80,5000.0,Anti Fraud
+f9d9abaf-df0f-48f2-be70-5ed0846f2929,2026-09-29T15:19:35.327349,a36f6282-ebba-4414-8c82-d8aebd29b8bc,execute_payment,ALLOW,20,150.0,Standard Limits

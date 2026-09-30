@@ -58,27 +58,40 @@ export default function PlatformBillingPage() {
         </button>
       </div>
 
+      {/* Payment Gateway Status Notice */}
+      <div className="bg-[#121722] border border-[#1E2638] rounded-[10px] p-3.5 flex items-center justify-between text-[12px] font-mono">
+        <div className="flex items-center gap-2 text-[#94A3B8]">
+          <CreditCard className="w-4 h-4 text-[#F59A23]" />
+          <span>PAYMENT GATEWAY: <strong className="text-white">NOT CONFIGURED</strong> (Direct Database License Allocation Active)</span>
+        </div>
+        <span className="text-[10px] font-bold uppercase bg-[#3D2910] text-[#F59A23] px-2 py-0.5 rounded border border-[#F59A23]/30">
+          EXTERNAL PAYMENTS UNCONFIGURED
+        </span>
+      </div>
+
       {/* License Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Total Subscriptions</span>
-          <h2 className="text-[28px] font-bold text-white">{licenses.length || 5}</h2>
+          <h2 className="text-[28px] font-bold text-white">{loading ? "..." : licenses.length}</h2>
         </div>
         <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Active Licenses</span>
           <h2 className="text-[28px] font-bold text-[#2E9D50]">
-            {licenses.filter((l) => l.status === "ACTIVE").length || 5}
+            {loading ? "..." : licenses.filter((l) => l.status === "ACTIVE").length}
           </h2>
         </div>
         <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Expiring Soon (≤ 30d)</span>
           <h2 className="text-[28px] font-bold text-[#F59A23]">
-            {licenses.filter((l) => l.expiring_soon).length || 1}
+            {loading ? "..." : licenses.filter((l) => l.expiring_soon).length}
           </h2>
         </div>
         <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Enterprise Plans</span>
-          <h2 className="text-[28px] font-bold text-white">4</h2>
+          <h2 className="text-[28px] font-bold text-white">
+            {loading ? "..." : licenses.filter((l) => (l.plan_id || "").toLowerCase().includes("enterprise")).length}
+          </h2>
         </div>
       </div>
 

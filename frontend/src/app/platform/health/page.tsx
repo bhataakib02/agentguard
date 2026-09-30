@@ -88,8 +88,10 @@ export default function PlatformHealthPage() {
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">{srv.category || "Core"}</span>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
-                  srv.status === "Operational"
+                  srv.status === "Operational" || srv.status === "HEALTHY"
                     ? "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
+                    : srv.status === "Not Configured" || srv.status === "NOT_CONFIGURED"
+                    ? "bg-[#281816] text-[#EF4444] border border-[#EF4444]/40"
                     : "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
                 }`}>
                   {srv.status}
@@ -105,7 +107,9 @@ export default function PlatformHealthPage() {
                 </div>
                 <div>
                   <span className="text-[#64748B] block">Response</span>
-                  <span className="text-[#2E9D50] font-bold">{srv.latency_ms} ms</span>
+                  <span className="text-[#2E9D50] font-bold">
+                    {srv.latency_ms !== null && srv.latency_ms !== undefined ? `${srv.latency_ms} ms` : "N/A"}
+                  </span>
                 </div>
                 <div>
                   <span className="text-[#64748B] block">Checked</span>
