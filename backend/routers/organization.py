@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import datetime
+import os
 
 from database import get_db
 from core.deps import get_current_user, require_admin, check_org_isolation, check_license_limit, get_effective_org_id, HUMAN_ROLES
@@ -318,15 +319,36 @@ def invite_user_to_organization(
     db.commit()
     db.refresh(new_user)
 
+    # 5. Check outbound email provider configuration truthfully via email_service
+    from services.email_service import email_service
+    if email_service.is_configured():
+        send_res = email_service.send_email(
+            to_email=new_user.email,
+            subject=f"Welcome to AGENTGUARD: Organization Invitation",
+            body_text=f"Hello {new_user.full_name},\n\nYou have been invited to join AGENTGUARD as {target_role}.\nYour temporary credentials:\nEmail: {new_user.email}\nPassword: {plain_password}\n\nPlease log in and change your password."
+        )
+        email_delivery_status = send_res.get("status", "EMAIL_SENT")
+        email_delivery_note = f"Invitation email dispatched to {new_user.email}."
+    else:
+        email_delivery_status = "EMAIL_PROVIDER_NOT_CONFIGURED"
+        email_delivery_note = "User account created in database. Outbound email not dispatched because SMTP provider is not configured in environment."
+
+
     # Record Audit Log
     audit = models.AuditLog(
+        org_id=str(current_user.org_id),
         event_type="USER_INVITED",
         actor_type="USER",
         actor_id=str(current_user.id),
-        action=f"Invited user {payload.email} with role {target_role}",
+        action=f"Invited user {payload.email} with role {target_role} ({email_delivery_status})",
         resource="users",
         result="SUCCESS",
-        metadata_json={"invited_user_id": str(new_user.id), "org_id": str(current_user.org_id), "role": target_role}
+        metadata_json={
+            "invited_user_id": str(new_user.id),
+            "org_id": str(current_user.org_id),
+            "role": target_role,
+            "email_delivery_status": email_delivery_status
+        }
     )
     db.add(audit)
     db.commit()
@@ -336,5 +358,7 @@ def invite_user_to_organization(
         "user_id": str(new_user.id),
         "email": new_user.email,
         "role": new_user.role,
-        "org_id": str(new_user.org_id)
+        "org_id": str(new_user.org_id),
+        "email_delivery_status": email_delivery_status,
+        "email_delivery_note": email_delivery_note
     }

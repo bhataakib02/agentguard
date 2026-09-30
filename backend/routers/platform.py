@@ -5,11 +5,13 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import datetime
 import re
+import os
 
 from database import get_db, engine
 from core.deps import get_current_user, require_super_admin, HUMAN_ROLES
 from core import security
 from core.supabase_admin import supabase_admin
+from bootstrap import ensure_canonical_plans
 import models
 
 def slugify(text_val: str) -> str:
@@ -273,6 +275,74 @@ def get_organization_details(
         "audit_logs": audit_list
     }
 
+@router.patch("/organizations/{org_id}/status")
+def update_organization_status(
+    org_id: str,
+    payload: UpdateOrgStatusRequest,
+    current_user: models.User = Depends(require_super_admin),
+    db: Session = Depends(get_db)
+):
+    new_status = payload.status.upper()
+    if new_status not in ["ACTIVE", "SUSPENDED", "RESTRICTED", "DEACTIVATED"]:
+        raise HTTPException(status_code=400, detail="Invalid status value. Supported: ACTIVE, SUSPENDED, RESTRICTED, DEACTIVATED")
+
+    org = db.query(models.Organization).filter((models.Organization.id == org_id) | (models.Organization.slug == org_id)).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    old_status = org.status
+    org.status = new_status
+    db.commit()
+    db.refresh(org)
+
+    audit = models.AuditLog(
+        event_type="ORGANIZATION_STATUS_UPDATED",
+        actor_type="SUPER_ADMIN",
+        actor_id=str(current_user.id),
+        action=f"Changed organization {org.name} status from {old_status} to {new_status}",
+        resource="organizations",
+        result="SUCCESS",
+        metadata_json={"org_id": str(org.id), "old_status": old_status, "new_status": new_status}
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"status": "SUCCESS", "org_id": str(org.id), "new_status": org.status}
+
+@router.patch("/users/{user_id}/status")
+def update_platform_user_status(
+    user_id: str,
+    payload: UpdateOrgStatusRequest,
+    current_user: models.User = Depends(require_super_admin),
+    db: Session = Depends(get_db)
+):
+    new_status = payload.status.upper()
+    if new_status not in ["ACTIVE", "SUSPENDED", "INACTIVE", "DEACTIVATED"]:
+        raise HTTPException(status_code=400, detail="Invalid status value. Supported: ACTIVE, SUSPENDED, INACTIVE, DEACTIVATED")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    old_status = user.status
+    user.status = new_status
+    db.commit()
+    db.refresh(user)
+
+    audit = models.AuditLog(
+        event_type="USER_STATUS_UPDATED",
+        actor_type="SUPER_ADMIN",
+        actor_id=str(current_user.id),
+        action=f"Changed user {user.email} status from {old_status} to {new_status}",
+        resource="users",
+        result="SUCCESS",
+        metadata_json={"user_id": str(user.id), "old_status": old_status, "new_status": new_status}
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"status": "SUCCESS", "user_id": str(user.id), "new_status": user.status}
+
 @router.post("/organizations")
 def create_organization(
     payload: CreateOrgRequest,
@@ -280,17 +350,70 @@ def create_organization(
     current_user: models.User = Depends(require_super_admin),
     db: Session = Depends(get_db)
 ):
+    ensure_canonical_plans(db)
+
     target_slug = slugify(payload.name)
     existing_org = db.query(models.Organization).filter(
         (models.Organization.slug == target_slug) | 
         (models.Organization.name.ilike(payload.name.strip()))
     ).first()
 
+    default_pwd = payload.admin_password or os.getenv("DEFAULT_USER_PASSWORD", "AgentGuardSecure2026!")
+
     if existing_org:
-        admin_user = db.query(models.User).filter(models.User.org_id == existing_org.id, models.User.role == "ADMIN").first()
+        # Check if requested admin user exists or create them
+        admin_user = db.query(models.User).filter(models.User.email == payload.admin_email.strip()).first()
         if not admin_user:
-            admin_user = db.query(models.User).filter(models.User.email == payload.admin_email).first()
+            auth_uid = supabase_admin.create_user(
+                email=payload.admin_email.strip(),
+                password=default_pwd,
+                full_name=payload.admin_full_name,
+            )
+            admin_user = models.User(
+                org_id=existing_org.id,
+                email=payload.admin_email.strip(),
+                full_name=payload.admin_full_name,
+                role="ADMIN",
+                department="Executive Management",
+                password_hash=security.get_password_hash(default_pwd),
+                auth_user_id=auth_uid,
+                status="ACTIVE"
+            )
+            db.add(admin_user)
+            db.commit()
+            db.refresh(admin_user)
+        else:
+            if admin_user.org_id != existing_org.id or admin_user.role != "ADMIN":
+                admin_user.org_id = existing_org.id
+                admin_user.role = "ADMIN"
+                db.commit()
+                db.refresh(admin_user)
+
+        # Check if license exists or create one
         lic = db.query(models.License).filter(models.License.org_id == existing_org.id).first()
+        if not lic:
+            target_plan_id = payload.plan_id.upper() if payload.plan_id else "STARTER"
+            plan = db.query(models.Plan).filter(models.Plan.id == target_plan_id).first()
+            if not plan:
+                plan = db.query(models.Plan).filter(models.Plan.id == "STARTER").first()
+                target_plan_id = "STARTER"
+            lic = models.License(
+                org_id=existing_org.id,
+                plan_id=target_plan_id,
+                status="ACTIVE",
+                start_date=datetime.datetime.utcnow(),
+                expiry_date=datetime.datetime.utcnow() + datetime.timedelta(days=365),
+                max_users=plan.max_users if plan else 10,
+                max_ai_agents=plan.max_ai_agents if plan else 5,
+                max_api_keys=plan.max_api_keys if plan else 5,
+                max_monthly_api_requests=plan.max_monthly_api_requests if plan else 100000
+            )
+            db.add(lic)
+            lic_usage = db.query(models.LicenseUsage).filter(models.LicenseUsage.org_id == existing_org.id).first()
+            if not lic_usage:
+                db.add(models.LicenseUsage(org_id=existing_org.id, api_requests_count=0, storage_used_gb=0.0))
+            db.commit()
+
         plan_id = lic.plan_id if lic else (payload.plan_id.upper() if payload.plan_id else "STARTER")
         return {
             "status": "SUCCESS",
@@ -302,100 +425,99 @@ def create_organization(
             "admin_user_id": str(admin_user.id) if admin_user else ""
         }
 
-    org = models.Organization(
-        name=payload.name.strip(),
-        slug=target_slug,
-        domain=payload.domain.strip() if payload.domain else None,
-        admin_email=payload.admin_email.strip(),
-        status="ACTIVE"
-    )
-    db.add(org)
-    db.commit()
-    db.refresh(org)
-
-    target_plan_id = payload.plan_id.upper() if payload.plan_id else "STARTER"
-    plan = db.query(models.Plan).filter(models.Plan.id == target_plan_id).first()
-    if not plan:
-        plan = db.query(models.Plan).filter(models.Plan.id == "STARTER").first()
-        target_plan_id = "STARTER"
-
-    max_users = plan.max_users if plan else 10
-    max_agents = plan.max_ai_agents if plan else 5
-    max_api_keys = plan.max_api_keys if plan else 5
-    max_reqs = plan.max_monthly_api_requests if plan else 100000
-
-    lic = models.License(
-        org_id=org.id,
-        plan_id=target_plan_id,
-        status="ACTIVE",
-        start_date=datetime.datetime.utcnow(),
-        expiry_date=datetime.datetime.utcnow() + datetime.timedelta(days=365),
-        max_users=max_users,
-        max_ai_agents=max_agents,
-        max_api_keys=max_api_keys,
-        max_monthly_api_requests=max_reqs
-    )
-    db.add(lic)
-
-    lic_usage = models.LicenseUsage(
-        org_id=org.id,
-        api_requests_count=0,
-        storage_used_gb=0.0
-    )
-    db.add(lic_usage)
-    db.commit()
-
-    existing_admin = db.query(models.User).filter(models.User.email == payload.admin_email).first()
-    if not existing_admin:
-        admin_plain_password = payload.admin_password or "Blackbird@12."
-
-        # Register in Supabase Auth first — gives us the auth_user_id
-        auth_uid = supabase_admin.create_user(
-            email=payload.admin_email,
-            password=admin_plain_password,
-            full_name=payload.admin_full_name,
-        )
-
-        admin_user = models.User(
-            org_id=org.id,
-            email=payload.admin_email,
-            full_name=payload.admin_full_name,
-            role="ADMIN",
-            department="Executive Management",
-            password_hash=security.get_password_hash(admin_plain_password),
-            auth_user_id=auth_uid,   # None if service role key not configured — local-login fallback still works
+    try:
+        org = models.Organization(
+            name=payload.name.strip(),
+            slug=target_slug,
+            domain=payload.domain.strip() if payload.domain else None,
+            admin_email=payload.admin_email.strip(),
             status="ACTIVE"
         )
-        db.add(admin_user)
-        db.commit()
-        db.refresh(admin_user)
-        admin_user_id = str(admin_user.id)
-    else:
-        existing_admin.org_id = org.id
-        existing_admin.role = "ADMIN"
-        db.commit()
-        admin_user_id = str(existing_admin.id)
+        db.add(org)
+        db.flush()
 
-    audit = models.AuditLog(
-        event_type="ORGANIZATION_CREATED",
-        actor_type="SUPER_ADMIN",
-        actor_id=str(current_user.id),
-        action=f"Created organization {org.name} under plan {target_plan_id}",
-        resource="organizations",
-        result="SUCCESS",
-        metadata_json={"org_id": str(org.id), "org_name": org.name, "admin_email": payload.admin_email, "idempotency_key": idempotency_key}
-    )
-    db.add(audit)
-    db.commit()
+        target_plan_id = payload.plan_id.upper() if payload.plan_id else "STARTER"
+        plan = db.query(models.Plan).filter(models.Plan.id == target_plan_id).first()
+        if not plan:
+            plan = db.query(models.Plan).filter(models.Plan.id == "STARTER").first()
+            target_plan_id = "STARTER"
 
-    return {
-        "status": "SUCCESS",
-        "org_id": str(org.id),
-        "name": org.name,
-        "slug": org.slug,
-        "plan_id": target_plan_id,
-        "admin_user_id": admin_user_id
-    }
+        max_users = plan.max_users if plan else 10
+        max_agents = plan.max_ai_agents if plan else 5
+        max_api_keys = plan.max_api_keys if plan else 5
+        max_reqs = plan.max_monthly_api_requests if plan else 100000
+
+        lic = models.License(
+            org_id=org.id,
+            plan_id=target_plan_id,
+            status="ACTIVE",
+            start_date=datetime.datetime.utcnow(),
+            expiry_date=datetime.datetime.utcnow() + datetime.timedelta(days=365),
+            max_users=max_users,
+            max_ai_agents=max_agents,
+            max_api_keys=max_api_keys,
+            max_monthly_api_requests=max_reqs
+        )
+        db.add(lic)
+
+        lic_usage = models.LicenseUsage(
+            org_id=org.id,
+            api_requests_count=0,
+            storage_used_gb=0.0
+        )
+        db.add(lic_usage)
+
+        existing_admin = db.query(models.User).filter(models.User.email == payload.admin_email.strip()).first()
+        if not existing_admin:
+            auth_uid = supabase_admin.create_user(
+                email=payload.admin_email.strip(),
+                password=default_pwd,
+                full_name=payload.admin_full_name,
+            )
+
+            admin_user = models.User(
+                org_id=org.id,
+                email=payload.admin_email.strip(),
+                full_name=payload.admin_full_name,
+                role="ADMIN",
+                department="Executive Management",
+                password_hash=security.get_password_hash(default_pwd),
+                auth_user_id=auth_uid,
+                status="ACTIVE"
+            )
+            db.add(admin_user)
+            db.flush()
+            admin_user_id = str(admin_user.id)
+        else:
+            existing_admin.org_id = org.id
+            existing_admin.role = "ADMIN"
+            db.flush()
+            admin_user_id = str(existing_admin.id)
+
+        audit = models.AuditLog(
+            event_type="ORGANIZATION_CREATED",
+            actor_type="SUPER_ADMIN",
+            actor_id=str(current_user.id),
+            action=f"Created organization {org.name} under plan {target_plan_id}",
+            resource="organizations",
+            result="SUCCESS",
+            metadata_json={"org_id": str(org.id), "org_name": org.name, "admin_email": payload.admin_email, "idempotency_key": idempotency_key}
+        )
+        db.add(audit)
+        db.commit()
+        db.refresh(org)
+
+        return {
+            "status": "SUCCESS",
+            "org_id": str(org.id),
+            "name": org.name,
+            "slug": org.slug,
+            "plan_id": target_plan_id,
+            "admin_user_id": admin_user_id
+        }
+    except Exception as e:
+        db.rollback()
+        raise e
 
 @router.get("/users")
 def list_platform_users(
@@ -902,6 +1024,9 @@ def get_detailed_system_health(
     if not recent_events:
         recent_events = [{"time": "Just now", "event": "Telemetry engine initialized", "level": "INFO", "source": "System"}]
 
+    smtp_configured = bool(os.getenv("SMTP_HOST") or os.getenv("SENDGRID_API_KEY"))
+    slack_configured = bool(os.getenv("SLACK_WEBHOOK_URL") or os.getenv("SLACK_BOT_TOKEN"))
+
     return {
         "overall_status": "Operational" if db_status == "Operational" else "Degraded",
         "services": [
@@ -912,7 +1037,7 @@ def get_detailed_system_health(
             {"id": "s5", "name": "Audit & Security Log Engine", "category": "Security", "status": "Operational", "telemetry": "Active", "latency_ms": latency_ms + 1, "last_checked": now_iso},
             {"id": "s6", "name": "Policy Engine Service", "category": "Governance", "status": "Operational", "telemetry": "Active", "latency_ms": latency_ms + 3, "last_checked": now_iso},
             {"id": "s7", "name": "Decision Engine & Intent Evaluator", "category": "AI Guardrails", "status": "Operational", "telemetry": "Active", "latency_ms": latency_ms + 5, "last_checked": now_iso},
-            {"id": "s8", "name": "Notification & Alerting Engine", "category": "Alerts", "status": "Operational", "telemetry": "Active", "latency_ms": latency_ms + 2, "last_checked": now_iso}
+            {"id": "s8", "name": "Notification & Alerting Engine", "category": "Alerts", "status": "Operational" if smtp_configured else "Not Configured", "telemetry": "Active" if smtp_configured else "Standby", "latency_ms": latency_ms + 2 if smtp_configured else None, "last_checked": now_iso}
         ],
         "recent_system_events": recent_events,
         "timestamp": now_iso
@@ -922,6 +1047,9 @@ def get_detailed_system_health(
 def get_platform_settings(
     current_user: models.User = Depends(require_super_admin)
 ):
+    smtp_active = bool(os.getenv("SMTP_HOST") or os.getenv("SENDGRID_API_KEY"))
+    slack_active = bool(os.getenv("SLACK_WEBHOOK_URL") or os.getenv("SLACK_BOT_TOKEN"))
+
     return {
         "general": {
             "platform_name": "AGENTGUARD Platform Control Center",
@@ -942,8 +1070,8 @@ def get_platform_settings(
             "auto_quarantine_breached_agents": True
         },
         "notifications": {
-            "email_alerts_enabled": True,
-            "slack_integration_active": True,
+            "email_alerts_enabled": smtp_active,
+            "slack_integration_active": slack_active,
             "security_incident_digest": "IMMEDIATE"
         },
         "audit": {

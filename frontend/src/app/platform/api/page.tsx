@@ -21,7 +21,6 @@ import {
 export default function PlatformApiIntegrationsPage() {
   const [apiData, setApiData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [copiedKey, setCopiedKey] = useState(false);
 
   const loadApiData = async () => {
     setLoading(true);
@@ -38,12 +37,6 @@ export default function PlatformApiIntegrationsPage() {
   useEffect(() => {
     loadApiData();
   }, []);
-
-  const handleCopyKey = () => {
-    navigator.clipboard.writeText("ag_live_pk_99482740182746284192");
-    setCopiedKey(true);
-    setTimeout(() => setCopiedKey(false), 2000);
-  };
 
   return (
     <div className="space-y-6 text-[#E1E7F0]">
@@ -153,29 +146,33 @@ export default function PlatformApiIntegrationsPage() {
             <div className="flex items-center justify-between border-b border-[#1E2638] pb-3">
               <h3 className="font-bold text-white text-[15px] flex items-center gap-2">
                 <Key className="w-4 h-4 text-[#2E9D50]" />
-                <span>Super Admin API Secret</span>
+                <span>Platform API Credentials</span>
               </h3>
-              <span className="text-[10px] font-mono text-[#E53935] uppercase font-bold">HIGH PRIVILEGE</span>
+              <span className="text-[10px] font-mono text-[#2E9D50] uppercase font-bold">ZERO-TRUST POLICY</span>
             </div>
 
             <div className="space-y-3 text-[12px]">
               <p className="text-[#94A3B8]">
-                Global platform master key. Allows administrative actions across all organization tenants.
+                In accordance with enterprise zero-trust security standards, plaintext API secrets are never stored in the database or exposed in frontend dashboard responses.
               </p>
 
-              <div className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between font-mono">
-                <span className="text-white">ag_live_pk_••••••••••••84192</span>
-                <button
-                  onClick={handleCopyKey}
-                  className="px-2.5 py-1 bg-[#173B25] hover:bg-[#237A3C] text-[#2E9D50] hover:text-white rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
-                >
-                  <Copy className="w-3 h-3" />
-                  <span>{copiedKey ? "Copied!" : "Copy Secret"}</span>
-                </button>
+              <div className="p-3.5 bg-[#161C2A] rounded-[8px] border border-[#232F48] space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-[#94A3B8]">Credential Storage</span>
+                  <span className="text-[#2E9D50] font-bold">Argon2 / SHA-256 Hashed</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-[#94A3B8]">Secret Display</span>
+                  <span className="text-white font-bold">One-Time On Generation</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-[#94A3B8]">Active Keys</span>
+                  <span className="text-white font-bold">{apiData?.total_api_keys ?? 0} Keys Provisioned</span>
+                </div>
               </div>
 
               <div className="text-[11px] text-[#64748B] font-mono">
-                Scope: <strong className="text-white">GLOBAL PLATFORM</strong> • Created: <strong className="text-white">Aug 1, 2026</strong>
+                Scope: <strong className="text-white">PLATFORM CONTROL PLANE</strong> • Tenant isolation strictly enforced
               </div>
             </div>
           </div>

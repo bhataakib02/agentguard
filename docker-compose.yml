@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: agentguard-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentguard-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - report_storage:/app/storage/reports
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentguard-worker
+    restart: unless-stopped
+    command: ["celery", "-A", "celery_app.celery_app", "worker", "--loglevel=info", "-c", "4"]
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - report_storage:/app/storage/reports
+
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentguard-beat
+    restart: unless-stopped
+    command: ["celery", "-A", "celery_app.celery_app", "beat", "--loglevel=info"]
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+  report_storage:

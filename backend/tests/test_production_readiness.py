@@ -19,6 +19,12 @@ class TestProductionReadiness(unittest.TestCase):
     def setUpClass(cls):
         cls.db = SessionLocal()
 
+        # Ensure demo organizations are seeded
+        if not cls.db.query(models.User).filter(models.User.email == "admin@acmefintech.com").first():
+            from scripts.seed_demo_orgs import seed_five_demo_organizations
+            seed_five_demo_organizations()
+            cls.db.expire_all()
+
         # Provision SUPER_ADMIN
         cls.super_admin_email = "super_admin_prod@agentguard.com"
         cls.super_admin = cls.db.query(models.User).filter(models.User.email == cls.super_admin_email).first()
@@ -51,6 +57,7 @@ class TestProductionReadiness(unittest.TestCase):
         return h
 
     def get_user_by_email(self, email):
+        self.db.expire_all()
         return self.db.query(models.User).filter(models.User.email == email).first()
 
     def test_01_vercel_and_render_config_files_exist(self):

@@ -15,7 +15,7 @@ def list_security_tests(
     query = db.query(models.SecurityTest)
     if current_user.role != "SUPER_ADMIN":
         query = query.join(models.Agent).filter(models.Agent.org_id == current_user.org_id)
-    return query.all()
+    return query.order_by(models.SecurityTest.timestamp.desc()).all()
 
 @router.post("/run")
 def run_security_test(
@@ -29,9 +29,12 @@ def run_security_test(
     agent = query.first()
 
     if not agent:
-        raise HTTPException(status_code=404, detail="No authorized registered AI agent available to test.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No authorized registered AI agent available to test."
+        )
 
-    res = red_team_engine.execute_test(agent_id=agent.id, attack_type=req.attack_type)
+    res = red_team_engine.execute_test(agent=agent, attack_type=req.attack_type, db=db)
 
     test_rec = models.SecurityTest(
         agent_id=agent.id,
@@ -44,8 +47,43 @@ def run_security_test(
     db.commit()
     db.refresh(test_rec)
 
+    # Tenant-isolated Audit Log
+    audit = models.AuditLog(
+        org_id=str(agent.org_id),
+        event_type="RED_TEAM_TEST_EXECUTED",
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action=f"Executed {res['test_category']} ({res['test_type']}) on agent {agent.agent_code}",
+        resource=f"agent:{agent.id}",
+        result=res["defense_result"],
+        metadata_json={
+            "test_id": str(test_rec.id),
+            "test_category": res["test_category"],
+            "expected_outcome": res["expected_outcome"],
+            "actual_outcome": res["actual_outcome"],
+            "security_score": res["security_score"],
+            "policy_applied": res["policy_applied"]
+        }
+    )
+    db.add(audit)
+    db.commit()
+
     return {
-        "test": test_rec,
+        "test": {
+            "id": str(test_rec.id),
+            "agent_id": str(test_rec.agent_id),
+            "test_type": test_rec.test_type,
+            "attack_payload": test_rec.attack_payload,
+            "defense_result": test_rec.defense_result,
+            "security_score": test_rec.security_score,
+            "timestamp": test_rec.timestamp.isoformat() if test_rec.timestamp else None
+        },
+        "test_category": res["test_category"],
+        "expected_outcome": res["expected_outcome"],
+        "actual_outcome": res["actual_outcome"],
+        "defense_result": res["defense_result"],
+        "security_score": res["security_score"],
+        "policy_applied": res["policy_applied"],
         "mitigation_detail": res["mitigation_detail"],
         "recommendation": res["recommendation"]
     }

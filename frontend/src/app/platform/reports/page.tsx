@@ -12,13 +12,16 @@ export default function PlatformReportsPage() {
     try {
       const endpoint = format === "pdf" ? "/reports/export/pdf" : format === "excel" ? "/reports/export/excel" : "/reports/export/csv";
       const token = localStorage.getItem("agentguard_token");
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/+$/, "");
       const res = await fetch(`${baseUrl}${endpoint}?type=${reportType}`, {
         headers: {
-          Authorization: `Bearer ${token}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
       });
-      if (!res.ok) throw new Error("Failed to export report.");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || `Failed to export report (HTTP ${res.status}).`);
+      }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");

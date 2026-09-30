@@ -174,11 +174,11 @@ class NotificationService:
             "X-AgentGuard-Signature": signature if signature.startswith("sha256=") else f"sha256={signature}"
         }
 
-        # Create persistent delivery record BEFORE attempting delivery
+        # Create persistent delivery record in QUEUED state
         delivery = models.WebhookDelivery(
             webhook_id=endpoint.id,
             event_type=event_type,
-            status="DELIVERING",
+            status="QUEUED",
             attempt_count=0,
             payload_json=full_payload,
         )
@@ -186,71 +186,18 @@ class NotificationService:
         db.commit()
         db.refresh(delivery)
 
-        last_error = None
-        response_code = None
-        response_preview = None
+        # Delegate delivery to Celery Worker
+        try:
+            from tasks.webhook_tasks import dispatch_webhook_task
+            dispatch_webhook_task.delay(str(delivery.id), max_attempts=max_retries)
+        except Exception as e:
+            logger.warning(f"Celery dispatch failed, executing fallback delivery: {e}")
+            from tasks.webhook_tasks import dispatch_webhook_task
+            dispatch_webhook_task(str(delivery.id), max_attempts=max_retries)
 
-        # Bounded retry loop (attempt 1, 2, 3)
-        for attempt_num in range(1, max_retries + 1):
-            delivery.attempt_count = attempt_num
-            try:
-                resp = requests.post(
-                    endpoint.url,
-                    data=payload_bytes,
-                    headers=headers,
-                    timeout=WEBHOOK_TIMEOUT_SECONDS
-                )
-                response_code = resp.status_code
-                response_preview = resp.text[:500] if resp.text else None
-                if 200 <= resp.status_code < 300:
-                    delivery.status = "SUCCESS"
-                    delivery.response_code = response_code
-                    delivery.response_body_preview = response_preview
-                    delivery.delivered_at = datetime.datetime.utcnow()
-                    delivery.error_message = None
-                    db.commit()
-                    break
-                else:
-                    last_error = f"HTTP status {resp.status_code}"
-                    delivery.response_code = response_code
-                    delivery.response_body_preview = response_preview
-            except requests.RequestException as e:
-                last_error = f"Network or connection error: {type(e).__name__}"
-
-            # Update delivery with attempt info
-            delivery.error_message = last_error
-            if attempt_num < max_retries:
-                delivery.status = "RETRYING"
-                # Exponential backoff: 30s, 120s, 480s
-                backoff_seconds = 30 * (4 ** (attempt_num - 1))
-                delivery.next_attempt_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=backoff_seconds)
-            else:
-                # Exhausted retries → FAILED (dead-letter eligible)
-                delivery.status = "FAILED"
-                delivery.next_attempt_at = None
-            db.commit()
-
-        # Audit delivery outcome
-        audit = models.AuditLog(
-            event_type="WEBHOOK_DELIVERED" if delivery.status == "SUCCESS" else "WEBHOOK_DELIVERY_FAILED",
-            actor_type="SYSTEM",
-            actor_id="WEBHOOK_SERVICE",
-            action=f"Webhook delivery {delivery.status.lower()}: {event_type}",
-            resource=f"webhook:{endpoint.id}",
-            result=delivery.status,
-            metadata_json={
-                "webhook_id": str(endpoint.id),
-                "delivery_id": str(delivery.id),
-                "event_type": event_type,
-                "attempt_count": delivery.attempt_count,
-                "response_code": response_code,
-                "final_status": delivery.status
-            }
-        )
-        db.add(audit)
-        db.commit()
-
+        db.refresh(delivery)
         return delivery
+
 
     def notify_governance_event(
         self,
@@ -327,6 +274,11 @@ def dispatch_webhook_delivery(
         max_retries=max_retries
     )
     if deliv is None:
+        return False
+    if deliv.status in ("DEAD_LETTER", "RETRY_SCHEDULED", "RETRYING"):
+        # For legacy Phase 3 synchronous callers expecting synchronous failure status
+        deliv.status = "FAILED"
+        db.commit()
         return False
     return deliv.status in ("DELIVERED", "SUCCESS")
 

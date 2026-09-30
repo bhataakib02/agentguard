@@ -1,46 +1,176 @@
 import sys
 import unittest
-import requests
-import json
 from sqlalchemy import text
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, r"d:\AGENTGUARD\backend")
-from database import engine
+from database import engine, SessionLocal
 from config import settings
 from main import app
-
-SUPABASE_URL = settings.SUPABASE_URL
-PUBLISHABLE_KEY = settings.SUPABASE_PUBLISHABLE_KEY
-TEST_PASSWORD = "Blackbird@12."
-
-def get_auth_token(email):
-    headers = {"apikey": PUBLISHABLE_KEY, "Content-Type": "application/json"}
-    login_url = f"{SUPABASE_URL}/auth/v1/token?grant_type=password"
-    resp = requests.post(login_url, json={"email": email, "password": TEST_PASSWORD}, headers=headers)
-    if resp.status_code == 200:
-        return resp.json().get("access_token")
-    return None
+from core import security
+import models
 
 class TestIdentityRelationships(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
-        cls.token_acme_user = get_auth_token("zoya@acme.com")
-        cls.token_acme_admin = get_auth_token("aarav@acme.com")
-        cls.token_nexa_admin = get_auth_token("zoya@nexa.com")
-        cls.token_super_admin = get_auth_token("thefreelancer2076@gmail.com")
+        cls.db = SessionLocal()
 
-        with engine.connect() as conn:
-            cls.acme_org_id = str(conn.execute(text("SELECT id FROM public.organizations WHERE slug = 'acme-technologies';")).scalar())
-            cls.nexa_org_id = str(conn.execute(text("SELECT id FROM public.organizations WHERE slug = 'nexa-financial-services';")).scalar())
-            
-            cls.acme_user = conn.execute(text("SELECT * FROM public.users WHERE email = 'zoya@acme.com';")).mappings().fetchone()
-            cls.nexa_user = conn.execute(text("SELECT * FROM public.users WHERE email = 'kabir@nexa.com';")).mappings().fetchone()
+        try:
+            # 1. Ensure Org A (Acme Identity Corporation)
+            org_a = cls.db.query(models.Organization).filter(
+                (models.Organization.slug == "acme-identity-corp") |
+                (models.Organization.name == "Acme Identity Corporation")
+            ).first()
+            if not org_a:
+                org_a = models.Organization(
+                    name="Acme Identity Corporation",
+                    slug="acme-identity-corp",
+                    domain="acme-identity.com",
+                    status="ACTIVE"
+                )
+                cls.db.add(org_a)
+                cls.db.commit()
+                cls.db.refresh(org_a)
+            else:
+                if org_a.slug != "acme-identity-corp":
+                    org_a.slug = "acme-identity-corp"
+                    cls.db.commit()
+            cls.acme_org_id = str(org_a.id)
 
-            cls.acme_agent = conn.execute(text("SELECT * FROM public.agents WHERE org_id = :org_id LIMIT 1;"), {"org_id": cls.acme_org_id}).mappings().fetchone()
-            cls.nexa_agent = conn.execute(text("SELECT * FROM public.agents WHERE org_id = :org_id LIMIT 1;"), {"org_id": cls.nexa_org_id}).mappings().fetchone()
+            # 2. Ensure Org B (Nexa Financial Services)
+            org_b = cls.db.query(models.Organization).filter(
+                (models.Organization.slug == "nexa-financial-services") |
+                (models.Organization.name == "Nexa Financial Services")
+            ).first()
+            if not org_b:
+                org_b = models.Organization(
+                    name="Nexa Financial Services",
+                    slug="nexa-financial-services",
+                    domain="nexa.com",
+                    status="ACTIVE"
+                )
+                cls.db.add(org_b)
+                cls.db.commit()
+                cls.db.refresh(org_b)
+            else:
+                if org_b.slug != "nexa-financial-services":
+                    org_b.slug = "nexa-financial-services"
+                    cls.db.commit()
+            cls.nexa_org_id = str(org_b.id)
+
+            # Helper to idempotently provision or update users
+            def ensure_user(org_id, email, full_name, role):
+                u = cls.db.query(models.User).filter(models.User.email == email).first()
+                if not u:
+                    u = models.User(
+                        org_id=org_id,
+                        email=email,
+                        full_name=full_name,
+                        role=role,
+                        status="ACTIVE"
+                    )
+                    cls.db.add(u)
+                    cls.db.commit()
+                    cls.db.refresh(u)
+                else:
+                    if u.org_id != org_id or u.role != role or u.status != "ACTIVE":
+                        u.org_id = org_id
+                        u.role = role
+                        u.status = "ACTIVE"
+                        cls.db.commit()
+                        cls.db.refresh(u)
+                return u
+
+            cls.user_acme = ensure_user(org_a.id, "zoya@acme.com", "Zoya Khan", "USER")
+            cls.admin_acme = ensure_user(org_a.id, "aarav@acme.com", "Aarav Patel", "ADMIN")
+            cls.kabir_acme = ensure_user(org_a.id, "kabir@acme.com", "Kabir Mehta", "USER")
+
+            cls.admin_nexa = ensure_user(org_b.id, "zoya@nexa.com", "Zoya Khan", "ADMIN")
+            cls.user_nexa = ensure_user(org_b.id, "kabir@nexa.com", "Kabir Mehta", "USER")
+
+            # Ensure SUPER_ADMIN
+            sa = cls.db.query(models.User).filter(models.User.email == "thefreelancer2076@gmail.com").first()
+            if not sa:
+                sa = cls.db.query(models.User).filter(models.User.role == "SUPER_ADMIN").first()
+                if not sa:
+                    sa = models.User(
+                        org_id=None,
+                        email="thefreelancer2076@gmail.com",
+                        full_name="Platform Super Admin",
+                        role="SUPER_ADMIN",
+                        status="ACTIVE"
+                    )
+                    cls.db.add(sa)
+                    cls.db.commit()
+                    cls.db.refresh(sa)
+                else:
+                    sa.email = "thefreelancer2076@gmail.com"
+                    cls.db.commit()
+            else:
+                if sa.role != "SUPER_ADMIN":
+                    sa.role = "SUPER_ADMIN"
+                    cls.db.commit()
+            cls.super_admin = sa
+
+            # Ensure Agent in Org A
+            agent_a = cls.db.query(models.Agent).filter(models.Agent.org_id == org_a.id).first()
+            if not agent_a:
+                agent_a = models.Agent(
+                    org_id=org_a.id,
+                    name="ACME Core Agent",
+                    agent_code="AGT-ACME-TEST-01",
+                    purpose="Automated test agent for identity relationship suite",
+                    autonomy_level="HIGH",
+                    status="ACTIVE",
+                    owner_id=cls.user_acme.id
+                )
+                cls.db.add(agent_a)
+                cls.db.commit()
+                cls.db.refresh(agent_a)
+            cls.acme_agent = {"id": str(agent_a.id), "name": agent_a.name, "org_id": str(agent_a.org_id)}
+
+            # Ensure Agent in Org B
+            agent_b = cls.db.query(models.Agent).filter(models.Agent.org_id == org_b.id).first()
+            if not agent_b:
+                agent_b = models.Agent(
+                    org_id=org_b.id,
+                    name="Nexa Risk Agent",
+                    agent_code="AGT-NEXA-TEST-01",
+                    purpose="Automated test agent for identity relationship suite",
+                    autonomy_level="MEDIUM",
+                    status="ACTIVE",
+                    owner_id=cls.user_nexa.id
+                )
+                cls.db.add(agent_b)
+                cls.db.commit()
+                cls.db.refresh(agent_b)
+            cls.nexa_agent = {"id": str(agent_b.id), "name": agent_b.name, "org_id": str(agent_b.org_id)}
+
+            # Ensure at least one Decision exists in the DB for test_10
+            decision = cls.db.query(models.Decision).first()
+            if not decision:
+                decision = models.Decision(
+                    org_id=org_a.id,
+                    agent_id=agent_a.id,
+                    decision="ALLOW",
+                    action_type="DATA_QUERY",
+                    risk_score=0.1
+                )
+                cls.db.add(decision)
+                cls.db.commit()
+
+            cls.acme_user = {"id": str(cls.user_acme.id), "org_id": str(cls.user_acme.org_id), "email": cls.user_acme.email}
+            cls.nexa_user = {"id": str(cls.user_nexa.id), "org_id": str(cls.user_nexa.org_id), "email": cls.user_nexa.email}
+
+            # Deterministic, local cryptographic JWT access tokens
+            cls.token_acme_user = security.create_access_token(cls.user_acme.id, email=cls.user_acme.email, role=cls.user_acme.role)
+            cls.token_acme_admin = security.create_access_token(cls.admin_acme.id, email=cls.admin_acme.email, role=cls.admin_acme.role)
+            cls.token_nexa_admin = security.create_access_token(cls.admin_nexa.id, email=cls.admin_nexa.email, role=cls.admin_nexa.role)
+            cls.token_super_admin = security.create_access_token(cls.super_admin.id, email=cls.super_admin.email, role=cls.super_admin.role)
+        finally:
+            cls.db.close()
 
     def test_01_user_belongs_to_one_organization(self):
         """TEST A: User belongs to exactly one organization via Foreign Key"""
@@ -135,7 +265,7 @@ class TestIdentityRelationships(unittest.TestCase):
         self.assertEqual(resp_patch.status_code, 200)
 
         # Re-authenticate kabir@acme.com
-        new_token = get_auth_token("kabir@acme.com")
+        new_token = security.create_access_token(target['id'], email="kabir@acme.com")
         resp_me = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {new_token}"})
         self.assertEqual(resp_me.json()["role"], "ANALYST")
         print("  [PASS] Test J: Role change persists across re-authentication")

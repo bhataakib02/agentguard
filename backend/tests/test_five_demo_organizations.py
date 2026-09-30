@@ -11,12 +11,19 @@ from database import SessionLocal
 from core import security
 import models
 
+from scripts.seed_demo_orgs import seed_five_demo_organizations
+
 client = TestClient(app)
 
 class TestFiveDemoOrganizations(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.db = SessionLocal()
+
+        # Ensure 5 demo organizations are seeded
+        if not cls.db.query(models.User).filter(models.User.email == "admin@acmefintech.com").first():
+            seed_five_demo_organizations()
+            cls.db.expire_all()
 
         # Provision SUPER_ADMIN
         cls.super_admin_email = "super_admin_demo5@agentguard.com"
@@ -50,16 +57,18 @@ class TestFiveDemoOrganizations(unittest.TestCase):
         return h
 
     def get_user_by_email(self, email):
+        self.db.expire_all()
         return self.db.query(models.User).filter(models.User.email == email).first()
 
     def test_01_verify_all_5_organizations_exist(self):
         """VERIFY 1-3: Verify 5 demo orgs exist in PostgreSQL with valid licenses and custom branding"""
+        self.db.expire_all()
         expected_names = [
-            "ACME Technologies",
-            "Nexa Financial Services",
-            "MedCore Health Systems",
-            "UrbanGrid Logistics",
-            "EduNova Learning"
+            "Acme Financial Technologies",
+            "NovaCare Health Systems",
+            "Vertex Manufacturing Industries",
+            "Orbit Retail & Commerce",
+            "Skyline Logistics & Mobility"
         ]
 
         for name in expected_names:
@@ -74,13 +83,14 @@ class TestFiveDemoOrganizations(unittest.TestCase):
 
     def test_02_verify_8_human_users_per_organization_and_roles(self):
         """VERIFY 4-5 & 20: Each org has exactly 8 human users with distinct roles (ADMIN, MANAGER, etc.)"""
+        self.db.expire_all()
         orgs = self.db.query(models.Organization).filter(
             models.Organization.name.in_([
-                "ACME Technologies",
-                "Nexa Financial Services",
-                "MedCore Health Systems",
-                "UrbanGrid Logistics",
-                "EduNova Learning"
+                "Acme Financial Technologies",
+                "NovaCare Health Systems",
+                "Vertex Manufacturing Industries",
+                "Orbit Retail & Commerce",
+                "Skyline Logistics & Mobility"
             ])
         ).all()
 

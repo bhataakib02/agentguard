@@ -15,8 +15,31 @@ client = TestClient(app)
 
 class TestEnterpriseReportCenterSuite(unittest.TestCase):
     @classmethod
+    def _cleanup_test_data(cls):
+        try:
+            for email in ["admin_rpt_a@acme-reports.com", "admin_rpt_b@xyz-reports.com"]:
+                u = cls.db.query(models.User).filter(models.User.email == email).first()
+                if u and u.org_id:
+                    cls.db.query(models.ReportHistory).filter(models.ReportHistory.org_id == u.org_id).delete()
+                    cls.db.query(models.ScheduledReport).filter(models.ScheduledReport.org_id == u.org_id).delete()
+                    cls.db.query(models.User).filter(models.User.org_id == u.org_id).delete()
+                    cls.db.query(models.Organization).filter(models.Organization.id == u.org_id).delete()
+                    cls.db.commit()
+            for domain in ["acme-reports.com", "xyz-reports.com"]:
+                org = cls.db.query(models.Organization).filter(models.Organization.domain == domain).first()
+                if org:
+                    cls.db.query(models.ReportHistory).filter(models.ReportHistory.org_id == org.id).delete()
+                    cls.db.query(models.ScheduledReport).filter(models.ScheduledReport.org_id == org.id).delete()
+                    cls.db.query(models.User).filter(models.User.org_id == org.id).delete()
+                    cls.db.query(models.Organization).filter(models.Organization.id == org.id).delete()
+                    cls.db.commit()
+        except Exception:
+            cls.db.rollback()
+
+    @classmethod
     def setUpClass(cls):
         cls.db = SessionLocal()
+        cls._cleanup_test_data()
 
         # Provision SUPER_ADMIN
         cls.super_admin_email = "super_admin_rpt@agentguard.com"
@@ -40,6 +63,7 @@ class TestEnterpriseReportCenterSuite(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        cls._cleanup_test_data()
         cls.db.close()
 
     def get_auth_headers(self, user_obj, extra_headers=None):
@@ -58,26 +82,26 @@ class TestEnterpriseReportCenterSuite(unittest.TestCase):
 
         # 1. Provision Org A
         resp_a = client.post("/api/platform/organizations", json={
-            "name": "Acme Technologies",
-            "domain": "acme.com",
+            "name": "Acme Report Enterprise",
+            "domain": "acme-reports.com",
             "plan_id": "STARTER",
-            "admin_email": "admin_rpt_a@acme.com",
+            "admin_email": "admin_rpt_a@acme-reports.com",
             "admin_full_name": "Acme Admin"
         }, headers=sa_headers)
         self.assertEqual(resp_a.status_code, 200)
 
         # 2. Provision Org B
         resp_b = client.post("/api/platform/organizations", json={
-            "name": "XYZ Corporation",
-            "domain": "xyz.com",
+            "name": "XYZ Report Enterprise",
+            "domain": "xyz-reports.com",
             "plan_id": "STARTER",
-            "admin_email": "admin_rpt_b@xyz.com",
+            "admin_email": "admin_rpt_b@xyz-reports.com",
             "admin_full_name": "XYZ Admin"
         }, headers=sa_headers)
         self.assertEqual(resp_b.status_code, 200)
 
-        admin_a = self.get_user_by_email("admin_rpt_a@acme.com")
-        admin_b = self.get_user_by_email("admin_rpt_b@xyz.com")
+        admin_a = self.get_user_by_email("admin_rpt_a@acme-reports.com")
+        admin_b = self.get_user_by_email("admin_rpt_b@xyz-reports.com")
         headers_a = self.get_auth_headers(admin_a)
         headers_b = self.get_auth_headers(admin_b)
 
@@ -120,8 +144,8 @@ class TestEnterpriseReportCenterSuite(unittest.TestCase):
 
     def test_02_report_download_security_and_cross_tenant_isolation(self):
         """TEST 18 & 21-22: Authorized report download works; cross-tenant download attempt rejected with 403"""
-        admin_a = self.get_user_by_email("admin_rpt_a@acme.com")
-        admin_b = self.get_user_by_email("admin_rpt_b@xyz.com")
+        admin_a = self.get_user_by_email("admin_rpt_a@acme-reports.com")
+        admin_b = self.get_user_by_email("admin_rpt_b@xyz-reports.com")
         headers_a = self.get_auth_headers(admin_a)
         headers_b = self.get_auth_headers(admin_b)
 
@@ -140,7 +164,7 @@ class TestEnterpriseReportCenterSuite(unittest.TestCase):
 
     def test_03_scheduled_report_delivery(self):
         """TEST 26: Create recurring report schedule & verify DB persistence"""
-        admin_a = self.get_user_by_email("admin_rpt_a@acme.com")
+        admin_a = self.get_user_by_email("admin_rpt_a@acme-reports.com")
         headers_a = self.get_auth_headers(admin_a)
 
         resp_sched = client.post("/api/reports/schedule", json={

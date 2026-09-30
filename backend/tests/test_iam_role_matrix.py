@@ -1,8 +1,13 @@
+import sys
+import os
 import unittest
-import requests
 import uuid
 
-BASE_URL = "http://127.0.0.1:8000/api/v1"
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from starlette.testclient import TestClient
+from main import app
+
+client = TestClient(app)
 
 class TestIamRoleMatrix(unittest.TestCase):
 
@@ -16,7 +21,7 @@ class TestIamRoleMatrix(unittest.TestCase):
             "password": "SecurePassword123!",
             "role": "SUPER_ADMIN"  # Intentionally attempt privilege escalation
         }
-        res = requests.post(f"{BASE_URL}/auth/register", json=payload)
+        res = client.post("/api/v1/auth/register", json=payload)
         self.assertEqual(res.status_code, 200, f"Registration failed: {res.text}")
         data = res.json()
         self.assertEqual(data["role"], "USER", f"Expected forced role USER, got {data['role']}")
@@ -27,7 +32,7 @@ class TestIamRoleMatrix(unittest.TestCase):
         """TEST 14: ADMIN attempting to assign SUPER_ADMIN must be rejected with 403 Forbidden."""
         # 1. Register Admin User
         admin_email = f"admin_{uuid.uuid4().hex[:6]}@enterprise.ai"
-        reg_admin = requests.post(f"{BASE_URL}/auth/register", json={
+        reg_admin = client.post("/api/v1/auth/register", json={
             "org_name": "Org Alpha",
             "full_name": "Admin User",
             "email": admin_email,
@@ -38,7 +43,7 @@ class TestIamRoleMatrix(unittest.TestCase):
 
         # 2. Register Target User
         target_email = f"target_{uuid.uuid4().hex[:6]}@enterprise.ai"
-        reg_target = requests.post(f"{BASE_URL}/auth/register", json={
+        reg_target = client.post("/api/v1/auth/register", json={
             "org_name": "Org Alpha",
             "full_name": "Target User",
             "email": target_email,
@@ -47,8 +52,8 @@ class TestIamRoleMatrix(unittest.TestCase):
         target_id = reg_target["user_id"]
 
         # 3. Standard ADMIN attempts to upgrade Target User to SUPER_ADMIN -> MUST fail with 403
-        res = requests.patch(
-            f"{BASE_URL}/admin/users/{target_id}/role",
+        res = client.patch(
+            f"/api/v1/admin/users/{target_id}/role",
             json={"role": "SUPER_ADMIN"},
             headers=headers
         )
@@ -58,7 +63,7 @@ class TestIamRoleMatrix(unittest.TestCase):
     def test_03_self_role_modification_protection(self):
         """TEST 15-16: User attempting self role modification MUST receive 403 Forbidden."""
         user_email = f"self_user_{uuid.uuid4().hex[:6]}@enterprise.ai"
-        reg_data = requests.post(f"{BASE_URL}/auth/register", json={
+        reg_data = client.post("/api/v1/auth/register", json={
             "org_name": "Org Self",
             "full_name": "Self User",
             "email": user_email,
@@ -69,8 +74,8 @@ class TestIamRoleMatrix(unittest.TestCase):
         headers = {"Authorization": f"Bearer {token}"}
 
         # Attempt self-escalation to ADMIN
-        res = requests.patch(
-            f"{BASE_URL}/admin/users/{user_id}/role",
+        res = client.patch(
+            f"/api/v1/admin/users/{user_id}/role",
             json={"role": "ADMIN"},
             headers=headers
         )
@@ -80,7 +85,7 @@ class TestIamRoleMatrix(unittest.TestCase):
     def test_04_organization_isolation(self):
         """TEST 19: Organization A Admin accessing Organization B user must be denied."""
         # Create Org A User
-        user_a = requests.post(f"{BASE_URL}/auth/register", json={
+        user_a = client.post("/api/v1/auth/register", json={
             "org_name": "Org A",
             "full_name": "User A",
             "email": f"usera_{uuid.uuid4().hex[:6]}@enterprise.ai",
@@ -90,7 +95,7 @@ class TestIamRoleMatrix(unittest.TestCase):
         headers_a = {"Authorization": f"Bearer {token_a}"}
 
         # Create Org B User
-        user_b = requests.post(f"{BASE_URL}/auth/register", json={
+        user_b = client.post("/api/v1/auth/register", json={
             "org_name": "Org B",
             "full_name": "User B",
             "email": f"userb_{uuid.uuid4().hex[:6]}@enterprise.ai",
@@ -99,8 +104,8 @@ class TestIamRoleMatrix(unittest.TestCase):
         target_b_id = user_b["user_id"]
 
         # User A attempts to modify User B -> MUST fail with 403 Forbidden
-        res = requests.patch(
-            f"{BASE_URL}/admin/users/{target_b_id}/role",
+        res = client.patch(
+            f"/api/v1/admin/users/{target_b_id}/role",
             json={"role": "ANALYST"},
             headers=headers_a
         )
