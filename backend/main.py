@@ -1,8 +1,9 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine, Base
+from database import engine, Base, get_db
 from ws_manager import manager as ws_manager
 from config import settings
+import datetime
 
 # Import routers
 from routers import (
@@ -16,8 +17,9 @@ from routers import (
 
 from bootstrap import bootstrap_database
 
-# Initialize DB Tables and Canonical Reference Data
-bootstrap_database()
+# Initialize DB Tables and Canonical Reference Data if enabled
+if getattr(settings, "AUTO_BOOTSTRAP_DB", True):
+    bootstrap_database()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -97,6 +99,44 @@ def root():
         "docs": "/docs",
         "api_v1": settings.API_V1_STR
     }
+
+@app.get("/health/live")
+@app.get("/health/liveness")
+@app.get(f"{settings.API_V1_STR}/health/live")
+def health_liveness():
+    """
+    Liveness probe: verifies that the FastAPI process is alive and responsive.
+    """
+    return {
+        "status": "ALIVE",
+        "process": "RUNNING",
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    }
+
+@app.get("/health/ready")
+@app.get("/health/readiness")
+@app.get(f"{settings.API_V1_STR}/health/ready")
+def health_readiness(response: Response, db: SessionLocal = Depends(get_db)):
+    """
+    Readiness probe: verifies that the service can connect to the database and serve traffic.
+    Returns 200 if database is healthy; 503 if database connectivity fails.
+    """
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1;"))
+        return {
+            "status": "READY",
+            "database": "CONNECTED",
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "NOT_READY",
+            "database": "DISCONNECTED",
+            "error": str(e),
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
