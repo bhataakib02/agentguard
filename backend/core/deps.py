@@ -403,3 +403,126 @@ def check_license_limit(org_id: str, resource_type: str, db: Session):
                 detail=f"LICENSE_LIMIT_REACHED: Organization has reached maximum AI agent limit ({max_agents}) under current plan"
             )
     return True
+
+
+from dataclasses import dataclass
+
+@dataclass
+class AuthenticatedAgent:
+    agent: models.Agent
+    agent_id: str
+    agent_code: str
+    org_id: str
+    autonomy_level: str
+    auth_method: str  # "MACHINE_JWT" or "AGENT_KEY"
+    credential_id: Optional[str] = None
+    jti: Optional[str] = None
+
+
+def get_current_machine_agent(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_agent_code: Optional[str] = Header(None, alias="X-Agent-Code"),
+    x_agent_key: Optional[str] = Header(None, alias="X-Agent-Key"),
+    db: Session = Depends(get_db)
+) -> AuthenticatedAgent:
+    """
+    Centralized machine agent authentication dependency.
+    Accepts:
+      1. Authorization: Bearer <machine-jwt>
+      2. X-Agent-Code and X-Agent-Key (raw machine credential)
+    Verifies agent identity, active status, organization binding,
+    and returns AuthenticatedAgent.
+    Rejects unauthorized, expired, or cross-tenant mismatches.
+    """
+    from services.machine_auth_service import machine_auth_service
+
+    # Option 1: Bearer Machine JWT
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ", 1)[1].strip()
+        try:
+            res = machine_auth_service.decode_and_verify_machine_jwt(token, db)
+            return AuthenticatedAgent(
+                agent=res["agent"],
+                agent_id=res["agent_id"],
+                agent_code=res["agent_code"],
+                org_id=res["org_id"],
+                autonomy_level=res["autonomy_level"],
+                auth_method="MACHINE_JWT",
+                credential_id=res["payload"].get("credential_id"),
+                jti=res["jti"]
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Machine authentication failed: {str(e)}",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+
+    # Option 2: Direct Machine Agent Key Header
+    if x_agent_key:
+        try:
+            agent, cred = machine_auth_service.authenticate_agent_credential(
+                db=db,
+                credential_plaintext=x_agent_key,
+                agent_code=x_agent_code
+            )
+            return AuthenticatedAgent(
+                agent=agent,
+                agent_id=str(agent.id),
+                agent_code=agent.agent_code,
+                org_id=str(agent.org_id),
+                autonomy_level=agent.autonomy_level,
+                auth_method="AGENT_KEY",
+                credential_id=str(cred.id)
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Machine authentication failed: {str(e)}"
+            )
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Machine authentication credentials missing. Provide 'Authorization: Bearer <machine-jwt>' or 'X-Agent-Key'.",
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+def get_authenticated_entity(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_agent_code: Optional[str] = Header(None, alias="X-Agent-Code"),
+    x_agent_key: Optional[str] = Header(None, alias="X-Agent-Key"),
+    db: Session = Depends(get_db)
+):
+    """
+    Unified authentication dependency for endpoints that accept EITHER
+    human users (via user JWT / API key) OR machine agents (via machine JWT / agent key).
+    Returns either a models.User or an AuthenticatedAgent.
+    """
+    # Try machine agent first if machine headers are present or token is machine
+    if x_agent_key:
+        return get_current_machine_agent(
+            authorization=authorization,
+            x_agent_code=x_agent_code,
+            x_agent_key=x_agent_key,
+            db=db
+        )
+
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ", 1)[1].strip()
+        try:
+            # Quick check if it's a machine JWT
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"], options={"verify_exp": False})
+            if payload.get("token_type") == "machine":
+                return get_current_machine_agent(authorization=authorization, db=db)
+        except Exception:
+            pass
+
+    # Fall back to human user authentication
+    return get_current_user(
+        authorization=authorization,
+        x_api_key=x_api_key,
+        db=db
+    )
+

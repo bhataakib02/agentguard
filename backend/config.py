@@ -117,6 +117,21 @@ class Settings:
         self.S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "").strip()
         self.S3_REGION = os.getenv("S3_REGION", "us-east-1").strip()
 
+        # Data Governance & Retention
+        self.AUDIT_LOG_RETENTION_DAYS = int(os.getenv("AUDIT_LOG_RETENTION_DAYS", "365"))
+        self.TELEMETRY_RETENTION_DAYS = int(os.getenv("TELEMETRY_RETENTION_DAYS", "90"))
+        self.EXPIRED_SESSION_RETENTION_DAYS = int(os.getenv("EXPIRED_SESSION_RETENTION_DAYS", "7"))
+
+        # LLM Provider Configuration for AI Assistant & Intelligence
+        self.LLM_PROVIDER = os.getenv("LLM_PROVIDER", "AUTO").upper()  # AUTO, OPENAI, ANTHROPIC, GEMINI, NONE
+        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+        self.OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+        self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+        self.ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022").strip()
+        self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+        self.GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+
 settings = Settings()
+
 
 

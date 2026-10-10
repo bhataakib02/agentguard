@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentguard"
+version = "1.0.0"
+description = "Official Python SDK and Runtime Governance Guardrails for AgentGuard"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "AgentGuard Core Security Team", email = "security@agentguard.dev" }
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "requests>=2.28.0",
+]
+
+[project.optional-dependencies]
+langchain = [
+    "langchain-core>=0.1.0",
+]
+crewai = [
+    "crewai>=0.1.0",
+]
+all = [
+    "langchain-core>=0.1.0",
+    "crewai>=0.1.0",
+    "cryptography>=3.4.0",
+]

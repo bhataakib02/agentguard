@@ -87,3 +87,32 @@ def run_security_test(
         "mitigation_detail": res["mitigation_detail"],
         "recommendation": res["recommendation"]
     }
+
+@router.post("/fuzz", response_model=schemas.RedTeamFuzzResponse)
+def fuzz_agent_policies(
+    req: schemas.RedTeamFuzzRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Agent).filter((models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id))
+    if current_user.role != "SUPER_ADMIN":
+        query = query.filter(models.Agent.org_id == current_user.org_id)
+    agent = query.first()
+
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No authorized registered AI agent available to fuzz."
+        )
+
+    fuzz_res = red_team_engine.fuzz_agent_policy(
+        agent=agent,
+        db=db,
+        intensity=req.intensity,
+        include_pii_tests=req.include_pii_tests,
+        include_injection_tests=req.include_injection_tests,
+        include_boundary_tests=req.include_boundary_tests
+    )
+
+    return fuzz_res
+

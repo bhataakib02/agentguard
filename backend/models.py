@@ -177,6 +177,10 @@ class AgentPassport(Base):
     id = Column(GUID(), primary_key=True, default=gen_uuid)
     agent_id = Column(GUID(), ForeignKey("agents.id"), unique=True, nullable=False)
     passport_number = Column(String, unique=True, nullable=False)
+    algorithm = Column(String, default="Ed25519")
+    key_id = Column(String, default="agentguard-root-1")
+    passport_version = Column(String, default="1.0")
+    claims = Column(JSON, nullable=True)
     digital_signature = Column(String, nullable=False)
     issued_at = Column(DateTime, default=datetime.datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
@@ -190,13 +194,33 @@ class AgentCredential(Base):
 
     id = Column(GUID(), primary_key=True, default=gen_uuid)
     agent_id = Column(GUID(), ForeignKey("agents.id"), nullable=False)
+    name = Column(String, nullable=True)
+    key_prefix = Column(String, nullable=True)
     credential_type = Column(String, nullable=False)  # API_KEY, OAUTH_TOKEN, PRIVATE_KEY
     key_hash = Column(String, nullable=False)
     status = Column(String, default="ACTIVE")  # ACTIVE, EXPIRED, REVOKED
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
 
     agent = relationship("Agent", back_populates="credentials")
+
+
+class AgentRuntimeSession(Base):
+    __tablename__ = "agent_runtime_sessions"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    agent_id = Column(GUID(), ForeignKey("agents.id"), nullable=False)
+    session_token_jti = Column(String, unique=True, index=True, nullable=False)
+    status = Column(String, default="ACTIVE")  # ACTIVE, CLOSED, EXPIRED, TERMINATED
+    started_at = Column(DateTime, default=datetime.datetime.utcnow)
+    last_heartbeat_at = Column(DateTime, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    client_ip = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+
+    agent = relationship("Agent")
 
 
 class Permission(Base):
@@ -217,12 +241,19 @@ class Tool(Base):
     __tablename__ = "tools"
 
     id = Column(GUID(), primary_key=True, default=gen_uuid)
-    name = Column(String, nullable=False)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=True)
+    name = Column(String, nullable=False, index=True)
     category = Column(String, default="API")  # DATABASE, EMAIL, PAYMENT, REFUND, CLOUD, CRM, STORAGE
     endpoint = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
     risk_level = Column(String, default="MEDIUM")  # LOW, MEDIUM, HIGH, CRITICAL
     status = Column(String, default="ACTIVE")
     latency_ms = Column(Integer, default=120)
+    schema_definition = Column(JSON, default=dict)  # OpenAPI / JSON Schema definition of inputs
+    headers_json = Column(JSON, default=dict)  # Custom headers or auth config
+    timeout_seconds = Column(Integer, default=30)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
 class Capability(Base):
@@ -297,6 +328,11 @@ class Decision(Base):
     explanation = Column(Text, nullable=False)
     execution_status = Column(String, default="EXECUTED")  # EXECUTED, BLOCKED, PENDING_APPROVAL
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    execution_gate_token = Column(String, nullable=True, index=True)
+    gate_token_used = Column(Boolean, default=False)
+    executed_at = Column(DateTime, nullable=True)
+    tool_id = Column(GUID(), ForeignKey("tools.id"), nullable=True)
+    execution_parameters = Column(JSON, default=dict)
 
     agent = relationship("Agent", back_populates="decisions")
     approval_request = relationship("ApprovalRequest", back_populates="decision", uselist=False, cascade="all, delete-orphan")
