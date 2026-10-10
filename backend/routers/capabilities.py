@@ -84,3 +84,40 @@ async def revoke_capability_token(
     db.commit()
 
     return {"status": "SUCCESS", "message": f"Capability token {token_code} has been revoked."}
+
+
+@router.post("/validate")
+def validate_capability_token_endpoint(
+    req: schemas.CapabilityTokenValidateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Validates a capability token against agent, capability scope, expiration, and amount limits.
+    """
+    agent = None
+    if req.agent_id:
+        agent = db.query(models.Agent).filter(
+            (models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id)
+        ).first()
+
+    validation = capability_engine.validate_token(
+        db=db,
+        token_code=req.token_code,
+        agent=agent,
+        required_capability=req.capability_name,
+        requested_amount=req.amount or 0.0,
+        requested_scope=req.scope
+    )
+
+    token_rec = validation.get("token")
+    return {
+        "valid": validation["valid"],
+        "reason": validation["reason"],
+        "token_code": req.token_code,
+        "capability_name": token_rec.capability_name if token_rec else None,
+        "scope": token_rec.scope if token_rec else None,
+        "amount_limit": token_rec.amount_limit if token_rec else None,
+        "expires_at": token_rec.expires_at.isoformat() if token_rec and token_rec.expires_at else None,
+        "status": token_rec.status if token_rec else "NOT_FOUND"
+    }
+

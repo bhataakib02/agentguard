@@ -1,0 +1,25 @@
+{
+  "name": "@agentguard/sdk",
+  "version": "1.0.0",
+  "description": "Official TypeScript/Node.js SDK for AgentGuard AI Runtime Governance Control Plane",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "agentguard",
+    "ai-agents",
+    "governance",
+    "guardrails",
+    "security",
+    "llm",
+    "langchain"
+  ],
+  "author": "AgentGuard Security Team <security@agentguard.dev>",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

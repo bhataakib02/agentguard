@@ -83,14 +83,54 @@ def ensure_canonical_plans(db: Session = None):
         if close_db:
             db.close()
 
+def ensure_schema_compatibility(db_engine=engine):
+    """
+    Safely checks and adds any missing columns to existing tables
+    (SQLite and PostgreSQL compatible) to ensure backward compatibility
+    without drops or destructive resets.
+    """
+    from sqlalchemy import inspect, text
+    inspector = inspect(db_engine)
+    
+    # Check agent_credentials columns
+    if "agent_credentials" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("agent_credentials")}
+        with db_engine.connect() as conn:
+            if "name" not in cols:
+                conn.execute(text("ALTER TABLE agent_credentials ADD COLUMN name VARCHAR;"))
+            if "key_prefix" not in cols:
+                conn.execute(text("ALTER TABLE agent_credentials ADD COLUMN key_prefix VARCHAR;"))
+            if "last_used_at" not in cols:
+                conn.execute(text("ALTER TABLE agent_credentials ADD COLUMN last_used_at TIMESTAMP;"))
+            if "revoked_at" not in cols:
+                conn.execute(text("ALTER TABLE agent_credentials ADD COLUMN revoked_at TIMESTAMP;"))
+            conn.commit()
+
+    # Check agent_passports columns
+    if "agent_passports" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("agent_passports")}
+        with db_engine.connect() as conn:
+            if "algorithm" not in cols:
+                conn.execute(text("ALTER TABLE agent_passports ADD COLUMN algorithm VARCHAR DEFAULT 'Ed25519';"))
+            if "key_id" not in cols:
+                conn.execute(text("ALTER TABLE agent_passports ADD COLUMN key_id VARCHAR DEFAULT 'agentguard-root-1';"))
+            if "passport_version" not in cols:
+                conn.execute(text("ALTER TABLE agent_passports ADD COLUMN passport_version VARCHAR DEFAULT '1.0';"))
+            if "claims" not in cols:
+                conn.execute(text("ALTER TABLE agent_passports ADD COLUMN claims JSON;"))
+            conn.commit()
+
+
 def bootstrap_database():
     """
     Initializes metadata schema and guarantees canonical reference data.
     Safe and idempotent across PostgreSQL and SQLite.
     """
     Base.metadata.create_all(bind=engine)
+    ensure_schema_compatibility(engine)
     ensure_canonical_plans()
 
 if __name__ == "__main__":
     bootstrap_database()
     print("[AgentGuard] Database schema and canonical plans bootstrap complete.")
+

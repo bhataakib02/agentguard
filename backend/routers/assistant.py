@@ -13,4 +13,4 @@ def query_assistant(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return assistant_engine.process_query(req.question, db)
+    return assistant_engine.process_query(req.question, db, org_id=current_user.org_id)
