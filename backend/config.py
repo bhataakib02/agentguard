@@ -135,6 +135,23 @@ class Settings:
         self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
         self.GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
 
+        # -------------------------------------------------------------------------
+        # SIEM Log Streaming & Asynchronous Forwarder Pipeline Configuration
+        # -------------------------------------------------------------------------
+        self.SIEM_FORWARDER_URL = os.getenv("SIEM_FORWARDER_URL", "").strip()
+        self.SIEM_AUTH_TOKEN = os.getenv("SIEM_AUTH_TOKEN", "").strip()
+        self.SIEM_PROVIDER = os.getenv("SIEM_PROVIDER", "GENERIC_HTTP").upper().strip()  # GENERIC_HTTP, SPLUNK_HEC, DATADOG
+        self.SIEM_FORMAT = os.getenv("SIEM_FORMAT", "JSONL").upper().strip()  # JSONL, CEF
+        self.SIEM_BATCH_SIZE = int(os.getenv("SIEM_BATCH_SIZE", "100"))
+        self.SIEM_TIMEOUT_SECONDS = int(os.getenv("SIEM_TIMEOUT_SECONDS", "10"))
+        self.SIEM_MAX_RETRIES = int(os.getenv("SIEM_MAX_RETRIES", "3"))
+
+        # Dedicated SIEM Provider Specific Credentials & URLs
+        self.SPLUNK_HEC_URL = os.getenv("SPLUNK_HEC_URL", "").strip()
+        self.SPLUNK_HEC_TOKEN = os.getenv("SPLUNK_HEC_TOKEN", "").strip()
+        self.DATADOG_INTAKE_URL = os.getenv("DATADOG_INTAKE_URL", "https://http-intake.logs.datadoghq.com/api/v2/logs").strip()
+        self.DATADOG_API_KEY = os.getenv("DATADOG_API_KEY", "").strip()
+
 settings = Settings()
 
 

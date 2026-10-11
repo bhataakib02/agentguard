@@ -32,6 +32,7 @@ celery_app = Celery(
         "tasks.notification_tasks",
         "tasks.escalation_tasks",
         "tasks.retention_tasks",
+        "tasks.siem_tasks",
     ]
 )
 
@@ -58,6 +59,10 @@ celery_app.conf.update(
         },
         "retry-pending-webhooks": {
             "task": "tasks.webhook_tasks.retry_pending_webhooks_task",
+            "schedule": 300.0,  # Every 5 minutes
+        },
+        "retry-pending-siem-forwarding": {
+            "task": "tasks.siem_tasks.retry_pending_siem_deliveries_task",
             "schedule": 300.0,  # Every 5 minutes
         },
         "purge-expired-data": {

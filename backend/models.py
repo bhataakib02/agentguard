@@ -819,3 +819,65 @@ class RuntimeRiskSignal(Base):
     )
 
 
+# ============================================================================
+# PHASE 6E: Asynchronous Enterprise SIEM Event Forwarding Pipeline
+# ============================================================================
+
+class SiemCollectorConfig(Base):
+    """
+    Persistent configuration for external SIEM log collectors.
+    Can be configured per tenant (org_id set) or platform-wide (org_id is NULL).
+    Secret authentication credentials are never returned in cleartext to callers.
+    """
+    __tablename__ = "siem_configs"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=True, index=True)
+    name = Column(String, default="Primary SIEM Collector")
+    provider = Column(String, default="GENERIC_HTTP")  # GENERIC_HTTP, SPLUNK_HEC, DATADOG
+    collector_url = Column(String, nullable=False)
+    auth_token_encrypted = Column(String, nullable=True)  # Securely stored authentication credential
+    auth_token_preview = Column(String, nullable=True)    # Masked preview e.g. "sec_****ab12"
+    format = Column(String, default="JSONL")              # JSONL, CEF
+    is_active = Column(Boolean, default=True)
+    batch_size = Column(Integer, default=100)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    organization = relationship("Organization")
+
+
+class SiemDelivery(Base):
+    """
+    Tracks asynchronous batch forwarding lifecycle for immutable audit events to external SIEMs.
+    Enforces at-least-once delivery, worker claim locks, bounded retries, and sanitized audit trails.
+    """
+    __tablename__ = "siem_deliveries"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False, index=True)
+    batch_id = Column(String, nullable=False, unique=True, index=True)
+    provider = Column(String, nullable=False)             # GENERIC_HTTP, SPLUNK_HEC, DATADOG
+    format = Column(String, default="JSONL")              # JSONL, CEF
+    event_count = Column(Integer, default=0)
+    status = Column(String, default="PENDING", index=True)  # PENDING, CLAIMED, DELIVERING, DELIVERED, RETRYING, DEAD_LETTER
+    attempt_count = Column(Integer, default=0)
+    response_code = Column(Integer, nullable=True)
+    error_message = Column(Text, nullable=True)           # Sanitized error details (never raw secrets)
+    start_event_id = Column(String, nullable=True)
+    end_event_id = Column(String, nullable=True)
+    lock_token = Column(String, nullable=True)            # Distributed worker lock identifier
+    locked_at = Column(DateTime, nullable=True)
+    next_attempt_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+    organization = relationship("Organization")
+
+    __table_args__ = (
+        Index("ix_siem_deliveries_status_next", "status", "next_attempt_at"),
+        Index("ix_siem_deliveries_org_created", "org_id", "created_at"),
+    )
+
+
+

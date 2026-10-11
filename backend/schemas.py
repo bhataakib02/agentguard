@@ -368,6 +368,63 @@ class WebhookDeliverySchema(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+# --- SIEM Forwarding Schemas ---
+
+class SiemConfigCreateRequest(BaseModel):
+    name: Optional[str] = "Primary SIEM Collector"
+    provider: Optional[str] = "GENERIC_HTTP"  # GENERIC_HTTP, SPLUNK_HEC, DATADOG
+    collector_url: str
+    auth_token: Optional[str] = None
+    format: Optional[str] = "JSONL"           # JSONL, CEF
+    is_active: Optional[bool] = True
+    batch_size: Optional[int] = 100
+
+class SiemConfigResponse(BaseModel):
+    id: str
+    org_id: Optional[str] = None
+    name: str
+    provider: str
+    collector_url: str
+    auth_token_preview: Optional[str] = None
+    format: str
+    is_active: bool
+    batch_size: int
+    created_at: datetime.datetime
+    updated_at: Optional[datetime.datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class SiemDeliverySchema(BaseModel):
+    id: str
+    org_id: str
+    batch_id: str
+    provider: str
+    format: str
+    event_count: int
+    status: str
+    attempt_count: int
+    response_code: Optional[int] = None
+    error_message: Optional[str] = None
+    next_attempt_at: Optional[datetime.datetime] = None
+    delivered_at: Optional[datetime.datetime] = None
+    created_at: datetime.datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class SiemTriggerForwardRequest(BaseModel):
+    format: Optional[str] = None  # None = use configured format
+    batch_size: Optional[int] = None
+
+class SiemTriggerForwardResponse(BaseModel):
+    status: str
+    batch_id: str
+    delivery_id: str
+    event_count: int
+    format: str
+    message: str
+
+
 # --- Notification Schemas ---
 
 class NotificationSchema(BaseModel):
