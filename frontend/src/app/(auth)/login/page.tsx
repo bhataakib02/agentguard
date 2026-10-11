@@ -24,37 +24,75 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      // 1. Authenticate via Supabase Auth
-      const { data, error: authErr } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      let token: string | null = null;
+      let targetRole: string | null = null;
 
-      if (authErr || !data.session) {
-        throw new Error(authErr?.message || "Invalid login credentials");
+      // 1. Attempt Supabase Auth first
+      let authUserEmail = email;
+      let authUserId: string | undefined = undefined;
+      let supabaseSuccess = false;
+
+      try {
+        const { data, error: authErr } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (!authErr && data?.session) {
+          supabaseSuccess = true;
+          token = data.session.access_token;
+          authUserId = data.user.id;
+          authUserEmail = data.user.email || email;
+          document.cookie = `agentguard_token=${data.session.access_token}; path=/; max-age=86400; SameSite=Lax`;
+          localStorage.setItem("agentguard_token", data.session.access_token);
+        }
+      } catch (sbErr) {
+        console.warn("Supabase Auth sign-in notice:", sbErr);
       }
 
-      // 2. Set authenticated token in cookie and localStorage
-      document.cookie = `agentguard_token=${data.session.access_token}; path=/; max-age=86400; SameSite=Lax`;
-      localStorage.setItem("agentguard_token", data.session.access_token);
-
-      // 3. Sync with backend authoritative profile
-      const backendUser = await fetchApi("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({
-          email: data.user.email,
-          auth_user_id: data.user.id,
-        }),
-      });
-
-      // 4. Update session token with backend-issued JWT containing role claims
-      if (backendUser?.access_token) {
-        document.cookie = `agentguard_token=${backendUser.access_token}; path=/; max-age=86400; SameSite=Lax`;
-        localStorage.setItem("agentguard_token", backendUser.access_token);
+      // 2. If Supabase Auth succeeded, sync with backend authoritative profile
+      if (supabaseSuccess) {
+        try {
+          const backendUser = await fetchApi("/auth/login", {
+            method: "POST",
+            body: JSON.stringify({
+              email: authUserEmail,
+              auth_user_id: authUserId,
+            }),
+          });
+          if (backendUser?.access_token) {
+            token = backendUser.access_token;
+            document.cookie = `agentguard_token=${backendUser.access_token}; path=/; max-age=86400; SameSite=Lax`;
+            localStorage.setItem("agentguard_token", backendUser.access_token);
+          }
+          targetRole = backendUser?.role;
+        } catch (syncErr: any) {
+          console.warn("Backend auth profile sync notice:", syncErr);
+        }
+      } else {
+        // 3. Fallback: Attempt local database login for seeded / enterprise accounts
+        try {
+          const localUser = await fetchApi("/auth/local-login", {
+            method: "POST",
+            body: JSON.stringify({ email, password }),
+          });
+          if (localUser?.access_token) {
+            token = localUser.access_token;
+            document.cookie = `agentguard_token=${localUser.access_token}; path=/; max-age=86400; SameSite=Lax`;
+            localStorage.setItem("agentguard_token", localUser.access_token);
+            targetRole = localUser.role;
+          }
+        } catch (localErr: any) {
+          console.warn("Local auth fallback notice:", localErr);
+          throw new Error(localErr?.message || "Invalid email or password. Please verify your credentials.");
+        }
       }
 
-      // 5. Authoritative routing based purely on backend database role
-      if (backendUser?.role === "SUPER_ADMIN") {
+      if (!token) {
+        throw new Error("Invalid email or password. Please verify your credentials.");
+      }
+
+      // 4. Authoritative routing based purely on role
+      if (targetRole === "SUPER_ADMIN") {
         router.push("/platform");
       } else {
         router.push("/dashboard");
