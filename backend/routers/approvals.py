@@ -64,7 +64,11 @@ async def act_on_approval(
 
     dec = db.query(models.Decision).filter(models.Decision.id == app_req.decision_id).first()
     if dec:
-        dec.execution_status = "EXECUTED" if new_status == "APPROVED" else "BLOCKED"
+        if new_status == "APPROVED":
+            dec.decision = "ALLOW"
+            dec.execution_status = "EXECUTED"
+        else:
+            dec.execution_status = "BLOCKED"
 
     db.commit()
 

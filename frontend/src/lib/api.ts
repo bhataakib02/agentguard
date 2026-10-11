@@ -133,3 +133,62 @@ export class RobustWebSocketClient {
   }
 }
 
+export interface SandboxStatus {
+  provider: string;
+  configured: boolean;
+  available: boolean;
+  healthy: boolean;
+  details?: Record<string, any>;
+}
+
+export interface SandboxJob {
+  job_id: string;
+  org_id: string;
+  agent_id: string;
+  decision_id: string;
+  status: string;
+  runtime_language: string;
+  exit_code?: number | null;
+  output?: string | null;
+  error?: string | null;
+  duration_ms?: number | null;
+  memory_used_mb?: number | null;
+  created_at: string;
+  completed_at?: string | null;
+  artifacts_cleaned_up: boolean;
+}
+
+export async function getSandboxStatus(): Promise<SandboxStatus> {
+  return await fetchApi("/runtime/sandbox/status");
+}
+
+export async function executeSandbox(request: {
+  execution_token: string;
+  runtime_language: string;
+  code: string;
+  entrypoint?: string;
+  stdin?: string;
+  timeout_seconds?: number;
+  memory_limit_mb?: number;
+  allow_network?: boolean;
+}): Promise<any> {
+  return await fetchApi("/runtime/sandbox/execute", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+}
+
+export async function getSandboxJobs(limit: number = 50, offset: number = 0): Promise<SandboxJob[]> {
+  return await fetchApi(`/runtime/sandbox/jobs?limit=${limit}&offset=${offset}`);
+}
+
+export async function getSandboxJob(jobId: string): Promise<SandboxJob> {
+  return await fetchApi(`/runtime/sandbox/jobs/${jobId}`);
+}
+
+export async function cancelSandboxJob(jobId: string): Promise<{ success: boolean; job_id: string; status: string; message: string }> {
+  return await fetchApi(`/runtime/sandbox/jobs/${jobId}/cancel`, {
+    method: "POST",
+  });
+}
+
