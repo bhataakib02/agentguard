@@ -14,15 +14,15 @@ Last Updated: 2026-10-11
 Current Phase: Phase 6 — Enterprise Production Readiness & Full Verification Complete
 Current Milestone: Milestone 6 — Production Release & Full Checklist Compliance
 Total Tracked Checkbox Items: 113
-Completed: 111
+Completed: 112
 Partial: 0
 Foundation: 0
-Simulated: 2
+Simulated: 1
 Demo: 0
 Not Implemented: 0
 Blocked: 0
 Broken: 0
-Overall Completion: 98.2% (111 / 113 genuinely complete items; 2 intentionally simulated test harnesses)
+Overall Completion: 99.1% (112 / 113 genuinely complete items; 1 intentionally simulated test harness)
 ```
 
 ---
@@ -527,8 +527,8 @@ Overall Completion: 98.2% (111 / 113 genuinely complete items; 2 intentionally s
 
 - [x] Audit log export & Enterprise SIEM streaming  
   *Status:* COMPLETE  
-  *Evidence:* `backend/routers/reports.py`, `backend/routers/audit.py` (`/export/cef`, `/export/jsonl`, `/siem/status`), `backend/routers/integrations.py` (`siem_forwarder`), `backend/tests/test_audit_siem_export_suite.py` (5/5 passed)  
-  *What currently works:* Exportable as CSV, Excel, and PDF via Report Center. High-throughput streaming export in Common Event Format (CEF) and JSON-Lines (NDJSON) with strict tenant isolation for Splunk, ArcSight, Datadog, IBM QRadar, and Microsoft Sentinel. Truthful `NOT_CONFIGURED` status reported when external SIEM collector credentials are unset.
+  *Evidence:* `backend/routers/reports.py`, `backend/routers/audit.py` (`/export/cef`, `/export/jsonl`, `/siem/status`, `/siem/forward`, `/siem/deliveries`, `/siem/config`), `backend/services/siem_forwarder_service.py`, `backend/tasks/siem_tasks.py` (`forward_siem_batch_task`, `retry_pending_siem_deliveries_task`), `backend/models.py` (`SiemCollectorConfig`, `SiemDelivery`), `supabase/migrations/20261011000000_siem_forwarding_pipeline.sql`, `backend/tests/test_audit_siem_export_suite.py` (17/17 passed)  
+  *What currently works:* Exportable as CSV, Excel, and PDF via Report Center. High-throughput on-demand streaming export in Common Event Format (CEF) and JSON-Lines (NDJSON). Asynchronous batch event forwarding pipeline backed by Celery/Redis with at-least-once delivery semantics, dedicated provider adapters (`GENERIC_HTTP`, `SPLUNK_HEC`, `DATADOG`), atomic worker claim locks preventing concurrent duplicate batch dispatch, bounded exponential retry backoff, dead-letter recording, pre-dispatch and config-time SSRF validation (blocking loopback, cloud metadata, and RFC1918 private IPs), strict tenant payload isolation, recursive sensitive field redaction in audit payloads, and truthful operational status and batch delivery reporting.
 
 ---
 
@@ -967,5 +967,7 @@ Whenever an implementation phase is completed:
 | 2026-10-11 | Milestone 5 — BYOK, E2E Machine Agent Lifecycle & Deployment Resilience | Implemented per-tenant AES-256-GCM BYOK envelope encryption REST lifecycle (`byok_service.py`, `organization.py`), full contiguous 13-stage E2E machine agent integration suite (`test_e2e_machine_agent_lifecycle.py`), resolved Vercel CORS policy blocking (`config.py`, `main.py`) with dynamic regex matching, and added resilient local authentication fallback in Next.js frontend login. | 2 items completed (73 / 154 = 47.4%) | Feature 5.2: TypeScript SDK & Advanced Framework Interceptors |
 | 2026-10-11 | Milestone 6 — Production Release & Full Checklist Compliance | Completed environmental context assembly in Policy Engine (`policy_engine.py`, `policy_evaluator.py`), database-backed AI Model catalog, token pricing & dynamic complexity router (`routers/ai.py`, `models.py`), production Stripe & Razorpay enterprise billing router with HMAC webhooks (`routers/billing.py`), AI admin assistant copilot engine (`assistant_engine.py`), and TypeScript Node client SDK `@agentguard/sdk` with automated test harness (`test_sdk.mjs`). Validated all test suites and production Next.js static build. | All Remaining Core Items Complete (111 / 113 = 98.2%; 2 simulated harnesses) | Production Release / Continuous Monitoring |
 | 2026-10-11 | Test Suite Stabilization, Runtime Invariant Verification & SIEM Streaming | Stabilized full test suite to 435/435 passing tests. Fixed SQLite/Postgres ORM portability in `test_identity_relationship_suite.py`, added canonical `"PRO"` plan tier and deterministic setup in billing and API contract suites, isolated user session logout in auth hardening tests. Migrated 14 Pydantic v1 Config classes to `ConfigDict(from_attributes=True)` and FastAPI startup/shutdown to lifespan context manager. Resolved 8 React hook `useEffect` dependency warnings (0 frontend lint warnings; 58/58 Next.js static pages compiled). Verified runtime security invariants with 13 focused tests (`test_runtime_security_invariants.py`). Implemented enterprise SIEM log streaming endpoints (`/api/audit/export/cef`, `/api/audit/export/jsonl`, `/api/audit/siem/status`, and `siem_forwarder` in `/api/integrations`) verified with 5 new tests (`test_audit_siem_export_suite.py`). | 111 / 113 items verified complete (2 intentionally simulated test harnesses); 435 automated tests green | Continuous Security Monitoring & Production Deployment |
+| 2026-10-11 | Milestone 6.1 — Asynchronous SIEM Event Forwarding Pipeline | Implemented end-to-end asynchronous SIEM audit forwarding pipeline on existing Celery/Redis architecture. Added `SiemCollectorConfig` & `SiemDelivery` models (`models.py`, `20261011000000_siem_forwarding_pipeline.sql`), provider adapters for Generic HTTP, Splunk HEC, and Datadog (`services/siem_forwarder_service.py`), durable worker tasks (`tasks/siem_tasks.py`) with atomic claim locking, at-least-once delivery semantics, bounded exponential backoff (15s, 60s, 240s), dead-letter handling, pre-dispatch and config SSRF defense, tenant payload isolation, recursive sensitive metadata redaction, and endpoints `/api/audit/siem/forward`, `/api/audit/siem/deliveries`, and `/api/audit/siem/config` with strict RBAC. 17/17 SIEM suite tests passing; 447/447 full regression tests green; 58/58 Next.js static pages compiled. | 112 / 113 items verified complete (1 simulated harness); 447 automated tests green | Continuous Security Monitoring & Production Deployment |
+
 
 

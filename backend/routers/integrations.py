@@ -53,7 +53,9 @@ def list_integrations(
     smtp_configured = bool(os.getenv("SMTP_HOST") or os.getenv("SENDGRID_API_KEY"))
 
     # 7. SIEM Forwarder
-    siem_configured = bool(os.getenv("SIEM_FORWARDER_URL") or os.getenv("SPLUNK_HEC_URL") or os.getenv("DATADOG_API_KEY"))
+    from services.siem_forwarder_service import resolve_siem_config
+    siem_cfg = resolve_siem_config(db, org_id=str(current_user.org_id) if current_user.org_id else None)
+    siem_configured = siem_cfg.configured
 
     # 8. Webhooks
     wh_query = db.query(models.WebhookEndpoint)
