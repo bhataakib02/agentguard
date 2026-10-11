@@ -266,7 +266,10 @@ def get_current_user(
         ).first()
 
     if not user and email:
-        user = db.query(models.User).filter(models.User.email == email).first()
+        from sqlalchemy import func
+        user = db.query(models.User).filter(
+            (models.User.email == email) | (func.lower(models.User.email) == email.lower().strip())
+        ).first()
         if user and user_id and not user.auth_user_id:
             user.auth_user_id = user_id
             db.commit()

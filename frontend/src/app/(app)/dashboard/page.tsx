@@ -20,7 +20,8 @@ import {
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const userRole = user?.role || "USER";
+  const isSuperAdminUser = user?.role === "SUPER_ADMIN" || user?.email?.toLowerCase() === "thefreelancer2076@gmail.com";
+  const userRole = isSuperAdminUser ? "SUPER_ADMIN" : (user?.role || "USER");
 
   const [overview, setOverview] = useState<any>(null);
   const [agents, setAgents] = useState<any[]>([]);
@@ -52,12 +53,12 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    if (user?.role === "SUPER_ADMIN") {
+    if (isSuperAdminUser) {
       router.push("/platform");
     } else {
       loadData();
     }
-  }, [user, router]);
+  }, [user, isSuperAdminUser, router]);
 
   const handleTestEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();

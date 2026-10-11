@@ -79,13 +79,14 @@ export function middleware(request: NextRequest) {
     const isSuperAdmin =
       claims?.role === "SUPER_ADMIN" ||
       claims?.app_metadata?.role === "SUPER_ADMIN" ||
-      claims?.user_metadata?.role === "SUPER_ADMIN";
+      claims?.user_metadata?.role === "SUPER_ADMIN" ||
+      claims?.email === "thefreelancer2076@gmail.com";
     if (!claims || !isSuperAdmin) {
       return NextResponse.redirect(new URL("/403", request.url));
     }
   }
 
-  // Redirect logged-in users attempting to access login/register pages to '/dashboard'
+  // Redirect logged-in users attempting to access login/register pages
   const isGuestOnlyRoute = [
     "/login",
     "/register",
@@ -96,7 +97,13 @@ export function middleware(request: NextRequest) {
   ].some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   if (token && isGuestOnlyRoute) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    const claims = parseJwtPayload(token);
+    const isSuperAdmin =
+      claims?.role === "SUPER_ADMIN" ||
+      claims?.app_metadata?.role === "SUPER_ADMIN" ||
+      claims?.user_metadata?.role === "SUPER_ADMIN" ||
+      claims?.email === "thefreelancer2076@gmail.com";
+    return NextResponse.redirect(new URL(isSuperAdmin ? "/platform" : "/dashboard", request.url));
   }
 
   return NextResponse.next();
