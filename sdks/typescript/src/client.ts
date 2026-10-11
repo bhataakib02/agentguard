@@ -14,6 +14,8 @@ import {
   HeartbeatResponse,
   ScanPiiRequest,
   ScanPiiResponse,
+  ScanOutputRequest,
+  ScanOutputResponse,
 } from "./types.js";
 import {
   AgentGuardError,
@@ -239,4 +241,23 @@ export class AgentGuardClient {
     }
     return (await res.json()) as ScanPiiResponse;
   }
+
+  /**
+   * Scans agent output or LLM responses for toxicity, hate speech, dangerous instructions,
+   * and ungrounded hallucinations against reference context.
+   */
+  async scanOutput(req: ScanOutputRequest): Promise<ScanOutputResponse> {
+    const url = `${this.baseUrl}/api/runtime/scan-output`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify(req),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!res.ok) {
+      throw new AgentGuardError(`Scan output failed: ${await res.text()}`);
+    }
+    return (await res.json()) as ScanOutputResponse;
+  }
 }
+
