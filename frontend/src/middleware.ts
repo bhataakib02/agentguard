@@ -76,7 +76,11 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
     const claims = parseJwtPayload(token);
-    if (!claims || claims.role !== "SUPER_ADMIN") {
+    const isSuperAdmin =
+      claims?.role === "SUPER_ADMIN" ||
+      claims?.app_metadata?.role === "SUPER_ADMIN" ||
+      claims?.user_metadata?.role === "SUPER_ADMIN";
+    if (!claims || !isSuperAdmin) {
       return NextResponse.redirect(new URL("/403", request.url));
     }
   }
