@@ -12,7 +12,7 @@ from routers import (
     provenance, audit, red_team, digital_twin, economics, impact,
     optimization, analytics, assistant, developers, integrations, system,
     settings as settings_router, notifications, platform, organization, reports, webhooks,
-    telemetry, tools
+    telemetry, tools, billing
 )
 
 from bootstrap import bootstrap_database
@@ -50,7 +50,7 @@ DOMAIN_ROUTERS = [
     economics.router, impact.router, optimization.router, analytics.router,
     assistant.router, developers.router, integrations.router, system.router,
     settings_router.router, notifications.router, webhooks.router,
-    telemetry.router, tools.router
+    telemetry.router, tools.router, billing.router
 ]
 
 for r in DOMAIN_ROUTERS:

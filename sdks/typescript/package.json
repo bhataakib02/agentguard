@@ -5,8 +5,10 @@
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "node tests/test_sdk.mjs"
   },
   "keywords": [
     "agentguard",

@@ -109,3 +109,20 @@ export interface ScanPiiResponse {
   redacted_parameters?: Record<string, any>;
   mode: string;
 }
+
+export interface ScanOutputRequest {
+  output_text: string;
+  reference_context?: string;
+  policy_mode?: "ALLOW" | "WARN" | "REDACT" | "BLOCK";
+}
+
+export interface ScanOutputResponse {
+  blocked: boolean;
+  action: "ALLOW" | "WARN" | "REDACT" | "BLOCK";
+  sanitized_output: string;
+  violations_count: number;
+  toxicity_score: number;
+  hallucination_score: number;
+  findings: string[];
+}
+

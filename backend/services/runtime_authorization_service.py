@@ -331,7 +331,14 @@ class RuntimeAuthorizationService:
             agent_department=agent.department,
             agent_code=agent.agent_code,
             user_role="MACHINE",
-            intent=effective_prompt
+            intent=effective_prompt,
+            environmental_context={
+                "is_within_operating_hours": not behavior_eval.get("is_off_hours", False),
+                "is_off_hours": behavior_eval.get("is_off_hours", False),
+                "behavior_deviation": behavior_deviation,
+                "request_velocity": behavior_eval.get("request_velocity", 1.0),
+                "ip_address": (context or {}).get("ip_address", "127.0.0.1")
+            }
         )
 
         decision_outcome = policy_res.get("decision", "REFUSE")

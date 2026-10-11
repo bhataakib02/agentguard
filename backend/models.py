@@ -51,6 +51,10 @@ class Organization(Base):
     license = relationship("License", back_populates="organization", uselist=False)
     license_usage = relationship("LicenseUsage", back_populates="organization", uselist=False)
 
+    @property
+    def plan_id(self):
+        return self.license.plan_id if self.license else "FREE"
+
 
 class Plan(Base):
     __tablename__ = "plans"
@@ -87,6 +91,14 @@ class License(Base):
     feature_flags = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    @property
+    def valid_until(self):
+        return self.expiry_date
+
+    @valid_until.setter
+    def valid_until(self, val):
+        self.expiry_date = val
 
     organization = relationship("Organization", back_populates="license")
     plan = relationship("Plan", back_populates="licenses")

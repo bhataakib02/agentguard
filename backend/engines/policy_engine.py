@@ -6,6 +6,7 @@ and safe condition evaluation.
 """
 
 from typing import Dict, Any, Optional, List
+import datetime
 import logging
 from sqlalchemy.orm import Session
 from engines.policy_evaluator import evaluate_condition
@@ -34,7 +35,8 @@ class PolicyEngine:
         agent_department: str = "Operations",
         agent_code: str = "",
         user_role: str = "USER",
-        intent: str = ""
+        intent: str = "",
+        environmental_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Main policy evaluation entrypoint.
@@ -55,7 +57,15 @@ class PolicyEngine:
                 "rules_evaluated_count": 0
             }
 
-        # 2. Prepare Context for Rule Evaluation
+        # 2. Assemble Base and Environmental Context for Rule Evaluation
+        now = datetime.datetime.utcnow()
+        time_decimal = round(now.hour + now.minute / 60.0, 2)
+        env = environmental_context or {}
+
+        # Default operating hours: 09:00 - 18:00 (9.0 to 18.0)
+        default_in_hours = 9.0 <= time_decimal <= 18.0 and now.weekday() < 5
+        in_hours = env.get("is_within_operating_hours", default_in_hours)
+
         context = {
             "amount": float(amount or 0.0),
             "risk_score": int(risk_score or 0),
@@ -69,8 +79,20 @@ class PolicyEngine:
             "agent_autonomy": str(agent_autonomy or "MEDIUM").strip(),
             "department": str(agent_department or "Operations").strip(),
             "status": str(agent_status or "NORMAL").strip(),
-            "user_role": str(user_role or "USER").strip()
+            "user_role": str(user_role or "USER").strip(),
+            # Environmental and temporal attributes
+            "time_of_day": env.get("time_of_day", time_decimal),
+            "day_of_week": env.get("day_of_week", now.strftime("%A")),
+            "is_weekend": env.get("is_weekend", now.weekday() >= 5),
+            "is_within_operating_hours": in_hours,
+            "is_off_hours": not in_hours,
+            "ip_address": env.get("ip_address", "127.0.0.1"),
+            "request_velocity": env.get("request_velocity", 1.0)
         }
+        # Merge any custom environmental keys without overwriting canonical fields
+        for k, v in env.items():
+            if k not in context:
+                context[k] = v
 
         # 3. Load Active Tenant Policies from Database
         active_policies: List[models.Policy] = []

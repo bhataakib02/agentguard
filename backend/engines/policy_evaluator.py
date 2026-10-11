@@ -27,6 +27,13 @@ ALLOWED_CONTEXT_FIELDS = {
     "department",
     "status",
     "user_role",
+    "time_of_day",
+    "day_of_week",
+    "is_weekend",
+    "is_within_operating_hours",
+    "is_off_hours",
+    "ip_address",
+    "request_velocity",
 }
 
 # Allowed AST node types

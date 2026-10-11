@@ -619,3 +619,59 @@ class BYOKTestResponse(BaseModel):
     probe_verified: bool = False
     error: Optional[str] = None
 
+
+class AiModelCreate(BaseModel):
+    model_name: str
+    provider: str = "OpenAI"
+    cost_per_1k_tokens: float = 0.002
+    avg_latency_ms: int = 300
+    accuracy_rating: float = 0.98
+    status: str = "ACTIVE"
+
+
+class AiModelResponse(BaseModel):
+    id: str
+    model_name: str
+    provider: str
+    cost_per_1k_tokens: float
+    avg_latency_ms: int
+    accuracy_rating: float
+    status: str
+    provider_configured: bool = False
+    health: str = "HEALTHY"
+
+    class Config:
+        from_attributes = True
+
+
+class ModelPricingResponse(BaseModel):
+    id: str
+    provider: str
+    model: str
+    input_cost_per_1k: float
+    output_cost_per_1k: float
+    currency: str = "USD"
+    active: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class ModelSelectRequest(BaseModel):
+    task_complexity: str = "HIGH"  # LOW, MEDIUM, HIGH, CRITICAL
+    max_latency_ms: Optional[int] = None
+    max_cost_per_1k: Optional[float] = None
+    preferred_provider: Optional[str] = None
+
+
+class ModelSelectResponse(BaseModel):
+    selected_model: str
+    provider: str
+    tier: str
+    avg_latency_ms: int
+    cost_per_1k_tokens: float
+    accuracy_rating: float
+    recommended_for: str
+    selection_reason: str
+
+
