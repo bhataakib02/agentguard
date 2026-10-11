@@ -18,6 +18,15 @@ def slugify(text_val: str) -> str:
 from bootstrap import bootstrap_database
 
 def seed_five_demo_organizations():
+    if os.getenv("ALLOW_DEMO_SEED", "false").lower() not in ("true", "1"):
+        raise RuntimeError(
+            "[AgentGuard Security Block] Automatic demo-data seeding is disabled. "
+            "To explicitly seed development fixtures, set ALLOW_DEMO_SEED=true in a non-production environment."
+        )
+    if os.getenv("ENVIRONMENT", "").lower() == "production":
+        raise RuntimeError(
+            "[AgentGuard Security Block] Demo-data seeding is strictly prohibited in production environments."
+        )
     bootstrap_database()
     db = SessionLocal()
     print("Starting provisioning of 5 real Multi-Tenant Demo Organizations...")

@@ -20,10 +20,11 @@ class TestFiveDemoOrganizations(unittest.TestCase):
     def setUpClass(cls):
         cls.db = SessionLocal()
 
-        # Ensure 5 demo organizations are seeded
+        # Ensure 5 demo organizations are seeded in isolated test environment only
         if not cls.db.query(models.User).filter(models.User.email == "admin@acmefintech.com").first():
-            seed_five_demo_organizations()
-            cls.db.expire_all()
+            if os.getenv("ENVIRONMENT", "").lower() != "production" and os.getenv("ALLOW_DEMO_SEED", "").lower() in ("true", "1"):
+                seed_five_demo_organizations()
+                cls.db.expire_all()
 
         # Provision SUPER_ADMIN
         cls.super_admin_email = "super_admin_demo5@agentguard.com"

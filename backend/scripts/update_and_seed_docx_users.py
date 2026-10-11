@@ -90,6 +90,15 @@ def update_users_json():
     print("   [SUCCESS] users.json updated with exact DOCX test emails!")
 
 def update_database_users():
+    if os.getenv("ALLOW_DEMO_SEED", "false").lower() not in ("true", "1"):
+        raise RuntimeError(
+            "[AgentGuard Security Block] Automatic demo user seeding is disabled. "
+            "To explicitly seed development fixtures, set ALLOW_DEMO_SEED=true in a non-production environment."
+        )
+    if os.getenv("ENVIRONMENT", "").lower() == "production":
+        raise RuntimeError(
+            "[AgentGuard Security Block] Demo user seeding is strictly prohibited in production environments."
+        )
     print("\n2. Updating Supabase Auth & Public Users in Database...")
     headers = {
         "apikey": settings.SUPABASE_PUBLISHABLE_KEY,

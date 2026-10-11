@@ -132,6 +132,22 @@ def ensure_schema_compatibility(db_engine=engine):
                 conn.execute(text("ALTER TABLE agent_passports ADD COLUMN claims JSON;"))
             conn.commit()
 
+    # Check organizations KMS BYOK columns
+    if "organizations" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("organizations")}
+        with db_engine.connect() as conn:
+            if "kms_provider" not in cols:
+                conn.execute(text("ALTER TABLE organizations ADD COLUMN kms_provider VARCHAR DEFAULT 'SYSTEM_MANAGED';"))
+            if "kms_key_arn" not in cols:
+                conn.execute(text("ALTER TABLE organizations ADD COLUMN kms_key_arn VARCHAR;"))
+            if "kms_key_alias" not in cols:
+                conn.execute(text("ALTER TABLE organizations ADD COLUMN kms_key_alias VARCHAR;"))
+            if "kms_key_status" not in cols:
+                conn.execute(text("ALTER TABLE organizations ADD COLUMN kms_key_status VARCHAR DEFAULT 'NOT_CONFIGURED';"))
+            if "kms_config_json" not in cols:
+                conn.execute(text("ALTER TABLE organizations ADD COLUMN kms_config_json JSON DEFAULT '{}'::json;"))
+            conn.commit()
+
 
 def bootstrap_database():
     """
