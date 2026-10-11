@@ -86,6 +86,10 @@ class TestPhase1AuthHardening(unittest.TestCase):
 
     def setUp(self):
         self.db.rollback()
+        self.db.query(models.Session).filter(
+            models.Session.user_id.in_([self.normal_user.id, self.tenant_admin.id, self.super_admin.id])
+        ).delete(synchronize_session=False)
+        self.db.commit()
 
     def get_token(self, user_obj):
         return security.create_access_token(user_obj.id, email=user_obj.email, role=user_obj.role)
@@ -218,31 +222,47 @@ class TestPhase1AuthHardening(unittest.TestCase):
     # --- TEST 10: Logout invalidates session server-side ---
     def test_10_logout_invalidates_session(self):
         """Calling /api/auth/logout must revoke the session, and subsequent calls with that token must return 401"""
-        # Create a test session
-        token = self.get_token(self.normal_user)
-        session = models.Session(
-            user_id=self.normal_user.id,
-            token=token,
-            expires_at=security.utcnow() + security.timedelta(hours=1),
-            revoked=False
+        # Create an isolated test user specifically for this test
+        isolated_user = models.User(
+            org_id=self.tenant_org.id,
+            email=f"isolated_logout_10_{uuid.uuid4().hex[:8]}@tenant.com",
+            full_name="Isolated Logout User 10",
+            role="USER",
+            status="ACTIVE"
         )
-        self.db.add(session)
+        self.db.add(isolated_user)
         self.db.commit()
+        self.db.refresh(isolated_user)
 
-        headers = {"Authorization": f"Bearer {token}"}
+        try:
+            token = self.get_token(isolated_user)
+            session = models.Session(
+                user_id=isolated_user.id,
+                token=token,
+                expires_at=security.utcnow() + security.timedelta(hours=1),
+                revoked=False
+            )
+            self.db.add(session)
+            self.db.commit()
 
-        # Token is valid initially
-        resp_before = client.get("/api/auth/me", headers=headers)
-        self.assertEqual(resp_before.status_code, 200)
+            headers = {"Authorization": f"Bearer {token}"}
 
-        # Call logout
-        resp_logout = client.post("/api/auth/logout", headers=headers)
-        self.assertEqual(resp_logout.status_code, 200)
-        self.assertEqual(resp_logout.json()["status"], "SUCCESS")
+            # Token is valid initially
+            resp_before = client.get("/api/auth/me", headers=headers)
+            self.assertEqual(resp_before.status_code, 200)
 
-        # Now token must be rejected with 401
-        resp_after = client.get("/api/auth/me", headers=headers)
-        self.assertEqual(resp_after.status_code, 401, "Revoked token must be rejected with 401")
+            # Call logout
+            resp_logout = client.post("/api/auth/logout", headers=headers)
+            self.assertEqual(resp_logout.status_code, 200)
+            self.assertEqual(resp_logout.json()["status"], "SUCCESS")
+
+            # Now token must be rejected with 401
+            resp_after = client.get("/api/auth/me", headers=headers)
+            self.assertEqual(resp_after.status_code, 401, "Revoked token must be rejected with 401")
+        finally:
+            self.db.query(models.Session).filter(models.Session.user_id == isolated_user.id).delete()
+            self.db.delete(isolated_user)
+            self.db.commit()
 
     # --- TEST 11: All domain endpoints reject unauthenticated access ---
     def test_11_unauthenticated_domain_endpoints_rejected(self):
@@ -428,23 +448,39 @@ class TestPhase1AuthHardening(unittest.TestCase):
 
     def test_spec_10_logout_then_protected_request(self):
         """TEST 10: Logout -> protected request | EXPECTED: rejected (401)"""
-        token = self.get_token(self.normal_user)
-        session = models.Session(
-            user_id=self.normal_user.id,
-            token=token,
-            expires_at=security.utcnow() + security.timedelta(hours=1),
-            revoked=False
+        isolated_user = models.User(
+            org_id=self.tenant_org.id,
+            email=f"isolated_spec_logout_{uuid.uuid4().hex[:8]}@tenant.com",
+            full_name="Isolated Spec Logout User",
+            role="USER",
+            status="ACTIVE"
         )
-        self.db.add(session)
+        self.db.add(isolated_user)
         self.db.commit()
+        self.db.refresh(isolated_user)
 
-        # Logout
-        resp_logout = client.post("/api/auth/logout", headers={"Authorization": f"Bearer {token}"})
-        self.assertEqual(resp_logout.status_code, 200)
+        try:
+            token = self.get_token(isolated_user)
+            session = models.Session(
+                user_id=isolated_user.id,
+                token=token,
+                expires_at=security.utcnow() + security.timedelta(hours=1),
+                revoked=False
+            )
+            self.db.add(session)
+            self.db.commit()
 
-        # Protected request after logout
-        resp_protected = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
-        self.assertEqual(resp_protected.status_code, 401, "Request with revoked session must be rejected with 401")
+            # Logout
+            resp_logout = client.post("/api/auth/logout", headers={"Authorization": f"Bearer {token}"})
+            self.assertEqual(resp_logout.status_code, 200)
+
+            # Protected request after logout
+            resp_protected = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+            self.assertEqual(resp_protected.status_code, 401, "Request with revoked session must be rejected with 401")
+        finally:
+            self.db.query(models.Session).filter(models.Session.user_id == isolated_user.id).delete()
+            self.db.delete(isolated_user)
+            self.db.commit()
 
     def test_spec_11_direct_platform_api_call_without_auth(self):
         """TEST 11: Direct /platform API call without authentication | EXPECTED: rejected (401)"""

@@ -57,7 +57,7 @@ export default function DashboardPage() {
     } else {
       loadData();
     }
-  }, [user]);
+  }, [user, router]);
 
   const handleTestEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();

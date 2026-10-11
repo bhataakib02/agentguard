@@ -24,6 +24,8 @@ class TestBillingSuite(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.db = SessionLocal()
+        from bootstrap import ensure_canonical_plans
+        ensure_canonical_plans(cls.db)
 
         # Create or fetch test organization
         cls.org = cls.db.query(models.Organization).filter(

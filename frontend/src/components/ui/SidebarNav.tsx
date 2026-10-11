@@ -58,7 +58,7 @@ export default function SidebarNav({ isOpen = false, onClose }: SidebarNavProps)
     if (onClose) {
       onClose();
     }
-  }, [pathname]);
+  }, [pathname, onClose]);
 
   useEffect(() => {
     async function loadBranding() {

@@ -21,12 +21,48 @@ from bootstrap import bootstrap_database
 if getattr(settings, "AUTO_BOOTSTRAP_DB", True):
     bootstrap_database()
 
+from contextlib import asynccontextmanager
+import logging
+from core.supabase_admin import supabase_admin
+from database import SessionLocal
+import models
+
+logger = logging.getLogger("agentguard.startup")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup validation and auditing
+    if supabase_admin.is_configured:
+        logger.info("[AgentGuard] Supabase Admin Auth: ACTIVE (Service Role Key configured)")
+    else:
+        logger.warning(
+            "[AgentGuard] Supabase Admin Auth: SUPABASE_SERVICE_ROLE_KEY not configured. "
+            "New org/invite users will have local password fallback only."
+        )
+
+    try:
+        db = SessionLocal()
+        users_count = db.query(models.User).count()
+        users_with_supabase = db.query(models.User).filter(models.User.auth_user_id != None).count()
+        users_with_local_hash = db.query(models.User).filter(models.User.password_hash != None).count()
+        logger.info(
+            f"[AgentGuard] Auth Audit: {users_count} total users | "
+            f"{users_with_supabase} linked to Supabase Auth | "
+            f"{users_with_local_hash} with local password hash"
+        )
+        db.close()
+    except Exception as e:
+        logger.warning(f"[AgentGuard] Startup user audit notice: {e}")
+
+    yield
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description=settings.TAGLINE,
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Enable CORS for Next.js frontend with restricted trusted origins
@@ -57,37 +93,6 @@ for r in DOMAIN_ROUTERS:
     app.include_router(r, prefix=settings.API_V1_STR)
     if settings.API_V1_STR != "/api/v1":
         app.include_router(r, prefix="/api/v1")
-
-import logging
-from core.supabase_admin import supabase_admin
-from database import SessionLocal
-import models
-
-logger = logging.getLogger("agentguard.startup")
-
-@app.on_event("startup")
-def validate_auth_and_config():
-    if supabase_admin.is_configured:
-        logger.info("[AgentGuard] Supabase Admin Auth: ACTIVE (Service Role Key configured)")
-    else:
-        logger.warning(
-            "[AgentGuard] Supabase Admin Auth: SUPABASE_SERVICE_ROLE_KEY not configured. "
-            "New org/invite users will have local password fallback only."
-        )
-
-    try:
-        db = SessionLocal()
-        users_count = db.query(models.User).count()
-        users_with_supabase = db.query(models.User).filter(models.User.auth_user_id != None).count()
-        users_with_local_hash = db.query(models.User).filter(models.User.password_hash != None).count()
-        logger.info(
-            f"[AgentGuard] Auth Audit: {users_count} total users | "
-            f"{users_with_supabase} linked to Supabase Auth | "
-            f"{users_with_local_hash} with local password hash"
-        )
-        db.close()
-    except Exception as e:
-        logger.warning(f"[AgentGuard] Startup user audit notice: {e}")
 
 @app.get("/")
 @app.get("/health")

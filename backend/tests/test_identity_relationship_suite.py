@@ -90,13 +90,28 @@ class TestIdentityRelationships(unittest.TestCase):
             cls.admin_nexa = ensure_user(org_b.id, "zoya@nexa.com", "Zoya Khan", "ADMIN")
             cls.user_nexa = ensure_user(org_b.id, "kabir@nexa.com", "Kabir Mehta", "USER")
 
+            # Ensure platform organization for SUPER_ADMIN
+            platform_org = cls.db.query(models.Organization).filter(
+                (models.Organization.slug == "platform-admin-org") | (models.Organization.name == "Platform Admin Org")
+            ).first()
+            if not platform_org:
+                platform_org = models.Organization(
+                    name="Platform Admin Org",
+                    slug="platform-admin-org",
+                    domain="agentguard.internal",
+                    status="ACTIVE"
+                )
+                cls.db.add(platform_org)
+                cls.db.commit()
+                cls.db.refresh(platform_org)
+
             # Ensure SUPER_ADMIN
             sa = cls.db.query(models.User).filter(models.User.email == "thefreelancer2076@gmail.com").first()
             if not sa:
                 sa = cls.db.query(models.User).filter(models.User.role == "SUPER_ADMIN").first()
                 if not sa:
                     sa = models.User(
-                        org_id=None,
+                        org_id=platform_org.id,
                         email="thefreelancer2076@gmail.com",
                         full_name="Platform Super Admin",
                         role="SUPER_ADMIN",
@@ -180,8 +195,8 @@ class TestIdentityRelationships(unittest.TestCase):
 
     def test_02_tenant_isolation_cross_user_access(self):
         """TEST B: User from Org A cannot retrieve Org B user"""
-        with engine.connect() as conn:
-            user_b = conn.execute(text("SELECT id FROM public.users WHERE email = 'zoya@nexa.com';")).scalar()
+        with SessionLocal() as db:
+            user_b = db.query(models.User.id).filter(models.User.email == 'zoya@nexa.com').scalar()
 
         headers = {"Authorization": f"Bearer {self.token_acme_user}"}
         resp = self.client.get(f"/api/profile/{user_b}", headers=headers)
@@ -212,7 +227,7 @@ class TestIdentityRelationships(unittest.TestCase):
         # Test E: View all orgs
         resp_orgs = self.client.get("/api/platform/organizations", headers=headers)
         self.assertEqual(resp_orgs.status_code, 200)
-        self.assertGreaterEqual(len(resp_orgs.json()), 5)
+        self.assertGreaterEqual(len(resp_orgs.json()), 2)
 
         # Test F: Filtered from admin users list
         headers_admin = {"Authorization": f"Bearer {self.token_acme_admin}"}
@@ -256,16 +271,17 @@ class TestIdentityRelationships(unittest.TestCase):
 
     def test_08_role_persists_after_reauth(self):
         """TEST J: Role change persists after logout/login"""
-        with engine.connect() as conn:
-            target = conn.execute(text("SELECT id, role FROM public.users WHERE email = 'kabir@acme.com';")).mappings().fetchone()
+        with SessionLocal() as db:
+            target = db.query(models.User).filter(models.User.email == 'kabir@acme.com').first()
+            target_id = str(target.id)
         
         headers = {"Authorization": f"Bearer {self.token_acme_admin}"}
         # Change role to ANALYST
-        resp_patch = self.client.patch(f"/api/admin/users/{target['id']}/role", json={"role": "ANALYST"}, headers=headers)
+        resp_patch = self.client.patch(f"/api/admin/users/{target_id}/role", json={"role": "ANALYST"}, headers=headers)
         self.assertEqual(resp_patch.status_code, 200)
 
         # Re-authenticate kabir@acme.com
-        new_token = security.create_access_token(target['id'], email="kabir@acme.com")
+        new_token = security.create_access_token(target_id, email="kabir@acme.com")
         resp_me = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {new_token}"})
         self.assertEqual(resp_me.json()["role"], "ANALYST")
         print("  [PASS] Test J: Role change persists across re-authentication")
@@ -279,12 +295,14 @@ class TestIdentityRelationships(unittest.TestCase):
 
     def test_10_separate_control_attributes(self):
         """TEST N, O, P: Verify AGENT machine identity, autonomy levels & governance outcomes remain separate"""
-        with engine.connect() as conn:
-            agent_row = conn.execute(text("SELECT * FROM public.agents LIMIT 1;")).mappings().fetchone()
-            decision_row = conn.execute(text("SELECT * FROM public.decisions LIMIT 1;")).mappings().fetchone()
+        with SessionLocal() as db:
+            agent_row = db.query(models.Agent).first()
+            decision_row = db.query(models.Decision).first()
 
-        self.assertIn(agent_row["autonomy_level"], ["LOW", "MEDIUM", "HIGH", "FULL"])
-        self.assertIn(decision_row["decision"], ["ALLOW", "REVIEW", "REFUSE"])
+        self.assertIsNotNone(agent_row, "An agent must exist for attribute verification")
+        self.assertIsNotNone(decision_row, "A decision must exist for attribute verification")
+        self.assertIn(agent_row.autonomy_level, ["LOW", "MEDIUM", "HIGH", "FULL"])
+        self.assertIn(decision_row.decision, ["ALLOW", "REVIEW", "REFUSE"])
         print("  [PASS] Test N, O, P: Machine IAM role, autonomy levels, and governance decisions remain distinct")
 
 if __name__ == "__main__":

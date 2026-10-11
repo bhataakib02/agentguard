@@ -44,6 +44,18 @@ CANONICAL_PLANS = [
         "feature_flags": {}
     },
     {
+        "id": "PRO",
+        "name": "Pro Tier",
+        "description": "Advanced enterprise AI governance, SOC & red-team lab (Pro)",
+        "price_monthly": 999.0,
+        "max_users": 50,
+        "max_ai_agents": 25,
+        "max_api_keys": 20,
+        "max_monthly_api_requests": 1000000,
+        "max_storage_gb": 100.0,
+        "feature_flags": {}
+    },
+    {
         "id": "ENTERPRISE",
         "name": "Custom Enterprise",
         "description": "Full-scale multi-tenant enterprise control plane with dedicated SLA",

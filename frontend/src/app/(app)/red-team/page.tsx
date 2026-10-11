@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { fetchApi } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { Flame, Play, ShieldCheck, AlertTriangle, Info, CheckCircle2, XCircle } from "lucide-react";
@@ -13,7 +13,7 @@ export default function RedTeamPage() {
   const [running, setRunning] = useState(false);
   const [latestResult, setLatestResult] = useState<any>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [tData, aData] = await Promise.all([
         fetchApi("/red-team/tests").catch(() => []),
@@ -21,15 +21,15 @@ export default function RedTeamPage() {
       ]);
       setTests(tData || []);
       setAgents(aData || []);
-      if (aData && aData.length > 0 && !agentId) setAgentId(aData[0].id);
+      if (aData && aData.length > 0) setAgentId((prev) => prev || aData[0].id);
     } catch (err) {
       console.error("Red-team fetch error:", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleRunAttack = async (e: React.FormEvent) => {
     e.preventDefault();

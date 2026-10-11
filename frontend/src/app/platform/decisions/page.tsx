@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { fetchApi } from "@/lib/api";
 import {
   Activity,
@@ -29,7 +29,7 @@ export default function PlatformDecisionsPage() {
   // Trace Modal State
   const [selectedTrace, setSelectedTrace] = useState<any>(null);
 
-  const loadDecisions = async () => {
+  const loadDecisions = useCallback(async () => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
@@ -47,11 +47,11 @@ export default function PlatformDecisionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedOrg, selectedDecision]);
 
   useEffect(() => {
     loadDecisions();
-  }, [selectedOrg, selectedDecision]);
+  }, [loadDecisions]);
 
   const filteredDecisions = decisions.filter((d) => {
     if (!searchQuery.trim()) return true;
