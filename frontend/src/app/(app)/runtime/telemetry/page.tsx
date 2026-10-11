@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
 import {
@@ -31,7 +31,7 @@ export default function TelemetryDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("30d");
 
-  const loadTelemetry = async () => {
+  const loadTelemetry = useCallback(async () => {
     setLoading(true);
     try {
       const [tok, agents, signals, cbs, budg, wh, execs] = await Promise.all([
@@ -55,9 +55,9 @@ export default function TelemetryDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [range]);
 
-  useEffect(() => { loadTelemetry(); }, [range]);
+  useEffect(() => { loadTelemetry(); }, [loadTelemetry]);
 
   const fmtNum = (n: number) => {
     if (n >= 1000000) return `${(n / 1000000).toFixed(2)}M`;

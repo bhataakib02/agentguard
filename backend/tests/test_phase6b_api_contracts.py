@@ -17,6 +17,8 @@ class TestPhase6bApiContracts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.db = SessionLocal()
+        from bootstrap import ensure_canonical_plans
+        ensure_canonical_plans(cls.db)
         try:
             # 1. Ensure Tenant Org A
             cls.org_a = cls.db.query(models.Organization).filter(models.Organization.slug == "phase6b-org-a").first()

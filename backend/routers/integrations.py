@@ -52,7 +52,10 @@ def list_integrations(
     teams_configured = bool(os.getenv("TEAMS_WEBHOOK_URL"))
     smtp_configured = bool(os.getenv("SMTP_HOST") or os.getenv("SENDGRID_API_KEY"))
 
-    # 7. Webhooks
+    # 7. SIEM Forwarder
+    siem_configured = bool(os.getenv("SIEM_FORWARDER_URL") or os.getenv("SPLUNK_HEC_URL") or os.getenv("DATADOG_API_KEY"))
+
+    # 8. Webhooks
     wh_query = db.query(models.WebhookEndpoint)
     if current_user.role != "SUPER_ADMIN":
         wh_query = wh_query.filter(models.WebhookEndpoint.org_id == current_user.org_id)
@@ -166,5 +169,14 @@ def list_integrations(
             "status": "CONFIGURED" if smtp_configured else "NOT_CONFIGURED",
             "health": "STANDBY" if smtp_configured else "NOT_CONFIGURED",
             "details": "SMTP email delivery configured in environment" if smtp_configured else "SMTP_HOST not configured. Email invitation and security digest delivery disabled."
+        },
+        {
+            "id": "siem_forwarder",
+            "name": "Enterprise SIEM Log Streamer (CEF / Syslog / HEC)",
+            "category": "Security Information & Event Management",
+            "classification": "CONFIGURED" if siem_configured else "NOT_CONFIGURED",
+            "status": "CONFIGURED" if siem_configured else "NOT_CONFIGURED",
+            "health": "STANDBY" if siem_configured else "NOT_CONFIGURED",
+            "details": "SIEM stream connector active" if siem_configured else "SIEM_FORWARDER_URL or SPLUNK_HEC_URL not configured. On-demand CEF & JSONL export active."
         }
     ]

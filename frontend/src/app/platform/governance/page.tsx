@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { fetchApi } from "@/lib/api";
 import {
   Shield,
@@ -21,7 +21,7 @@ export default function PlatformGovernancePage() {
   const [selectedOrg, setSelectedOrg] = useState("ALL");
   const [loading, setLoading] = useState(true);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [polData, orgData] = await Promise.all([
@@ -35,11 +35,11 @@ export default function PlatformGovernancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedOrg]);
 
   useEffect(() => {
     loadData();
-  }, [selectedOrg]);
+  }, [loadData]);
 
   return (
     <div className="space-y-6 text-[#E1E7F0]">

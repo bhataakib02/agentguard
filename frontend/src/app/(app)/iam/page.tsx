@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { fetchApi } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -60,7 +60,7 @@ export default function IamPage() {
   const [updating, setUpdating] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams();
@@ -81,11 +81,11 @@ export default function IamPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, roleFilter, statusFilter]);
 
   useEffect(() => {
     loadData();
-  }, [roleFilter, statusFilter]);
+  }, [loadData]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();

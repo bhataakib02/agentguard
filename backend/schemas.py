@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Any, Dict
 import datetime
 
@@ -41,8 +41,7 @@ class UserSchema(BaseModel):
     created_at: datetime.datetime
     org_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AgentCreateRequest(BaseModel):
     name: str
@@ -85,8 +84,7 @@ class AgentSchema(BaseModel):
     daily_budget: float
     created_at: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AgentCredentialCreateRequest(BaseModel):
     name: Optional[str] = None
@@ -105,8 +103,7 @@ class AgentCredentialResponse(BaseModel):
     last_used_at: Optional[datetime.datetime] = None
     revoked_at: Optional[datetime.datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AgentCredentialCreatedResponse(BaseModel):
     credential: AgentCredentialResponse
@@ -167,8 +164,7 @@ class PermissionSchema(BaseModel):
     is_allowed: bool
     created_at: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class RuntimeAuthorizeRequest(BaseModel):
     action: str
@@ -230,8 +226,7 @@ class CapabilityTokenSchema(BaseModel):
     expires_at: datetime.datetime
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ActionEvaluateRequest(BaseModel):
     prompt: str
@@ -253,8 +248,7 @@ class DecisionSchema(BaseModel):
     execution_status: str
     timestamp: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ApprovalActionRequest(BaseModel):
     action: str  # APPROVE, REJECT
@@ -301,8 +295,7 @@ class PolicyRuleSchema(BaseModel):
     risk_delta: int
     description: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PolicyCreateRequest(BaseModel):
     name: str
@@ -331,8 +324,7 @@ class PolicySchema(BaseModel):
     rules: List[PolicyRuleSchema] = []
     rules_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Webhook Schemas ---
 
@@ -358,8 +350,7 @@ class WebhookEndpointSchema(BaseModel):
     created_at: datetime.datetime
     updated_at: Optional[datetime.datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class WebhookCreatedResponse(WebhookEndpointSchema):
     secret: str  # Only returned once upon creation!
@@ -375,8 +366,7 @@ class WebhookDeliverySchema(BaseModel):
     delivered_at: Optional[datetime.datetime] = None
     created_at: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Notification Schemas ---
 
@@ -390,8 +380,7 @@ class NotificationSchema(BaseModel):
     is_read: bool
     created_at: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Tool Registry Schemas ---
@@ -435,8 +424,7 @@ class ToolResponse(BaseModel):
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Runtime Execution & Forward Proxy Gateway Schemas ---
@@ -640,8 +628,7 @@ class AiModelResponse(BaseModel):
     provider_configured: bool = False
     health: str = "HEALTHY"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ModelPricingResponse(BaseModel):
@@ -653,8 +640,7 @@ class ModelPricingResponse(BaseModel):
     currency: str = "USD"
     active: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ModelSelectRequest(BaseModel):

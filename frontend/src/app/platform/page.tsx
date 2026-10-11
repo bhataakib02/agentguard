@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
 import {
@@ -57,7 +57,7 @@ export default function PlatformDashboardPage() {
   const [createMsg, setCreateMsg] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const loadPlatformData = async (orgScope = selectedOrgScope) => {
+  const loadPlatformData = useCallback(async (orgScope = selectedOrgScope) => {
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -78,11 +78,11 @@ export default function PlatformDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedOrgScope]);
 
   useEffect(() => {
     loadPlatformData();
-  }, []);
+  }, [loadPlatformData]);
 
   const handleOrgScopeChange = (scopeId: string) => {
     setSelectedOrgScope(scopeId);
