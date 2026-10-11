@@ -40,7 +40,9 @@ class Settings:
                 "http://localhost:8000",
                 "http://127.0.0.1:8000",
                 "https://agentguard.vercel.app",
+                "https://agentguard-beta-ten.vercel.app",
             ]
+        self.CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"^https://([a-zA-Z0-9_-]+\.)?vercel\.app$")
 
         # Trusted Hosts Configuration
         trusted_hosts_env = os.getenv("TRUSTED_HOSTS", "")
@@ -52,7 +54,9 @@ class Settings:
                 "127.0.0.1",
                 "testserver",
                 "agentguard.vercel.app",
-                "agentguard-backend.onrender.com"
+                "agentguard-beta-ten.vercel.app",
+                "agentguard-backend.onrender.com",
+                "agentguard-spfg.onrender.com",
             ]
 
         # Database Connection Pool Settings
