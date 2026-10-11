@@ -78,15 +78,26 @@ This comprehensive cleanup operation purged all synthetic, test, demo, and gener
 | **TOTALS** | **676** | **878** | **202** | **Cleaned & Verified** |
 
 ### C. Data Intentionally Preserved
-1. **10 Genuine Users:**
-   - `thefreelancer2076@gmail.com` (Super Admin, linked to Supabase Auth ID `6610b8a6-13de-4b67-9f70-9b8f34dd2c81`, authenticated today).
-   - `suite_user@agentguard.com` (Bhaskar Updated Bhatnagar, linked to Supabase Auth ID `8e075060-6561-4651-bea3-f584afed4268`).
-   - 8 authenticated suite role accounts: `suite_admin@agentguard.com`, `suite_super_admin@agentguard.com`, `suite_developer@agentguard.com`, `suite_operator@agentguard.com`, `suite_analyst@agentguard.com`, `suite_manager@agentguard.com`, `suite_security_analyst@agentguard.com`, `suite_viewer@agentguard.com`.
+1. **10 Retained Users (Forensically Classified):**
+   - **Confirmed Genuine Application Users (2 Accounts):**
+     - `thefreelancer2076@gmail.com` (Role: `SUPER_ADMIN`, Linked to Supabase Auth ID `6610b8a6-13de-4b67-9f70-9b8f34dd2c81`, Active login 2026-10-11, Platform Super Admin in `Platform Admin Control`).
+     - `suite_user@agentguard.com` (Name: `Bhaskar Updated Bhatnagar`, Role: `USER`, Linked to Supabase Auth ID `8e075060-6561-4651-bea3-f584afed4268`, Lead Security Architect in `AgentGuard Enterprise Core`).
+   - **Dedicated Automated-Test / Development Role Accounts (8 Accounts):**
+     - Preserved for review as RBAC test harness identities representing the 9-tier enterprise permission matrix:
+     - `suite_viewer@agentguard.com` (Role: `VIEWER`, Auth ID `50a66498-4f1f-4ba4-a517-19b8100e8b9e`)
+     - `suite_analyst@agentguard.com` (Role: `ANALYST`, Auth ID `6f917609-5c02-43a9-9590-03d969f78e1f`)
+     - `suite_operator@agentguard.com` (Role: `OPERATOR`, Auth ID `81a92287-15f5-4aef-b842-636253ef16f5`)
+     - `suite_security_analyst@agentguard.com` (Role: `SECURITY_ANALYST`, Auth ID `69090840-85a6-45ba-ad9d-29c1582ccf8f`)
+     - `suite_manager@agentguard.com` (Role: `MANAGER`, Auth ID `74304fef-7e1a-4a58-9f9a-a03cf4bec7ec`)
+     - `suite_developer@agentguard.com` (Role: `DEVELOPER`, Auth ID `706e596f-ccd6-4235-9f4c-76ae90f8f3ae`)
+     - `suite_admin@agentguard.com` (Role: `ADMIN`, Auth ID `da66f964-f699-4358-91d8-359825637f2a`)
+     - `suite_super_admin@agentguard.com` (Role: `SUPER_ADMIN`, Auth ID `6bef0334-c437-49dd-9605-5ecb3ff401a0`)
 2. **2 Genuine Organizations:**
    - `Platform Admin Control` (`8b79cca4-9cbf-4969-920e-e433ddc2808f`).
    - `AgentGuard Enterprise Core` (`08498fe0-2565-45c3-9a49-57e4c0c3cb44`).
 3. **175 Protected Audit Logs:**
-   - 100% of audit logs preserved. To prevent foreign-key deletion blocks without violating the immutability invariant, 80 logs referencing dummy organizations had their nullable foreign key `org_id` disassociated to `NULL`.
+   - 100% of audit log rows preserved (0 deleted).
+   - Forensic Analysis of 80 Disassociated Logs: To avoid foreign-key constraint violations (`audit_logs_org_id_fkey`) when deleting the 72 synthetic/demo organizations, 80 audit records originally belonging to 15 demo organizations had `org_id` disassociated to `NULL`. Original tenant attribution and UUIDs are 100% preserved in the pre-cleanup backup manifest. Restoring these foreign keys in the live database is architecturally blocked by PostgreSQL foreign key enforcement unless the purged dummy organizations are re-created.
 4. **12 Canonical Reference Records:**
    - 5 Plans (`FREE`, `STARTER`, `PROFESSIONAL`, `PRO`, `ENTERPRISE`).
    - 6 AI Models (`gpt-4o`, `claude-3-5-sonnet`, `gemini-1.5-pro`, `gpt-4o-mini`, `claude-3-haiku`, `gemini-1.5-flash`).
@@ -98,18 +109,19 @@ This comprehensive cleanup operation purged all synthetic, test, demo, and gener
 
 ### A. Summary of Files & Directories Removed
 - **Total Files Removed:** 410 files.
-  - Python Bytecode Cache (`.pyc`): 155 files.
-  - Generated Test Report Artifacts (PDF/Excel/CSV in `backend/storage/reports/`): 248 files.
+  - Python Bytecode Cache (`.pyc`): 150 files.
+  - Generated Test Report Artifacts (PDF/Excel/CSV in `backend/storage/reports/`): 253 files.
   - Temporary Test Database Files in `backend/` (`test_*.db`): 6 files.
   - Obsolete Scripts (`scripts/fix_test_paths.py`): 1 file.
 - **Total Directories Removed:** 123 directories.
   - Python `__pycache__` directories: 10 directories.
   - Pytest Cache directories (`.pytest_cache` in root and backend): 2 directories.
   - Obsolete tenant report folders in `storage/reports/`: 111 directories.
+*(Note: Python bytecode `.pyc` and isolated `.db` files are re-generated dynamically by the interpreter and pytest during subsequent automated test suite runs).*
 
 ### B. Important Files Intentionally Preserved
 1. `AGENTGUARD_MASTER_BUILD_CHECKLIST.md` — Living roadmap and authoritative source of truth.
-2. `implementation_plan.md` — Explicitly preserved per prompt instructions.
+2. `implementation_plan.md` — Explicitly preserved untouched per prompt instructions.
 3. `test_machine_identity.db` and `test_runtime_authorization.db` (root) — Retained as Git-tracked test targets.
 4. `scripts/audit_phase6c.py` — Preserved static code analysis scanner.
 5. `backend/scripts/*.py` — Preserved all migration and utility scripts with new security opt-in guards.
@@ -138,16 +150,27 @@ The following security hardening changes were made to guarantee that dummy data 
 
 | Test Suite / Check | Command Executed | Outcome |
 |:---|:---|:---|
-| **Database Schema Verification** | `python inspect_db.py` | **47 / 47 tables verified, 202 rows** |
-| **Foreign Key Consistency** | PostgreSQL transactional integrity audit | **Zero orphaned records; 100% valid** |
-| **User & Organization Preservation** | Direct PostgreSQL inspection | **10 genuine users, 2 genuine orgs verified** |
-| **Frontend UI Build Check** | `npm run build` in `frontend` | **58 / 58 static pages built successfully** |
-| **Backend Core Regression Tests** | `pytest backend/tests` | **462 / 462 tests green in isolated SQLite DB** |
+| **Database Schema Verification** | `python scratch/verify_db_integrity.py` | **47 / 47 tables verified, 202 rows** |
+| **Foreign Key Consistency** | Transactional integrity check across all 47 tables | **Zero orphaned records; 100% valid** |
+| **User & Organization Preservation** | Direct PostgreSQL inspection | **10 retained users, 2 genuine orgs verified** |
+| **Isolated Backup Restoration** | `python scratch/test_isolated_restore.py` | **47 / 47 tables, 878 / 878 rows restored with 0 errors** |
+| **Backend Core Regression Tests** | `pytest backend/tests -q` | **462 / 462 tests passed (100% green)** |
+| **Frontend Lint Check** | `npm run lint` in `frontend/` | **0 errors (4 image optimization warnings)** |
+| **Frontend UI Build Check** | `npm run build` in `frontend/` | **58 / 58 static pages built successfully** |
+| **Application Readiness Probe** | `GET /health/ready` via TestClient | **HTTP 200 OK (`READY`, `CONNECTED`)** |
 
 ---
 
-## 6. Register Links
+## 6. Edge Middleware & Access Control Hardening
+
+- **Issue Resolved:** In `frontend/src/middleware.ts`, edge-level route protection for `/platform` previously inspected only top-level `claims.role`. In Supabase Auth JWT tokens, top-level `role` defaults to `"authenticated"` while the application role is stored in `claims.app_metadata.role` or `claims.user_metadata.role`, causing authenticated `SUPER_ADMIN` users to be falsely redirected to `/403`.
+- **Resolution:** Updated `frontend/src/middleware.ts` to inspect `claims.role`, `claims.app_metadata.role`, and `claims.user_metadata.role`. Re-tested and verified with Next.js production build (`58/58` pages static compiled).
+
+---
+
+## 7. Register Links
 
 - **Deleted Files Register:** [`cleanup_reports/DELETED_FILES_REGISTER.md`](file:///d:/AGENTGUARD/cleanup_reports/DELETED_FILES_REGISTER.md)
 - **Deleted Database Records Register:** [`cleanup_reports/DELETED_DATABASE_RECORDS.md`](file:///d:/AGENTGUARD/cleanup_reports/DELETED_DATABASE_RECORDS.md)
-- **Database Backup Artifact:** `cleanup_reports/backups/agentguard_backup_20261011_093951.json`
+- **Database Backup Artifact:** `cleanup_reports/backups/agentguard_backup_20261011_093951.json` (595,863 bytes)
+- **SQL Backup Artifact:** `cleanup_reports/backups/agentguard_backup_20261011_093951.sql` (466,973 bytes)
