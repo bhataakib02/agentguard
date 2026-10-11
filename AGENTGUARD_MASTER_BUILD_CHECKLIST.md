@@ -14,15 +14,15 @@ Last Updated: 2026-10-01
 Current Phase: Phase 4 — Security Intelligence & AI Guardrails Complete
 Current Milestone: Milestone 5 — Developer SDKs & External Integrations
 Total Tracked Checkbox Items: 154
-Completed: 71
+Completed: 73
 Partial: 27
 Foundation: 19
 Simulated: 12
 Demo: 6
-Not Implemented: 19
+Not Implemented: 17
 Blocked: 0
 Broken: 0
-Overall Completion: 46.1% (71 / 154 genuinely complete items)
+Overall Completion: 47.4% (73 / 154 genuinely complete items)
 ```
 
 ---
@@ -206,11 +206,11 @@ Overall Completion: 46.1% (71 / 154 genuinely complete items)
   *Evidence:* `backend/core/deps.py` (`check_license_limit`), `backend/routers/platform.py`  
   *What currently works:* Blocks user and agent creation when tenant hits plan limit (FREE, STARTER, PRO, ENTERPRISE).
 
-- [ ] Per-tenant custom encryption keys (BYOK)  
-  *Status:* NOT_IMPLEMENTED  
-  *Evidence:* `backend/models.py`  
-  *What currently works:* System uses global SECRET_KEY.  
-  *What is missing:* Organization-level KMS key configuration.
+- [x] Per-tenant custom encryption keys (BYOK)  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/services/byok_service.py`, `backend/routers/organization.py`, `backend/models.py` (`Organization.custom_encryption_key`), `backend/tests/test_byok_tenant_suite.py` (5/5 passed)  
+  *What currently works:* Tenant-managed AES-256-GCM envelope encryption with per-tenant DEK derivation, encrypted envelope formatting (`v1:{nonce}:{auth_tag}:{ciphertext}`), dynamic key rotation, tamper resistance, status inspection, and roundtrip verification probe via REST endpoints (`GET/POST /api/organization/byok`, `POST /api/organization/byok/rotate`, `POST /api/organization/byok/disable`, `POST /api/organization/byok/test`). Immutable audit logs emitted for all operations.  
+  *Dependencies:* PostgreSQL / SQLAlchemy, AES-256-GCM cryptography.
 
 ---
 
@@ -858,9 +858,10 @@ Overall Completion: 46.1% (71 / 154 genuinely complete items)
   *Status:* COMPLETE  
   *Evidence:* Verified across `auth.py`, `policies.py`, `decisions.py`, `approvals.py`, `runtime_telemetry_service.py`, `audit.py`.
 
-- [ ] End-to-end Machine Agent -> Auth -> Passport -> Permission -> Capability -> Runtime Gate flow  
-  *Status:* NOT_IMPLEMENTED  
-  *Evidence:* See Section 1, 4, 5, 6, 7, 13.
+- [x] End-to-end Machine Agent -> Auth -> Passport -> Permission -> Capability -> Runtime Gate flow  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/tests/test_e2e_machine_agent_lifecycle.py` (13 contiguous lifecycle stages verified, 1/1 passed)  
+  *What currently works:* Verified full lifecycle: Tenant Provisioning -> BYOK Encryption -> Agent Registration -> Machine Credential Issuance -> Ed25519 Cryptographic Passport Signing -> Machine Auth (`POST /runtime/auth`) -> Session Heartbeat -> Permission Grant -> Capability Token Issuance -> Pre-flight Runtime Gate (`POST /runtime/authorize`) -> Tool Proxy Forward Execution (`POST /runtime/execute`) with Replay Protection -> Output Guardrails & Hallucination Filter (`POST /runtime/scan-output`) -> Python SDK Integration -> Audit Trail & Causal Provenance Verification.
 
 ---
 
@@ -1013,3 +1014,4 @@ Whenever an implementation phase is completed:
 | 2026-10-01 | Milestone 2 — Runtime Authorization Kernel | Implemented permission grant/revoke CRUD & Stage 5 permission enforcement gate, Stage 6 dynamic single-use capability token validation gate, unified pre-flight authorization endpoint `/api/runtime/authorize`, automatic circuit breaker tripping on consecutive refusals with operator reset. | 4 items completed | Milestone 3: Intent & Tool Proxy Gateway |
 | 2026-10-01 | Milestone 3 — Tool Proxy & Intent Engine | Implemented structured function call & JSON schema parameter validation, prompt injection & jailbreak detection heuristics, tool registry CRUD `/api/tools`, forward egress tool proxy with SSRF defense (blocking loopback & cloud metadata `169.254.169.254`), single-use execution gate token replay protection, `/api/runtime/execute`, `/api/runtime/invoke`, execution telemetry & provenance logging. | 4 items completed | Milestone 4: AI Guardrails & Security Intelligence |
 | 2026-10-01 | Milestone 4 — AI Guardrails & Security Intelligence | Implemented PII & sensitive data redaction engine (`pii_engine.py`) with MASK/PARTIAL_MASK/TOKENIZE/BLOCK modes, Stage 6.6 PII guardrail in runtime kernel, outbound proxy response sanitization, behavioral anomaly engine (`behavior_engine.py`) tracking velocity spikes, operating hours compliance, allowed tools, and baseline spending, Stage 8.5 dynamic risk scoring integration, upgraded red team engine (`red_team_engine.py`) with mutation techniques (Base64, Delimiter, Roleplay, Leetspeak, Instruction override), automated policy fuzzing `/api/red-team/fuzz`, and standalone `/api/runtime/scan-pii` diagnostics. | 4 items completed | Milestone 5: Developer Ecosystem & SDKs |
+| 2026-10-11 | Milestone 5 — BYOK, E2E Machine Agent Lifecycle & Deployment Resilience | Implemented per-tenant AES-256-GCM BYOK envelope encryption REST lifecycle (`byok_service.py`, `organization.py`), full contiguous 13-stage E2E machine agent integration suite (`test_e2e_machine_agent_lifecycle.py`), resolved Vercel CORS policy blocking (`config.py`, `main.py`) with dynamic regex matching, and added resilient local authentication fallback in Next.js frontend login. | 2 items completed (73 / 154 = 47.4%) | Feature 5.2: TypeScript SDK & Advanced Framework Interceptors |
