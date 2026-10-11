@@ -291,3 +291,31 @@ class AgentGuardClient:
                 raise AgentGuardException(f"Scan PII failed [{res.status_code}]: {res.text}")
         except requests.RequestException as e:
             raise AgentGuardException(f"Network error during scan_pii: {e}") from e
+
+    def scan_output(
+        self,
+        text: str,
+        grounding_context: Optional[str] = None,
+        policy_mode: str = "BLOCK",
+        toxicity_threshold: float = 50.0
+    ) -> Dict[str, Any]:
+        """
+        Scans model/tool output for toxicity, threats, and factual hallucination.
+        Calls POST /api/runtime/scan-output.
+        """
+        url = f"{self.base_url}/api/runtime/scan-output"
+        payload = {
+            "text": text,
+            "grounding_context": grounding_context,
+            "policy_mode": policy_mode,
+            "toxicity_threshold": toxicity_threshold
+        }
+        try:
+            res = self._session.post(url, headers=self._headers(), json=payload, timeout=self.timeout)
+            if res.status_code == 200:
+                return res.json()
+            else:
+                raise AgentGuardException(f"Scan output failed [{res.status_code}]: {res.text}")
+        except requests.RequestException as e:
+            raise AgentGuardException(f"Network error during scan_output: {e}") from e
+
