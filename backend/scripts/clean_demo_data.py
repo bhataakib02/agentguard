@@ -6,6 +6,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import engine, SessionLocal
 
 def clean_all_demo_data():
+    if os.getenv("ALLOW_RAW_PURGE", "false").lower() not in ("true", "1"):
+        print("[AgentGuard Safety Block] Broad table purge is disabled by default.")
+        return
     print("=" * 60)
     print("  AGENTGUARD PRODUCTION DATABASE CLEANUP & PURGE SCRIPT  ")
     print("=" * 60)

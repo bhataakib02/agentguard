@@ -15,8 +15,10 @@ def run_auth_verification_suite():
     print("  AGENTGUARD PRODUCTION AUTHENTICATION & MULTI-TENANT TEST SUITE  ")
     print("=" * 60)
 
-    Base.metadata.create_all(bind=engine)
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # Ensure isolated test engine is used so tests never mutate real database
+    test_engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(bind=test_engine)
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
     db = TestingSessionLocal()
 
     # 1. DATABASE SCHEMA TEST (auth_user_id)

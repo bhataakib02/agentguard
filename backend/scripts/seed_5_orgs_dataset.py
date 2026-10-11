@@ -83,6 +83,15 @@ def parse_dt(val):
         return datetime.datetime.utcnow()
 
 def seed_dataset():
+    if os.getenv("ALLOW_DEMO_SEED", "false").lower() not in ("true", "1"):
+        raise RuntimeError(
+            "[AgentGuard Security Block] Automatic demo dataset seeding is disabled. "
+            "To explicitly seed development fixtures, set ALLOW_DEMO_SEED=true in a non-production environment."
+        )
+    if os.getenv("ENVIRONMENT", "").lower() == "production":
+        raise RuntimeError(
+            "[AgentGuard Security Block] Demo dataset seeding is strictly prohibited in production environments."
+        )
     print("=" * 75)
     print("  SEEDING 5-ORGANIZATION DATASET WITH DOCX TESTING CREDENTIALS  ")
     print("=" * 75)

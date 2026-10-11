@@ -19,11 +19,12 @@ class TestProductionReadiness(unittest.TestCase):
     def setUpClass(cls):
         cls.db = SessionLocal()
 
-        # Ensure demo organizations are seeded
+        # Ensure demo organizations are seeded in isolated test environment only
         if not cls.db.query(models.User).filter(models.User.email == "admin@acmefintech.com").first():
-            from scripts.seed_demo_orgs import seed_five_demo_organizations
-            seed_five_demo_organizations()
-            cls.db.expire_all()
+            if os.getenv("ENVIRONMENT", "").lower() != "production" and os.getenv("ALLOW_DEMO_SEED", "").lower() in ("true", "1"):
+                from scripts.seed_demo_orgs import seed_five_demo_organizations
+                seed_five_demo_organizations()
+                cls.db.expire_all()
 
         # Provision SUPER_ADMIN
         cls.super_admin_email = "super_admin_prod@agentguard.com"

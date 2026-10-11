@@ -6,6 +6,7 @@ test_db_path = os.path.join(os.path.dirname(__file__), "test_agentguard_global.d
 os.environ["ENVIRONMENT"] = "testing"
 os.environ["DATABASE_URL"] = f"sqlite:///{test_db_path}"
 os.environ["SECRET_KEY"] = "agentguard-test-secret-key-32charactersmin"
+os.environ["ALLOW_DEMO_SEED"] = "true"
 
 sys.path.insert(0, os.path.dirname(__file__))
 
