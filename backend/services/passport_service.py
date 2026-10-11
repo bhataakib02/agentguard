@@ -82,6 +82,11 @@ class PassportSigningService:
         Creates a deterministic, sorted, whitespace-free canonical JSON representation
         of the passport and agent identity for digital signature hashing.
         """
+        if capabilities is None and hasattr(passport, "claims") and isinstance(passport.claims, dict):
+            capabilities = passport.claims.get("capabilities", [])
+        elif capabilities is None and hasattr(passport, "capabilities") and isinstance(passport.capabilities, list):
+            capabilities = passport.capabilities
+
         issued_at_str = passport.issued_at.isoformat() if hasattr(passport.issued_at, "isoformat") else str(passport.issued_at)
         expires_at_str = passport.expires_at.isoformat() if hasattr(passport.expires_at, "isoformat") else str(passport.expires_at)
 

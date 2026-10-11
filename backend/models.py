@@ -38,6 +38,13 @@ class Organization(Base):
     logo_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+    # Per-tenant custom encryption keys (BYOK)
+    kms_provider = Column(String, default="SYSTEM_MANAGED")  # SYSTEM_MANAGED, AWS_KMS, GCP_KMS, VAULT, LOCAL_AES
+    kms_key_arn = Column(String, nullable=True)
+    kms_key_alias = Column(String, nullable=True)
+    kms_key_status = Column(String, default="NOT_CONFIGURED")  # NOT_CONFIGURED, ACTIVE, VERIFYING, DISABLED
+    kms_config_json = Column(JSON, default=dict)
+
     users = relationship("User", back_populates="organization")
     agents = relationship("Agent", back_populates="organization")
     policies = relationship("Policy", back_populates="organization")

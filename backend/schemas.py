@@ -592,3 +592,30 @@ class OutputScanResponse(BaseModel):
     hallucination_score: float
     findings: List[Dict[str, Any]] = []
     sanitized_text: Optional[str] = None
+
+
+class BYOKConfigRequest(BaseModel):
+    provider: str  # SYSTEM_MANAGED, AWS_KMS, GCP_KMS, VAULT, LOCAL_AES
+    key_arn: Optional[str] = None
+    key_alias: Optional[str] = None
+    config_params: Optional[Dict[str, Any]] = None
+
+
+class BYOKConfigResponse(BaseModel):
+    org_id: str
+    provider: str
+    key_arn: Optional[str] = None
+    key_alias: Optional[str] = None
+    status: str
+    is_custom_key: bool
+
+
+class BYOKTestResponse(BaseModel):
+    success: bool
+    provider: str
+    key_arn: Optional[str] = None
+    key_alias: Optional[str] = None
+    status: str
+    probe_verified: bool = False
+    error: Optional[str] = None
+

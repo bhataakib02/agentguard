@@ -10,6 +10,8 @@ from core.deps import get_current_user, require_admin, check_org_isolation, chec
 from core import security
 from core.supabase_admin import supabase_admin
 import models
+import schemas
+from services.byok_service import byok_service
 
 router = APIRouter(prefix="/organization", tags=["Organization Tenant Administration"])
 
@@ -362,3 +364,197 @@ def invite_user_to_organization(
         "email_delivery_status": email_delivery_status,
         "email_delivery_note": email_delivery_note
     }
+
+
+# ==============================================================================
+# BYOK (Bring Your Own Key) & KMS Tenant Key Management Endpoints
+# ==============================================================================
+
+@router.get("/byok", response_model=schemas.BYOKConfigResponse)
+def get_organization_byok_config(
+    current_user: models.User = Depends(get_current_user),
+    x_org_context: Optional[str] = Header(None, alias="X-Organization-Context"),
+    db: Session = Depends(get_db)
+):
+    target_org_id = get_effective_org_id(current_user, x_org_context)
+    org = db.query(models.Organization).filter(models.Organization.id == target_org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    is_custom = bool(org.kms_provider and org.kms_provider != "SYSTEM_MANAGED")
+    return schemas.BYOKConfigResponse(
+        org_id=str(org.id),
+        provider=org.kms_provider or "SYSTEM_MANAGED",
+        key_arn=org.kms_key_arn,
+        key_alias=org.kms_key_alias,
+        status=org.kms_key_status or ("ACTIVE" if is_custom else "NOT_CONFIGURED"),
+        is_custom_key=is_custom
+    )
+
+
+@router.post("/byok", response_model=schemas.BYOKConfigResponse)
+def configure_organization_byok(
+    payload: schemas.BYOKConfigRequest,
+    current_user: models.User = Depends(require_admin),
+    x_org_context: Optional[str] = Header(None, alias="X-Organization-Context"),
+    db: Session = Depends(get_db)
+):
+    target_org_id = get_effective_org_id(current_user, x_org_context)
+    org = db.query(models.Organization).filter(models.Organization.id == target_org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    try:
+        updated_org = byok_service.configure_tenant_byok(
+            db=db,
+            org=org,
+            provider=payload.provider,
+            key_arn=payload.key_arn,
+            key_alias=payload.key_alias,
+            config_params=payload.config_params
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Audit log
+    audit = models.AuditLog(
+        org_id=str(org.id),
+        event_type="BYOK_KEY_CONFIGURED",
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action=f"Configured BYOK encryption with provider {payload.provider}",
+        resource="byok",
+        result="SUCCESS",
+        metadata_json={
+            "provider": payload.provider,
+            "key_alias": updated_org.kms_key_alias,
+            "key_arn": payload.key_arn
+        }
+    )
+    db.add(audit)
+    db.commit()
+
+    is_custom = bool(updated_org.kms_provider and updated_org.kms_provider != "SYSTEM_MANAGED")
+    return schemas.BYOKConfigResponse(
+        org_id=str(updated_org.id),
+        provider=updated_org.kms_provider,
+        key_arn=updated_org.kms_key_arn,
+        key_alias=updated_org.kms_key_alias,
+        status=updated_org.kms_key_status,
+        is_custom_key=is_custom
+    )
+
+
+@router.post("/byok/rotate", response_model=schemas.BYOKConfigResponse)
+def rotate_organization_byok(
+    payload: Optional[Dict[str, Any]] = None,
+    current_user: models.User = Depends(require_admin),
+    x_org_context: Optional[str] = Header(None, alias="X-Organization-Context"),
+    db: Session = Depends(get_db)
+):
+    target_org_id = get_effective_org_id(current_user, x_org_context)
+    org = db.query(models.Organization).filter(models.Organization.id == target_org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    updated_org = byok_service.rotate_tenant_byok(db=db, org=org, new_config_params=payload)
+
+    audit = models.AuditLog(
+        org_id=str(org.id),
+        event_type="BYOK_KEY_ROTATED",
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action=f"Rotated encryption key material for tenant {org.name}",
+        resource="byok",
+        result="SUCCESS",
+        metadata_json={
+            "key_version": (updated_org.kms_config_json or {}).get("key_version", 1),
+            "rotated_at": (updated_org.kms_config_json or {}).get("rotated_at")
+        }
+    )
+    db.add(audit)
+    db.commit()
+
+    is_custom = bool(updated_org.kms_provider and updated_org.kms_provider != "SYSTEM_MANAGED")
+    return schemas.BYOKConfigResponse(
+        org_id=str(updated_org.id),
+        provider=updated_org.kms_provider or "SYSTEM_MANAGED",
+        key_arn=updated_org.kms_key_arn,
+        key_alias=updated_org.kms_key_alias,
+        status=updated_org.kms_key_status or "ACTIVE",
+        is_custom_key=is_custom
+    )
+
+
+@router.post("/byok/disable", response_model=schemas.BYOKConfigResponse)
+def disable_organization_byok(
+    current_user: models.User = Depends(require_admin),
+    x_org_context: Optional[str] = Header(None, alias="X-Organization-Context"),
+    db: Session = Depends(get_db)
+):
+    target_org_id = get_effective_org_id(current_user, x_org_context)
+    org = db.query(models.Organization).filter(models.Organization.id == target_org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    reverted_org = byok_service.disable_tenant_byok(db=db, org=org)
+
+    audit = models.AuditLog(
+        org_id=str(org.id),
+        event_type="BYOK_KEY_DISABLED",
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action="Reverted encryption keys to system-managed defaults",
+        resource="byok",
+        result="SUCCESS",
+        metadata_json={"org_id": str(org.id)}
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.BYOKConfigResponse(
+        org_id=str(reverted_org.id),
+        provider=reverted_org.kms_provider,
+        key_arn=reverted_org.kms_key_arn,
+        key_alias=reverted_org.kms_key_alias,
+        status=reverted_org.kms_key_status,
+        is_custom_key=False
+    )
+
+
+@router.post("/byok/test", response_model=schemas.BYOKTestResponse)
+def test_organization_byok(
+    current_user: models.User = Depends(get_current_user),
+    x_org_context: Optional[str] = Header(None, alias="X-Organization-Context"),
+    db: Session = Depends(get_db)
+):
+    target_org_id = get_effective_org_id(current_user, x_org_context)
+    org = db.query(models.Organization).filter(models.Organization.id == target_org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    result = byok_service.test_roundtrip(db=db, org=org)
+
+    audit = models.AuditLog(
+        org_id=str(org.id),
+        event_type="BYOK_KEY_TESTED",
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action=f"Tested encryption key roundtrip probe: {result.get('status')}",
+        resource="byok",
+        result="SUCCESS" if result.get("success") else "FAILURE",
+        metadata_json=result
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.BYOKTestResponse(
+        success=result.get("success", False),
+        provider=result.get("provider", org.kms_provider or "SYSTEM_MANAGED"),
+        key_arn=result.get("key_arn"),
+        key_alias=result.get("key_alias"),
+        status=result.get("status", "UNKNOWN"),
+        probe_verified=result.get("probe_verified", False),
+        error=result.get("error")
+    )
+
