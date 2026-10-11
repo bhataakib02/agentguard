@@ -533,17 +533,20 @@ Below is the forensic catalog of deleted record IDs grouped by table. All sensit
 
 ## 4. Retained & Preserved Data Inventory
 
-### A. Genuine User Accounts (10 Users)
-- `thefreelancer2076@gmail.com` (Role: `SUPER_ADMIN`, Linked to Supabase Auth ID `6610b8a6-13de-4b67-9f70-9b8f34dd2c81`, Logged in 2026-10-11)
-- `suite_user@agentguard.com` (Name: `Bhaskar Updated Bhatnagar`, Role: `USER`, Linked to Supabase Auth ID `8e075060-6561-4651-bea3-f584afed4268`)
-- `suite_admin@agentguard.com` (Role: `ADMIN`, Linked to Supabase Auth ID `da66f964-f699-4358-91d8-359825637f2a`)
-- `suite_super_admin@agentguard.com` (Role: `SUPER_ADMIN`, Linked to Supabase Auth ID `6bef0334-c437-49dd-9605-5ecb3ff401a0`)
-- `suite_developer@agentguard.com` (Role: `DEVELOPER`, Linked to Supabase Auth ID `706e596f-ccd6-4235-9f4c-76ae90f8f3ae`)
-- `suite_manager@agentguard.com` (Role: `MANAGER`, Linked to Supabase Auth ID `74304fef-7e1a-4a58-9f9a-a03cf4bec7ec`)
-- `suite_operator@agentguard.com` (Role: `OPERATOR`, Linked to Supabase Auth ID `81a92287-15f5-4aef-b842-636253ef16f5`)
-- `suite_security_analyst@agentguard.com` (Role: `SECURITY_ANALYST`, Linked to Supabase Auth ID `69090840-85a6-45ba-ad9d-29c1582ccf8f`)
-- `suite_analyst@agentguard.com` (Role: `ANALYST`, Linked to Supabase Auth ID `6f917609-5c02-43a9-9590-03d969f78e1f`)
-- `suite_viewer@agentguard.com` (Role: `VIEWER`, Linked to Supabase Auth ID `50a66498-4f1f-4ba4-a517-19b8100e8b9e`)
+### A. Retained User Accounts (10 Users Forensically Classified)
+
+| Email | Full Name | Role | Status | Auth Provider Linkage | Classification | Evidence & Context |
+|:---|:---|:---|:---|:---|:---|:---|
+| `thefreelancer2076@gmail.com` | Platform Super Admin | `SUPER_ADMIN` | ACTIVE | Supabase Auth ID `6610b8a6-13de-4b67-9f70-9b8f34dd2c81` | **Confirmed Genuine Application User** | Primary owner/administrator of `Platform Admin Control`; active human authentication recorded on 2026-10-11. |
+| `suite_user@agentguard.com` | Bhaskar Updated Bhatnagar | `USER` | ACTIVE | Supabase Auth ID `8e075060-6561-4651-bea3-f584afed4268` | **Confirmed Genuine Application User** | Developer's personalized profile account in `AgentGuard Enterprise Core`; customized with actual developer name and security architect role. |
+| `suite_admin@agentguard.com` | Suite Admin | `ADMIN` | ACTIVE | Supabase Auth ID `da66f964-f699-4358-91d8-359825637f2a` | **Dedicated Test Role Account (Uncertain - Review)** | Provisioned in batch on 2026-10-01 as RBAC verification fixture for ADMIN permissions. Preserved for review. |
+| `suite_super_admin@agentguard.com` | Suite Super_Admin | `SUPER_ADMIN` | ACTIVE | Supabase Auth ID `6bef0334-c437-49dd-9605-5ecb3ff401a0` | **Dedicated Test Role Account (Uncertain - Review)** | Provisioned in batch on 2026-10-01 as RBAC verification fixture for SUPER_ADMIN permissions. Preserved for review. |
+| `suite_developer@agentguard.com` | Suite Developer | `DEVELOPER` | ACTIVE | Supabase Auth ID `706e596f-ccd6-4235-9f4c-76ae90f8f3ae` | **Dedicated Test Role Account (Uncertain - Review)** | Provisioned in batch on 2026-10-01 as RBAC verification fixture for DEVELOPER permissions. Preserved for review. |
+| `suite_manager@agentguard.com` | Suite Manager | `MANAGER` | ACTIVE | Supabase Auth ID `74304fef-7e1a-4a58-9f9a-a03cf4bec7ec` | **Dedicated Test Role Account (Uncertain - Review)** | Provisioned in batch on 2026-10-01 as RBAC verification fixture for MANAGER permissions. Preserved for review. |
+| `suite_operator@agentguard.com` | Suite Operator | `OPERATOR` | ACTIVE | Supabase Auth ID `81a92287-15f5-4aef-b842-636253ef16f5` | **Dedicated Test Role Account (Uncertain - Review)** | Provisioned in batch on 2026-10-01 as RBAC verification fixture for OPERATOR permissions. Preserved for review. |
+| `suite_security_analyst@agentguard.com` | Suite Security_Analyst | `SECURITY_ANALYST` | ACTIVE | Supabase Auth ID `69090840-85a6-45ba-ad9d-29c1582ccf8f` | **Dedicated Test Role Account (Uncertain - Review)** | Provisioned in batch on 2026-10-01 as RBAC verification fixture for SECURITY_ANALYST permissions. Preserved for review. |
+| `suite_analyst@agentguard.com` | Suite Analyst | `ANALYST` | ACTIVE | Supabase Auth ID `6f917609-5c02-43a9-9590-03d969f78e1f` | **Dedicated Test Role Account (Uncertain - Review)** | Provisioned in batch on 2026-10-01 as RBAC verification fixture for ANALYST permissions. Preserved for review. |
+| `suite_viewer@agentguard.com` | Suite Viewer | `VIEWER` | ACTIVE | Supabase Auth ID `50a66498-4f1f-4ba4-a517-19b8100e8b9e` | **Dedicated Test Role Account (Uncertain - Review)** | Provisioned in batch on 2026-10-01 as RBAC verification fixture for VIEWER permissions. Preserved for review. |
 
 ### B. Genuine Organizations (2 Organizations)
 - `Platform Admin Control` (`8b79cca4-9cbf-4969-920e-e433ddc2808f`) — Owner of `thefreelancer2076@gmail.com` Super-Admin control plane.
@@ -555,14 +558,37 @@ Below is the forensic catalog of deleted record IDs grouped by table. All sensit
 - `model_pricing` (1 configuration): Canonical OpenAI GPT-4o pricing entry
 
 ### D. Protected Security Audit Trail (175 Records)
-- `audit_logs` (175 records): 100% of historical audit logs preserved; 80 logs previously referencing dummy organizations were updated to `org_id = NULL` to preserve immutability and break FK dependency without deleting any logs.
+- Total audit logs: 175 rows (100% preserved; 0 deleted).
+- **Audit-Log Disassociation Forensic Analysis:**
+  - Originally in the pre-cleanup database, 95 records had `org_id = NULL` and 80 records referenced 15 disposable test/demo organizations.
+  - To prevent PostgreSQL foreign key errors (`audit_logs_org_id_fkey`) when deleting the 72 synthetic organizations, the 80 records had their foreign key set to `NULL`.
+  - **Original Provenance & Attribution Breakdown (Preserved in Backup):**
+    1. `SDK Enterprise b30250` (`0e29c89c-b406-4f87-81f7-5d53e1c81e63`): 28 logs (RUNTIME_AUTHORIZE, MACHINE_AUTH, TOOL_PROXY_EXECUTE)
+    2. `Phase5OrgAlpha` (`d9189010-1541-417d-9eee-9e13972b6204`): 18 logs (SUSPEND_USER, ACTIVATE_USER, CHANGE_ROLE, INVITE_USER)
+    3. `Phase 6C Org A` (`41a538b6-6025-41e7-935d-978307412028`): 10 logs (internal governance test events)
+    4. `SDK Enterprise e88c9d` (`b8e19416-e6c9-4f6c-8e80-d14d1b2a798e`): 7 logs (MACHINE_AUTH, RUNTIME_AUTHORIZE)
+    5. `Guardrails Cyber Corp 9a6a2c` (`9021e733-7305-4f5d-b164-3d25223c43e4`): 4 logs (Automated policy fuzzing events)
+    6. `Acme Financial Technologies` (`b0d8e703-818c-4537-996d-1fa716ac4e7b`): 3 logs (digital twin simulations)
+    7. `Phase4OrgA` (`1dc1f2de-32eb-47b2-bf64-e6dbb3508468`): 2 logs (SUSPEND_AGENT, RESTORE_AGENT)
+    8. `Acme Identity Corporation` (`ecc89ba5-56d0-4b8a-a763-514567bbcb82`): 1 log (CHANGE_ROLE)
+    9. `Alpha Corporate SaaS` (`8b178014-c40f-458e-a859-f1834621dfbd`): 1 log (INVITE_USER)
+    10. `Phase5OrgBeta` (`ac6b378f-1474-4ad9-8c89-db80b6e38244`): 1 log (CHANGE_ROLE)
+    11. `Phase 6C Org B` (`6620b0ea-4f8d-41c8-8404-991d2b69e39b`): 1 log (digital twin simulation)
+    12. `Acme SaaS Tenant A` (`512eee31-2af3-40b6-a678-0b532622a085`): 1 log (INVITE_USER)
+    13. `Org A Security Corp` (`89a887fa-d793-4a51-9ee2-7964b8545ace`): 1 log (INVITE_USER)
+    14. `Guardrails Cyber Corp` (`7795f6a9-c6d3-4b56-978d-423daef0b210`): 1 log (CREATE_API_KEY)
+    15. `Orbit Retail & Commerce` (`bb5cc303-37d5-41d5-a834-c46a235bd022`): 1 log (digital twin simulation)
+  - **Recovery Constraint:** Restoring `org_id` on these records in the active PostgreSQL database would require re-inserting the 15 purged dummy organizations or disabling foreign key enforcement, both of which violate operational integrity mandates. Full original attribution is preserved forensically in `agentguard_backup_20261011_093951.json`.
 
 ---
 
 ## 5. Post-Cleanup Verification & Integrity Check
 
 - **Active Database Target:** Supabase PostgreSQL (`aws-0-ap-south-1.pooler.supabase.com/postgres`)
-- **All 47 Tables Existing:** Confirmed.
+- **All 47 Tables Existing:** Confirmed 47/47 tables intact.
 - **Foreign Key Constraints:** Confirmed valid with zero orphaned child rows.
-- **Transaction Status:** COMMITTED successfully with atomic rollback safeguards.
+- **Isolated Backup Restoration:** Confirmed 100% recoverable in an isolated temporary database (`scratch/test_isolated_restore.py`: 47/47 tables created, 878/878 rows restored, 0 errors).
+- **Backend Regression Suite:** 462/462 tests passed (100% green).
+- **Frontend Production Build:** 58/58 static pages compiled with zero build errors.
+- **Health Readiness:** HTTP 200 OK (`READY`, `CONNECTED`).
 - **Startup Seeding Prevention:** Confirmed `seed_demo_orgs.py`, `seed_5_orgs_dataset.py`, and `update_and_seed_docx_users.py` have security checks rejecting automatic execution in production environments.
