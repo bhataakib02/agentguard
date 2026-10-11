@@ -34,6 +34,7 @@ def get_circuit_breakers(
 # MACHINE AGENT AUTHENTICATION & RUNTIME SESSION GATEWAYS
 # ============================================================================
 
+import logging
 import datetime
 from typing import Any, Optional
 from fastapi import HTTPException, status, Request
@@ -41,6 +42,8 @@ from core.deps import get_current_machine_agent, AuthenticatedAgent
 from services.machine_auth_service import machine_auth_service
 from services.passport_service import passport_service
 import schemas
+
+logger = logging.getLogger("agentguard.runtime")
 
 
 @router.post("/auth", response_model=schemas.MachineAuthResponse)
@@ -590,5 +593,75 @@ async def runtime_scan_pii(
     )
 
 
+from engines.output_guardrails_engine import output_guardrails_engine
 
 
+@router.post("/scan-output", response_model=schemas.OutputScanResponse)
+async def runtime_scan_output(
+    req: schemas.OutputScanRequest,
+    entity: Any = Depends(get_authenticated_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    AI Output Safety & Hallucination Guardrail Endpoint.
+    Scans generated model/tool outputs for toxicity, threats, harmful instructions,
+    and factual grounding contradictions against reference context.
+    Enforces tenant audit logging upon blocked output.
+    """
+    eval_res = output_guardrails_engine.evaluate_output(
+        output_text=req.text,
+        grounding_context=req.grounding_context,
+        policy_mode=req.policy_mode,
+        toxicity_threshold=req.toxicity_threshold
+    )
+
+    org_id = None
+    actor_id = "UNKNOWN"
+    actor_type = "USER"
+    if isinstance(entity, AuthenticatedAgent):
+        org_id = entity.agent.org_id
+        actor_id = str(entity.agent_id)
+        actor_type = "MACHINE"
+    elif isinstance(entity, models.User):
+        org_id = entity.org_id
+        actor_id = str(entity.id)
+        actor_type = "USER"
+
+    # Log security audit trail if content was blocked or toxic
+    if not eval_res["is_safe"] or eval_res["toxicity"]["is_toxic"]:
+        try:
+            audit = models.AuditLog(
+                org_id=org_id,
+                event_type="OUTPUT_GUARDRAIL_BLOCKED" if not eval_res["is_safe"] else "OUTPUT_GUARDRAIL_WARNING",
+                actor_type=actor_type,
+                actor_id=actor_id,
+                action="SCAN_OUTPUT",
+                resource="llm_output",
+                result="FAILURE" if not eval_res["is_safe"] else "SUCCESS",
+                metadata_json={
+                    "decision": eval_res["decision"],
+                    "reason": eval_res["reason"],
+                    "toxicity_score": eval_res["toxicity"]["toxicity_score"],
+                    "threat_level": eval_res["toxicity"]["threat_level"],
+                    "hallucination_score": eval_res["grounding"]["hallucination_score"],
+                    "categories_detected": eval_res["toxicity"]["categories_detected"],
+                    "original_length": eval_res["original_length"]
+                }
+            )
+            db.add(audit)
+            db.commit()
+        except Exception as e:
+            logger.error(f"Failed to record audit log for output scan: {e}")
+
+    return schemas.OutputScanResponse(
+        is_safe=eval_res["is_safe"],
+        decision=eval_res["decision"],
+        reason=eval_res["reason"],
+        toxicity_score=eval_res["toxicity"]["toxicity_score"],
+        threat_level=eval_res["toxicity"]["threat_level"],
+        categories_detected=eval_res["toxicity"]["categories_detected"],
+        is_grounded=eval_res["grounding"]["grounded"],
+        hallucination_score=eval_res["grounding"]["hallucination_score"],
+        findings=eval_res["toxicity"]["findings"] + eval_res["grounding"]["contradictions_found"] + eval_res["grounding"]["ungrounded_numbers"],
+        sanitized_text=eval_res["sanitized_text"]
+    )

@@ -574,5 +574,21 @@ class RedTeamFuzzResponse(BaseModel):
     remediation_plan: List[str] = []
 
 
+class OutputScanRequest(BaseModel):
+    text: str
+    grounding_context: Optional[str] = None
+    policy_mode: str = "BLOCK"  # BLOCK, REDACT, WARN, ALLOW
+    toxicity_threshold: float = 50.0
 
 
+class OutputScanResponse(BaseModel):
+    is_safe: bool
+    decision: str  # ALLOW, WARN, REDACT, BLOCK
+    reason: str
+    toxicity_score: float
+    threat_level: str
+    categories_detected: List[str] = []
+    is_grounded: bool
+    hallucination_score: float
+    findings: List[Dict[str, Any]] = []
+    sanitized_text: Optional[str] = None

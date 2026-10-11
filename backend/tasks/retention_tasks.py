@@ -77,7 +77,7 @@ def purge_expired_data_task(
         # 3. Old Audit Logs (Strict Retention Limit)
         audit_cutoff = now - datetime.timedelta(days=settings.AUDIT_LOG_RETENTION_DAYS)
         audit_query = db.query(models.AuditLog).filter(
-            models.AuditLog.created_at < audit_cutoff
+            models.AuditLog.timestamp < audit_cutoff
         )
         if org_id_filter:
             audit_query = audit_query.filter(models.AuditLog.org_id == org_id_filter)
@@ -97,9 +97,14 @@ def purge_expired_data_task(
             if any([summary["purged_sessions"], summary["purged_capability_tokens"], summary["purged_telemetry_logs"], summary["purged_audit_logs"]]):
                 try:
                     audit_record = models.AuditLog(
+                        event_type="DATA_RETENTION_PURGE",
+                        actor_type="SYSTEM",
+                        actor_id="retention_worker",
                         action="DATA_RETENTION_PURGE",
-                        org_id=org_id_filter or "SYSTEM",
-                        details={
+                        resource="system_data",
+                        result="SUCCESS",
+                        org_id=org_id_filter or None,
+                        metadata_json={
                             "purged_sessions": summary["purged_sessions"],
                             "purged_capability_tokens": summary["purged_capability_tokens"],
                             "purged_telemetry_logs": summary["purged_telemetry_logs"],

@@ -76,23 +76,27 @@ class AssistantEngine:
         decision_q = db.query(models.Decision)
         budget_q = db.query(models.Budget)
         incident_q = db.query(models.SecurityIncident)
-        circuit_q = db.query(models.CircuitBreakerState)
+        circuit_q = db.query(models.CircuitBreaker)
 
         if org_id:
             agent_q = agent_q.filter(models.Agent.org_id == org_id)
-            decision_q = decision_q.filter(models.Decision.org_id == org_id)
+            # Decision has no direct org_id — filter through Agent join
+            decision_q = decision_q.join(models.Agent, models.Decision.agent_id == models.Agent.id).filter(
+                models.Agent.org_id == org_id
+            )
             incident_q = incident_q.filter(models.SecurityIncident.org_id == org_id)
-            circuit_q = circuit_q.filter(models.CircuitBreakerState.org_id == org_id)
+            # CircuitBreaker has no direct org_id — join through Agent
+            circuit_q = circuit_q.join(models.Agent).filter(models.Agent.org_id == org_id)
             # Budget joins agent
             budget_q = budget_q.join(models.Agent).filter(models.Agent.org_id == org_id)
 
         agents = agent_q.all()
         high_risk_agents = [a for a in agents if (a.risk_score or 0) > 50]
-        recent_decisions = decision_q.order_by(models.Decision.created_at.desc()).limit(15).all()
+        recent_decisions = decision_q.order_by(models.Decision.executed_at.desc()).limit(15).all()
         refused_decisions = [d for d in recent_decisions if d.decision in ("REFUSE", "REVIEW")]
         budgets = budget_q.all()
         incidents = incident_q.order_by(models.SecurityIncident.created_at.desc()).limit(10).all()
-        tripped_circuits = circuit_q.filter(models.CircuitBreakerState.state == "TRIPPED").all()
+        tripped_circuits = circuit_q.filter(models.CircuitBreaker.state == "TRIPPED").all()
 
         total_daily_spend = sum(float(b.current_daily_spend or 0.0) for b in budgets)
         total_monthly_spend = sum(float(b.current_monthly_spend or 0.0) for b in budgets)
@@ -138,7 +142,7 @@ class AssistantEngine:
                 for i in incidents
             ],
             "tripped_circuit_breakers": [
-                {"agent_id": c.agent_id, "state": c.state, "failure_count": c.consecutive_failures}
+                {"agent_id": c.agent_id, "state": c.state, "trigger_reason": c.trigger_reason}
                 for c in tripped_circuits
             ]
         }

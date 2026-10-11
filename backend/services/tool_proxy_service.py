@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 import models
 from engines.intent_engine import intent_engine
 from engines.pii_engine import pii_engine
+from engines.output_guardrails_engine import output_guardrails_engine
 from services.runtime_telemetry_service import record_execution
 
 logger = logging.getLogger("agentguard.tool_proxy")
@@ -273,9 +274,17 @@ class ToolProxyService:
                 "timestamp": now.isoformat()
             }
 
-        # Sanitize response data to prevent sensitive data exfiltration
+        # Sanitize response data to prevent sensitive data exfiltration & toxic output
         if response_data is not None:
             sanitized_response, _ = pii_engine.scan_and_redact_payload(response_data, mode="MASK")
+            if isinstance(sanitized_response, dict) and "message" in sanitized_response and isinstance(sanitized_response["message"], str):
+                safety_eval = output_guardrails_engine.evaluate_output(sanitized_response["message"], policy_mode="REDACT")
+                if safety_eval.get("sanitized_text"):
+                    sanitized_response["message"] = safety_eval["sanitized_text"]
+            elif isinstance(sanitized_response, str):
+                safety_eval = output_guardrails_engine.evaluate_output(sanitized_response, policy_mode="REDACT")
+                if safety_eval.get("sanitized_text"):
+                    sanitized_response = safety_eval["sanitized_text"]
             response_data = sanitized_response
 
         latency_ms = int((time.time() - start_time) * 1000)

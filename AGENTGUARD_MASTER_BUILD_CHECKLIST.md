@@ -615,10 +615,10 @@ Overall Completion: 46.1% (71 / 154 genuinely complete items)
   *Evidence:* `backend/engines/pii_engine.py`, `backend/services/runtime_authorization_service.py` (Stage 6.6), `backend/services/tool_proxy_service.py`, `backend/routers/runtime.py` (`POST /api/runtime/scan-pii`), `backend/tests/test_ai_guardrails_suite.py`  
   *What currently works:* High-precision pattern detection for SSNs (synthetic and standard), payment card numbers (with Luhn checksum validation), emails, phone numbers, API keys / secrets (OpenAI, AWS, AgentGuard, Bearer), JWTs, and IPv4 addresses. Supports multiple remediation modes (`MASK`, `PARTIAL_MASK`, `TOKENIZE`, `BLOCK`). Sanitizes inputs prior to tool proxy dispatch and sanitizes outbound response payloads to prevent data exfiltration. Dedicated `/api/runtime/scan-pii` diagnostics endpoint live.
 
-- [ ] Output toxicity & hallucination filter  
-  *Status:* NOT_IMPLEMENTED  
-  *Evidence:* `backend/engines/`  
-  *What currently works:* None.
+- [x] Output toxicity & hallucination filter  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/engines/output_guardrails_engine.py`, `backend/routers/runtime.py` (`POST /api/runtime/scan-output`), `backend/services/tool_proxy_service.py`, `sdks/python/agentguard/client.py` (`scan_output`), `tests/test_output_guardrails_suite.py` (10/10 tests passed)  
+  *What currently works:* Evaluates model and tool outputs against multi-vector safety criteria: toxicity, hate speech, threats, harassment, and dangerous instructions (with configurable policy modes: `ALLOW`, `WARN`, `REDACT`, `BLOCK`). Detects factual contradictions, ungrounded numeric values, and speculative certainty markers against reference context. Integrated directly into the Egress Tool Proxy response flow, exposed via machine- and user-authenticated `POST /api/runtime/scan-output` endpoint with persistent audit logging (`OUTPUT_GUARDRAIL_BLOCKED`), and accessible through Python SDK `client.scan_output()`.
 
 ---
 
@@ -816,16 +816,16 @@ Overall Completion: 46.1% (71 / 154 genuinely complete items)
   *Evidence:* `backend/main.py` (FastAPI Swagger `/docs` and ReDoc `/redoc`), `routers/developers.py`  
   *What currently works:* OpenAPI schema generated for all 36 routers.
 
-- [ ] Python Client SDK (`agentguard-python`)  
-  *Status:* NOT_IMPLEMENTED  
-  *Evidence:* Root directory  
-  *What currently works:* None.  
-  *What is missing:* PyPI package with client for intercepting agent tool calls.
+- [x] Python Client SDK (`agentguard-python`)  
+  *Status:* COMPLETE  
+  *Evidence:* `sdks/python/agentguard/` (`client.py`, `langchain_handler.py`, `crewai_middleware.py`, `exceptions.py`), `backend/tests/test_sdk_suite.py` (19/19 passed)  
+  *What currently works:* Full-featured SDK client supporting machine authentication (`authenticate()`), direct header authorization (`authorize()`), gate token validation (`gate_...`), egress execution dispatch (`execute()`), atomic unified invocation (`invoke()`), session heartbeats (`heartbeat()`), PII scanning & masking (`scan_pii()`), output toxicity/hallucination scanning (`scan_output()`), LangChain callback handler (`LangChainAgentGuardHandler`), and CrewAI governance middleware (`CrewAIAgentGuardMiddleware`).
 
 - [ ] TypeScript / Node Client SDK (`@agentguard/sdk`)  
-  *Status:* NOT_IMPLEMENTED  
-  *Evidence:* Root directory  
-  *What currently works:* None.
+  *Status:* PARTIAL  
+  *Evidence:* `sdks/typescript/` (`client.ts`, `types.ts`, `errors.ts`)  
+  *What currently works:* Client, types, and error structures defined.  
+  *What is missing:* Comprehensive automated test suite and npm packaging.
 
 ---
 
@@ -836,19 +836,19 @@ Overall Completion: 46.1% (71 / 154 genuinely complete items)
   *Evidence:* `backend/routers/audit.py`  
   *What currently works:* Audit records cannot be modified or deleted.
 
-- [ ] Automated data retention & purging worker  
-  *Status:* NOT_IMPLEMENTED  
-  *Evidence:* `backend/tasks/`  
-  *What currently works:* Retention setting exists in `settings.py` (`audit_log_retention_days: 365`), but no cleanup task runs.
+- [x] Automated data retention & purging worker  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/tasks/retention_tasks.py` (`purge_expired_data_task`), `backend/tests/test_sdk_suite.py` (`test_data_retention_purging_task`)  
+  *What currently works:* Periodic Celery worker task that purges expired runtime sessions, expired capability tokens, stale telemetry metrics, and audit logs beyond retention threshold. Emits immutable `DATA_RETENTION_PURGE` audit logs summarizing purged entities.
 
 ---
 
 ### 36. Testing
 
-- [x] Automated test suite (299 test cases)  
+- [x] Automated test suite (398 test cases)  
   *Status:* COMPLETE  
-  *Evidence:* `backend/tests/` (23 test files), verified via `pytest --collect-only` (299 tests collected)  
-  *What currently works:* Auth hardening, policy engine evaluation, multi-tenant isolation, penetration tests, licensing, telemetry, webhooks, and reports.
+  *Evidence:* `backend/tests/` (29 test suites including `test_sdk_suite.py`, `test_tool_proxy_suite.py`, `test_machine_identity_suite.py`, `test_runtime_authorization_suite.py`, `test_ai_guardrails_suite.py`, `test_output_guardrails_suite.py`), verified via `pytest --collect-only` (398 tests collected)  
+  *What currently works:* Auth hardening, policy engine evaluation, multi-tenant isolation, penetration tests, licensing, machine authentication, cryptographic passport verification, runtime authorization kernel, tool proxy gateway, AI guardrails, output safety & hallucination filters, Python SDK client, and retention tasks.
 
 ---
 

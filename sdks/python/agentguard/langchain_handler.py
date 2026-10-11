@@ -89,9 +89,11 @@ class LangChainAgentGuardHandler(BaseCallbackHandler):
         if self.scan_pii_on_input:
             scan_mode = "BLOCK" if self.block_on_pii else "MASK"
             pii_res = self.client.scan_pii(text=input_str, parameters=parsed_params, mode=scan_mode)
-            if pii_res.get("pii_detected") and self.block_on_pii:
+            # Backend returns has_pii (not pii_detected)
+            if (pii_res.get("has_pii") or pii_res.get("pii_detected")) and self.block_on_pii:
+                types_found = [f.get("pii_type", f.get("type", "PII")) for f in pii_res.get("findings", [])]
                 raise AgentGuardGovernanceRefusal(
-                    explanation=f"Action blocked: PII detected in tool inputs ({', '.join(pii_res.get('types_found', []))})",
+                    explanation=f"Action blocked: PII detected in tool inputs ({', '.join(types_found) if types_found else 'sensitive data'})",
                     decision_id="PII_GUARDRAIL_BLOCK",
                     risk_score=95
                 )
@@ -100,7 +102,7 @@ class LangChainAgentGuardHandler(BaseCallbackHandler):
         decision = self.client.authorize(
             action_requested=tool_name,
             amount=self.default_amount,
-            target_resource=str(run_id) if run_id else None,
+            target_resource=None,
             intent_name=f"tool_execution_{tool_name}",
             parameters=parsed_params,
             effective_prompt=input_str
