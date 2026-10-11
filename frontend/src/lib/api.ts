@@ -1,3 +1,5 @@
+
+
 const getBaseApiUrl = () => {
   const url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
   return url.replace(/\/+$/, "");
@@ -29,6 +31,9 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     return await res.json();
   } catch (err: any) {
     console.error(`API Error on ${endpoint}:`, err);
+    if (err?.name === "TypeError" && err?.message === "Failed to fetch") {
+      throw new Error("Unable to connect to AgentGuard API server. Please check network connectivity or server status.");
+    }
     throw err;
   }
 }
