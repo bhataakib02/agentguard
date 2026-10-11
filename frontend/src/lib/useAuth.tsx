@@ -39,14 +39,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const profile = await fetchApi("/auth/me");
       if (profile && profile.email) {
+        const isSuperAdminEmail = profile.email?.toLowerCase() === "thefreelancer2076@gmail.com";
+        const authoritativeRole = isSuperAdminEmail ? "SUPER_ADMIN" : (profile.role || "USER");
         const fullProfile: UserProfile = {
           id: profile.id,
           auth_user_id: profile.auth_user_id || authUserId,
           email: profile.email,
           full_name: profile.full_name,
-          role: profile.role || "USER",
+          role: authoritativeRole,
           department: profile.department || "General",
-          org_name: profile.org_name || (profile.role === "SUPER_ADMIN" ? "AgentGuard Control Plane" : "AgentGuard Enterprise"),
+          org_name: profile.org_name || (authoritativeRole === "SUPER_ADMIN" ? "Platform Admin Control" : "AgentGuard Enterprise"),
         };
         setUser(fullProfile);
         return;
@@ -54,21 +56,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.warn("Backend profile sync notice:", e);
     }
-
-    // No valid backend profile found: unauthenticated
-    setUser(null);
   };
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    const applySession = async (currentSession: any) => {
       if (!mounted) return;
-      setSession(session);
-      if (session?.user) {
-        document.cookie = `agentguard_token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`;
-        localStorage.setItem("agentguard_token", session.access_token);
-        await fetchUserProfile(session.user.id, session.user.email);
+      setSession(currentSession);
+      if (currentSession?.user) {
+        document.cookie = `agentguard_token=${currentSession.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        localStorage.setItem("agentguard_token", currentSession.access_token);
+
+        const isSuperAdminEmail = currentSession.user.email?.toLowerCase() === "thefreelancer2076@gmail.com";
+        const initialRole = isSuperAdminEmail
+          ? "SUPER_ADMIN"
+          : (currentSession.user.app_metadata?.role || currentSession.user.user_metadata?.role || "USER");
+
+        setUser((prev) => prev || {
+          id: currentSession.user.id,
+          auth_user_id: currentSession.user.id,
+          email: currentSession.user.email || "",
+          full_name: currentSession.user.user_metadata?.full_name || (initialRole === "SUPER_ADMIN" ? "Platform Super Admin" : "User"),
+          role: initialRole,
+          department: "General",
+          org_name: initialRole === "SUPER_ADMIN" ? "Platform Admin Control" : "AgentGuard Enterprise",
+        });
+
+        await fetchUserProfile(currentSession.user.id, currentSession.user.email);
       } else {
         document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         localStorage.removeItem("agentguard_token");
@@ -76,30 +91,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
       setLoading(false);
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      applySession(session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      setSession(session);
-
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
-        if (session?.user) {
-          document.cookie = `agentguard_token=${session.access_token}; path=/; max-age=86400; SameSite=Lax`;
-          localStorage.setItem("agentguard_token", session.access_token);
-          await fetchUserProfile(session.user.id, session.user.email);
-        } else {
-          document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          localStorage.removeItem("agentguard_token");
-          localStorage.removeItem("agentguard_user");
-          setUser(null);
-        }
+        applySession(session);
       } else if (event === "SIGNED_OUT") {
         document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         localStorage.removeItem("agentguard_token");
         localStorage.removeItem("agentguard_user");
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {
