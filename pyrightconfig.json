@@ -1,0 +1,10 @@
+{
+  "include": [
+    "backend",
+    "sdks/python"
+  ],
+  "extraPaths": [
+    "sdks/python",
+    "backend"
+  ]
+}
