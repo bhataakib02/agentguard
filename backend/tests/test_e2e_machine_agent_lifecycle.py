@@ -361,14 +361,16 @@ class TestE2EMachineAgentLifecycle:
         # STAGE 12: Python SDK Integration & Verification
         # ----------------------------------------------------------------------
         sdk = AgentGuardClient(
-            base_url="http://testserver",
             agent_code=agent.agent_code,
-            agent_key=raw_api_key
+            agent_key=raw_api_key,
+            base_url="",
+            session=test_client
         )
-        sdk._jwt_token = machine_jwt  # Inject active token
+        token = sdk.authenticate()
+        assert token is not None
 
         # SDK heartbeat
-        sdk_hb = sdk.heartbeat(status="ONLINE")
+        sdk_hb = sdk.heartbeat(status="HEALTHY")
         assert sdk_hb.get("status") in ("HEALTHY", "PONG")
 
         # SDK output scan
@@ -376,8 +378,8 @@ class TestE2EMachineAgentLifecycle:
             text="Clean operation status report",
             policy_mode="BLOCK"
         )
-        assert sdk_scan.is_safe is True
-        assert sdk_scan.decision == "ALLOW"
+        assert sdk_scan["is_safe"] is True
+        assert sdk_scan["decision"] == "ALLOW"
 
         # ----------------------------------------------------------------------
         # STAGE 13: Immutable Audit Trail & Telemetry Provenance Check
@@ -390,10 +392,17 @@ class TestE2EMachineAgentLifecycle:
         assert "BYOK_KEY_CONFIGURED" in event_types
         assert "AGENT_CREDENTIAL_CREATED" in event_types
 
-        # Verify Execution Record exists
-        exec_record = self.db.query(models.Execution).filter(
-            models.Execution.agent_id == agent.id
+        # Verify Decision & Execution Record exists
+        decision_record = self.db.query(models.Decision).filter(
+            models.Decision.agent_id == agent.id
         ).first()
-        assert exec_record is not None
-        assert exec_record.status == "SUCCESS"
-        assert exec_record.tool_name == "treasury_wire_transfer"
+        assert decision_record is not None
+        assert decision_record.execution_status == "EXECUTED"
+        assert decision_record.gate_token_used is True
+
+        # Verify Causal Provenance Event recorded
+        prov_record = self.db.query(models.ProvenanceEvent).filter(
+            models.ProvenanceEvent.agent_id == agent.id
+        ).first()
+        assert prov_record is not None
+        assert prov_record.tool_used == "treasury_wire_transfer"

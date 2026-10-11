@@ -126,11 +126,24 @@ def bootstrap_database():
     Initializes metadata schema and guarantees canonical reference data.
     Safe and idempotent across PostgreSQL and SQLite.
     """
-    Base.metadata.create_all(bind=engine)
-    ensure_schema_compatibility(engine)
-    ensure_canonical_plans()
+    try:
+        Base.metadata.create_all(bind=engine)
+        ensure_schema_compatibility(engine)
+        ensure_canonical_plans()
+        logger.info("[AgentGuard] Database schema and canonical plans bootstrap complete.")
+    except Exception as e:
+        logger.error(
+            f"[AgentGuard Bootstrap] Database initialization encountered an error: {e}\n"
+            f"If using Supabase or remote PostgreSQL, please verify your DATABASE_URL in backend/.env "
+            f"and check whether your database project/pooler is active and not paused."
+        )
+        raise
 
 if __name__ == "__main__":
-    bootstrap_database()
-    print("[AgentGuard] Database schema and canonical plans bootstrap complete.")
+    try:
+        bootstrap_database()
+        print("[AgentGuard] Database schema and canonical plans bootstrap complete.")
+    except Exception as e:
+        print(f"[AgentGuard] Bootstrap failed: {e}")
+
 

@@ -319,3 +319,29 @@ class AgentGuardClient:
         except requests.RequestException as e:
             raise AgentGuardException(f"Network error during scan_output: {e}") from e
 
+    def heartbeat(
+        self,
+        status: str = "HEALTHY",
+        session_token_jti: Optional[str] = None,
+        metrics: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Sends an agent liveness heartbeat.
+        Calls POST /api/runtime/heartbeat.
+        """
+        url = f"{self.base_url}/api/runtime/heartbeat"
+        payload = {
+            "status": status,
+            "session_token_jti": session_token_jti,
+            "metrics": metrics or {}
+        }
+        try:
+            res = self._session.post(url, headers=self._headers(), json=payload, timeout=self.timeout)
+            if res.status_code == 200:
+                return res.json()
+            else:
+                raise AgentGuardException(f"Heartbeat failed [{res.status_code}]: {res.text}")
+        except requests.RequestException as e:
+            raise AgentGuardException(f"Network error during heartbeat: {e}") from e
+
+
