@@ -149,8 +149,19 @@ class Settings:
         # Dedicated SIEM Provider Specific Credentials & URLs
         self.SPLUNK_HEC_URL = os.getenv("SPLUNK_HEC_URL", "").strip()
         self.SPLUNK_HEC_TOKEN = os.getenv("SPLUNK_HEC_TOKEN", "").strip()
-        self.DATADOG_INTAKE_URL = os.getenv("DATADOG_INTAKE_URL", "https://http-intake.logs.datadoghq.com/api/v2/logs").strip()
-        self.DATADOG_API_KEY = os.getenv("DATADOG_API_KEY", "").strip()
+        # -------------------------------------------------------------------------
+        # External Isolated Sandbox Execution Provider Configuration
+        # -------------------------------------------------------------------------
+        self.SANDBOX_PROVIDER = os.getenv("SANDBOX_PROVIDER", "NOT_CONFIGURED").upper().strip()  # NOT_CONFIGURED, REMOTE_WORKER, GVISOR, FIRECRACKER, MOCK_TEST_WORKER
+        self.SANDBOX_ENDPOINT_URL = os.getenv("SANDBOX_ENDPOINT_URL", "").strip()
+        self.SANDBOX_API_KEY = os.getenv("SANDBOX_API_KEY", "").strip()
+        self.SANDBOX_DEFAULT_TIMEOUT_SECONDS = int(os.getenv("SANDBOX_DEFAULT_TIMEOUT_SECONDS", "30"))
+        self.SANDBOX_MAX_MEMORY_MB = int(os.getenv("SANDBOX_MAX_MEMORY_MB", "512"))
+        self.SANDBOX_MAX_CPU_CORES = float(os.getenv("SANDBOX_MAX_CPU_CORES", "1.0"))
+        self.SANDBOX_MAX_PROCESSES = int(os.getenv("SANDBOX_MAX_PROCESSES", "32"))
+        self.SANDBOX_MAX_OUTPUT_SIZE_BYTES = int(os.getenv("SANDBOX_MAX_OUTPUT_SIZE_BYTES", "65536"))  # 64 KB
+        self.SANDBOX_ALLOW_NETWORK = os.getenv("SANDBOX_ALLOW_NETWORK", "False").lower() in ("true", "1")
+        self.SANDBOX_ARTIFACT_RETENTION_HOURS = int(os.getenv("SANDBOX_ARTIFACT_RETENTION_HOURS", "24"))
 
 settings = Settings()
 

@@ -36,7 +36,7 @@ def get_circuit_breakers(
 
 import logging
 import datetime
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
 from fastapi import HTTPException, status, Request
 from core.deps import get_current_machine_agent, AuthenticatedAgent
 from services.machine_auth_service import machine_auth_service
@@ -427,10 +427,164 @@ async def runtime_execute_action(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exec_result["error"])
         elif status_label in ("GATE_TOKEN_REPLAYED", "GATE_TOKEN_EXPIRED", "SCHEMA_VALIDATION_FAILED"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exec_result["error"])
-        elif status_label in ("AGENT_MISMATCH", "SSRF_BLOCKED"):
+        elif status_label in ("AGENT_MISMATCH", "SSRF_BLOCKED", "NOT_AUTHORIZED"):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=exec_result["error"])
+        elif status_label in ("NOT_CONFIGURED", "UNAVAILABLE"):
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exec_result["error"])
 
     return exec_result
+
+
+# ============================================================================
+# EXTERNAL ISOLATED SANDBOX EXECUTION PROVIDER ENDPOINTS
+# ============================================================================
+
+from services.sandbox_service import sandbox_service
+
+
+@router.post("/sandbox/execute", response_model=schemas.SandboxExecuteResponse)
+async def runtime_sandbox_execute(
+    req: schemas.SandboxExecuteRequest,
+    entity: Any = Depends(get_authenticated_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    Executes code in an external isolated sandbox environment (e.g. gVisor, Firecracker).
+    Enforces non-bypassable pre-flight gate token validation, resource limits,
+    environment variable cleansing, output sanitization, and immutable audit logging.
+    """
+    agent = None
+    if isinstance(entity, AuthenticatedAgent):
+        agent = entity.agent
+    elif isinstance(entity, models.User):
+        decision = db.query(models.Decision).filter(
+            models.Decision.execution_gate_token == req.execution_gate_token
+        ).first()
+        if decision:
+            agent = db.query(models.Agent).filter(models.Agent.id == decision.agent_id).first()
+            if agent and entity.role != "SUPER_ADMIN" and agent.org_id != entity.org_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Cannot execute gate token for an agent in another organization."
+                )
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot resolve agent associated with execution request."
+        )
+
+    sbx_res = sandbox_service.execute_sandboxed_action(
+        db=db,
+        agent=agent,
+        gate_token=req.execution_gate_token,
+        code=req.code,
+        language=req.language,
+        tool_name=req.tool_name,
+        stdin=req.stdin,
+        parameters=req.parameters,
+        timeout_seconds=req.timeout_seconds,
+        network_enabled=req.network_enabled,
+        env_vars=req.env_vars
+    )
+
+    if not sbx_res["success"]:
+        st = sbx_res["status"]
+        if st == "GATE_TOKEN_INVALID":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=sbx_res["error"])
+        elif st in ("GATE_TOKEN_REPLAYED", "GATE_TOKEN_EXPIRED"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=sbx_res["error"])
+        elif st in ("AGENT_MISMATCH", "NOT_AUTHORIZED"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=sbx_res["error"])
+        elif st in ("NOT_CONFIGURED", "UNAVAILABLE"):
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=sbx_res["error"])
+
+    return sbx_res
+
+
+@router.get("/sandbox/status", response_model=schemas.SandboxStatusResponse)
+def get_sandbox_status(
+    entity: Any = Depends(get_authenticated_entity)
+):
+    """
+    Returns truthful configuration, provider name, and operational health status
+    of the external isolated sandbox provider.
+    """
+    return sandbox_service.get_provider_status()
+
+
+@router.get("/sandbox/jobs", response_model=List[schemas.SandboxJobResponse])
+def list_sandbox_jobs(
+    agent_id: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    entity: Any = Depends(get_authenticated_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    Lists historical and active sandbox execution jobs strictly scoped to calling tenant.
+    """
+    org_id = entity.org_id if hasattr(entity, "org_id") else (entity.agent.org_id if hasattr(entity, "agent") else None)
+    if not org_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Organization context required.")
+
+    return sandbox_service.list_jobs(
+        db=db,
+        org_id=str(org_id),
+        agent_id=agent_id,
+        status_filter=status_filter,
+        limit=limit,
+        offset=offset
+    )
+
+
+@router.get("/sandbox/jobs/{job_id}", response_model=schemas.SandboxJobResponse)
+def get_sandbox_job(
+    job_id: str,
+    entity: Any = Depends(get_authenticated_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieves execution logs, resource usage, and artifacts for a sandbox job.
+    Strictly enforces tenant ownership.
+    """
+    org_id = entity.org_id if hasattr(entity, "org_id") else (entity.agent.org_id if hasattr(entity, "agent") else None)
+    if not org_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Organization context required.")
+
+    job = sandbox_service.get_job(db=db, job_id=job_id, org_id=str(org_id))
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sandbox execution job not found.")
+    return job
+
+
+@router.post("/sandbox/jobs/{job_id}/cancel", response_model=schemas.SandboxCancelResponse)
+def cancel_sandbox_job(
+    job_id: str,
+    entity: Any = Depends(get_authenticated_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancels an active sandbox job and guarantees resource cleanup.
+    Strictly scoped to calling tenant.
+    """
+    org_id = entity.org_id if hasattr(entity, "org_id") else (entity.agent.org_id if hasattr(entity, "agent") else None)
+    actor_id = str(entity.id) if hasattr(entity, "id") else (str(entity.agent_id) if hasattr(entity, "agent_id") else "unknown")
+    if not org_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Organization context required.")
+
+    res = sandbox_service.cancel_job(db=db, job_id=job_id, org_id=str(org_id), actor_id=actor_id)
+    if not res["success"]:
+        if res["status"] == "NOT_FOUND":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=res["message"])
+        elif res["status"] == "ALREADY_FINISHED":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=res["message"])
+
+    return res
+
 
 
 @router.post("/invoke", response_model=schemas.RuntimeInvokeResponse)

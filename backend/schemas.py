@@ -718,3 +718,82 @@ class ModelSelectResponse(BaseModel):
     selection_reason: str
 
 
+# --- External Isolated Sandbox Execution Provider Schemas ---
+
+class SandboxExecuteRequest(BaseModel):
+    execution_gate_token: str
+    tool_name: Optional[str] = "python_sandbox"
+    language: str = "python"
+    code: str
+    stdin: Optional[str] = None
+    parameters: Optional[Dict[str, Any]] = None
+    timeout_seconds: Optional[int] = None
+    network_enabled: Optional[bool] = False
+    env_vars: Optional[Dict[str, str]] = None
+
+
+class SandboxExecuteResponse(BaseModel):
+    success: bool
+    status: str  # SUCCEEDED, FAILED, TIMED_OUT, CANCELLED, REJECTED, NOT_CONFIGURED, UNAVAILABLE, NOT_AUTHORIZED, GATE_TOKEN_REPLAYED, GATE_TOKEN_INVALID, GATE_TOKEN_EXPIRED, AGENT_MISMATCH
+    execution_id: str
+    job_id: Optional[str] = None
+    exit_code: Optional[int] = None
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+    duration_ms: int = 0
+    resource_usage: Optional[Dict[str, Any]] = None
+    artifacts: Optional[List[Dict[str, Any]]] = None
+    gate_token: str
+    cleaned_up: bool = True
+    provider: str = "NOT_CONFIGURED"
+    isolation_level: str = "NONE"
+    error: Optional[str] = None
+
+
+class SandboxJobResponse(BaseModel):
+    id: str
+    org_id: str
+    agent_id: str
+    decision_id: Optional[str] = None
+    execution_id: str
+    tool_name: str
+    language: str
+    status: str
+    provider: str
+    isolation_level: str
+    cpu_limit: float
+    memory_limit_mb: int
+    timeout_seconds: int
+    network_isolated: bool
+    exit_code: Optional[int] = None
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+    error_message: Optional[str] = None
+    resource_usage_json: Optional[Dict[str, Any]] = None
+    artifacts_json: Optional[List[Dict[str, Any]]] = None
+    cleanup_status: str
+    created_at: datetime.datetime
+    started_at: Optional[datetime.datetime] = None
+    completed_at: Optional[datetime.datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SandboxStatusResponse(BaseModel):
+    configured: bool
+    provider: str
+    status: str
+    endpoint_configured: bool
+    resource_limits: Dict[str, Any]
+    isolation_technology: str
+    supported_languages: List[str]
+
+
+class SandboxCancelResponse(BaseModel):
+    success: bool
+    execution_id: str
+    status: str
+    message: str
+
+
+

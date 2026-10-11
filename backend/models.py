@@ -50,6 +50,7 @@ class Organization(Base):
     policies = relationship("Policy", back_populates="organization")
     license = relationship("License", back_populates="organization", uselist=False)
     license_usage = relationship("LicenseUsage", back_populates="organization", uselist=False)
+    sandbox_jobs = relationship("SandboxExecutionJob", back_populates="organization", cascade="all, delete-orphan")
 
     @property
     def plan_id(self):
@@ -188,6 +189,7 @@ class Agent(Base):
     reputation_score = relationship("ReputationScore", back_populates="agent", uselist=False)
     circuit_breaker = relationship("CircuitBreaker", back_populates="agent", uselist=False)
     budget = relationship("Budget", back_populates="agent", uselist=False)
+    sandbox_jobs = relationship("SandboxExecutionJob", back_populates="agent", cascade="all, delete-orphan")
 
 
 class AgentPassport(Base):
@@ -356,6 +358,7 @@ class Decision(Base):
     agent = relationship("Agent", back_populates="decisions")
     approval_request = relationship("ApprovalRequest", back_populates="decision", uselist=False, cascade="all, delete-orphan")
     provenance_events = relationship("ProvenanceEvent", back_populates="decision", cascade="all, delete-orphan")
+    sandbox_job = relationship("SandboxExecutionJob", back_populates="decision", uselist=False)
 
 
 class ApprovalRequest(Base):
@@ -878,6 +881,56 @@ class SiemDelivery(Base):
         Index("ix_siem_deliveries_status_next", "status", "next_attempt_at"),
         Index("ix_siem_deliveries_org_created", "org_id", "created_at"),
     )
+
+
+# ============================================================================
+# PHASE 7: External Isolated Sandbox Execution Provider
+# ============================================================================
+
+class SandboxExecutionJob(Base):
+    """
+    Durable execution lifecycle tracking for untrusted code execution in an isolated sandbox.
+    Enforces strict tenant scoping, resource boundaries, stdout/stderr capture,
+    ephemeral workspace cleanup, and immutable provenance tracking.
+    """
+    __tablename__ = "sandbox_execution_jobs"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False, index=True)
+    agent_id = Column(GUID(), ForeignKey("agents.id"), nullable=False, index=True)
+    decision_id = Column(GUID(), ForeignKey("decisions.id"), nullable=True, index=True)
+    execution_id = Column(String, unique=True, index=True, nullable=False)
+    tool_name = Column(String, nullable=False)
+    language = Column(String, default="python", nullable=False)
+    code_hash = Column(String, index=True, nullable=False)  # SHA-256 hash of executed code
+    status = Column(String, default="PENDING", index=True)  # PENDING, QUEUED, RUNNING, SUCCEEDED, FAILED, TIMED_OUT, CANCELLED, REJECTED, NOT_CONFIGURED, UNAVAILABLE
+    provider = Column(String, default="NOT_CONFIGURED")     # NOT_CONFIGURED, REMOTE_WORKER, GVISOR, FIRECRACKER, MOCK_TEST_WORKER
+    isolation_level = Column(String, default="CONTAINER_HARDENED")
+    cpu_limit = Column(Float, default=1.0)
+    memory_limit_mb = Column(Integer, default=512)
+    timeout_seconds = Column(Integer, default=30)
+    network_isolated = Column(Boolean, default=True)
+    exit_code = Column(Integer, nullable=True)
+    stdout = Column(Text, nullable=True)
+    stderr = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    resource_usage_json = Column(JSON, default=dict)        # cpu_time_ms, peak_memory_mb, duration_ms
+    artifacts_json = Column(JSON, default=list)             # output files, hashes, sizes
+    cleanup_status = Column(String, default="CLEANED")      # CLEANED, PENDING, FAILED
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    organization = relationship("Organization", back_populates="sandbox_jobs")
+    agent = relationship("Agent", back_populates="sandbox_jobs")
+    decision = relationship("Decision", back_populates="sandbox_job")
+
+    __table_args__ = (
+        Index("ix_sandbox_jobs_org_created", "org_id", "created_at"),
+        Index("ix_sandbox_jobs_status_created", "status", "created_at"),
+        Index("ix_sandbox_jobs_agent_created", "agent_id", "created_at"),
+    )
+
 
 
 

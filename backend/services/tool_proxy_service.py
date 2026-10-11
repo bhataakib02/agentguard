@@ -205,13 +205,69 @@ class ToolProxyService:
         target_endpoint = override_endpoint or (tool_record.endpoint if tool_record else None)
 
         # --------------------------------------------------------------------
-        # 4. OUTBOUND DISPATCH
+        # 4. OUTBOUND DISPATCH / SANDBOX DELEGATION
         # --------------------------------------------------------------------
         start_time = time.time()
         status_code = None
         response_data = None
         error_msg = None
         exec_outcome = "EXECUTED"
+
+        # Check if tool requires isolated sandbox code execution
+        is_sandbox_tool = (
+            (tool_record and tool_record.category in ("SANDBOX", "CODE_EXECUTION")) or
+            (resolved_tool_name and "sandbox" in resolved_tool_name.lower()) or
+            (isinstance(effective_params, dict) and ("code" in effective_params or "script" in effective_params))
+        )
+
+        if is_sandbox_tool:
+            from services.sandbox_service import sandbox_service
+            code_str = ""
+            lang = "python"
+            stdin_val = None
+            timeout_val = (tool_record.timeout_seconds if tool_record else None)
+            net_val = False
+            env_val = None
+
+            if isinstance(effective_params, dict):
+                code_str = effective_params.get("code") or effective_params.get("script") or ""
+                lang = effective_params.get("language") or "python"
+                stdin_val = effective_params.get("stdin")
+                timeout_val = effective_params.get("timeout_seconds") or timeout_val
+                net_val = effective_params.get("network_enabled", False)
+                env_val = effective_params.get("env_vars")
+
+            sbx_res = sandbox_service.execute_sandboxed_action(
+                db=db,
+                agent=agent,
+                gate_token=gate_token,
+                code=code_str,
+                language=lang,
+                tool_name=resolved_tool_name,
+                stdin=stdin_val,
+                parameters=effective_params,
+                timeout_seconds=timeout_val,
+                network_enabled=net_val,
+                env_vars=env_val
+            )
+            return {
+                "success": sbx_res["success"],
+                "status": sbx_res["status"],
+                "execution_id": sbx_res.get("execution_id", execution_id),
+                "tool_name": resolved_tool_name,
+                "status_code": 200 if sbx_res["success"] else (400 if "REPLAY" in sbx_res.get("status", "") else 500),
+                "response_data": {
+                    "stdout": sbx_res.get("stdout"),
+                    "stderr": sbx_res.get("stderr"),
+                    "exit_code": sbx_res.get("exit_code"),
+                    "job_id": sbx_res.get("job_id"),
+                    "provider": sbx_res.get("provider"),
+                    "artifacts": sbx_res.get("artifacts")
+                },
+                "latency_ms": sbx_res.get("duration_ms", 0),
+                "gate_token": gate_token,
+                "error": sbx_res.get("error")
+            }
 
         if target_endpoint:
             # Validate SSRF safety

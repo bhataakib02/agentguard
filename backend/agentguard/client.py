@@ -344,4 +344,94 @@ class AgentGuardClient:
         except requests.RequestException as e:
             raise AgentGuardException(f"Network error during heartbeat: {e}") from e
 
+    def execute_sandbox(
+        self,
+        code: str,
+        execution_gate_token: str,
+        language: str = "python",
+        tool_name: str = "python_sandbox",
+        stdin: Optional[str] = None,
+        parameters: Optional[Dict[str, Any]] = None,
+        timeout_seconds: Optional[int] = None,
+        network_enabled: bool = False,
+        env_vars: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes untrusted code within an external isolated sandbox environment.
+        Enforces pre-flight gate token validation, resource limits, and output sanitization.
+        Calls POST /api/runtime/sandbox/execute.
+        """
+        url = f"{self.base_url}/api/runtime/sandbox/execute"
+        payload = {
+            "execution_gate_token": execution_gate_token,
+            "tool_name": tool_name,
+            "language": language,
+            "code": code,
+            "stdin": stdin,
+            "parameters": parameters or {},
+            "timeout_seconds": timeout_seconds,
+            "network_enabled": network_enabled,
+            "env_vars": env_vars or {}
+        }
+        try:
+            res = self._session.post(url, headers=self._headers(), json=payload, timeout=self.timeout)
+            if res.status_code == 200:
+                return res.json()
+            elif res.status_code in (400, 403, 404):
+                raise AgentGuardExecutionError(f"Sandbox execution rejected [{res.status_code}]: {res.text}", status_code=res.status_code)
+            elif res.status_code == 503:
+                raise AgentGuardException(f"Sandbox provider unavailable or not configured [{res.status_code}]: {res.text}")
+            else:
+                raise AgentGuardException(f"Sandbox execution failed [{res.status_code}]: {res.text}")
+        except requests.RequestException as e:
+            raise AgentGuardException(f"Network error during execute_sandbox: {e}") from e
+
+    def get_sandbox_status(self) -> Dict[str, Any]:
+        """
+        Queries operational health, provider type, and resource boundaries of the sandbox runtime.
+        Calls GET /api/runtime/sandbox/status.
+        """
+        url = f"{self.base_url}/api/runtime/sandbox/status"
+        try:
+            res = self._session.get(url, headers=self._headers(), timeout=self.timeout)
+            if res.status_code == 200:
+                return res.json()
+            else:
+                raise AgentGuardException(f"Failed to retrieve sandbox status [{res.status_code}]: {res.text}")
+        except requests.RequestException as e:
+            raise AgentGuardException(f"Network error during get_sandbox_status: {e}") from e
+
+    def get_sandbox_job(self, job_id: str) -> Dict[str, Any]:
+        """
+        Retrieves execution logs, resource usage, and artifacts for a sandbox job.
+        Calls GET /api/runtime/sandbox/jobs/{job_id}.
+        """
+        url = f"{self.base_url}/api/runtime/sandbox/jobs/{job_id}"
+        try:
+            res = self._session.get(url, headers=self._headers(), timeout=self.timeout)
+            if res.status_code == 200:
+                return res.json()
+            elif res.status_code == 404:
+                raise AgentGuardException(f"Sandbox job '{job_id}' not found.")
+            else:
+                raise AgentGuardException(f"Failed to retrieve sandbox job [{res.status_code}]: {res.text}")
+        except requests.RequestException as e:
+            raise AgentGuardException(f"Network error during get_sandbox_job: {e}") from e
+
+    def cancel_sandbox_job(self, job_id: str) -> Dict[str, Any]:
+        """
+        Cancels an active sandbox job and triggers immediate resource cleanup.
+        Calls POST /api/runtime/sandbox/jobs/{job_id}/cancel.
+        """
+        url = f"{self.base_url}/api/runtime/sandbox/jobs/{job_id}/cancel"
+        try:
+            res = self._session.post(url, headers=self._headers(), timeout=self.timeout)
+            if res.status_code == 200:
+                return res.json()
+            else:
+                raise AgentGuardException(f"Failed to cancel sandbox job [{res.status_code}]: {res.text}")
+        except requests.RequestException as e:
+            raise AgentGuardException(f"Network error during cancel_sandbox_job: {e}") from e
+
+
 

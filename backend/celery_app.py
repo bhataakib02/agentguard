@@ -33,6 +33,7 @@ celery_app = Celery(
         "tasks.escalation_tasks",
         "tasks.retention_tasks",
         "tasks.siem_tasks",
+        "tasks.sandbox_tasks",
     ]
 )
 
@@ -64,6 +65,10 @@ celery_app.conf.update(
         "retry-pending-siem-forwarding": {
             "task": "tasks.siem_tasks.retry_pending_siem_deliveries_task",
             "schedule": 300.0,  # Every 5 minutes
+        },
+        "cleanup-sandbox-artifacts": {
+            "task": "tasks.sandbox_tasks.cleanup_expired_sandbox_artifacts_task",
+            "schedule": 3600.0,  # Every hour
         },
         "purge-expired-data": {
             "task": "tasks.retention_tasks.purge_expired_data_task",
