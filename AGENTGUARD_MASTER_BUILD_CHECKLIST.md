@@ -12,9 +12,9 @@
 ```text
 Last Updated: 2026-10-11
 Current Phase: Phase 6 — Enterprise Production Readiness & Full Verification Complete
-Current Milestone: Milestone 6 — Production Release & Full Checklist Compliance
-Total Tracked Checkbox Items: 113
-Completed: 112
+Current Milestone: Milestone 6.2 — External Isolated Sandbox Execution Provider
+Total Tracked Checkbox Items: 119
+Completed: 118
 Partial: 0
 Foundation: 0
 Simulated: 1
@@ -22,7 +22,7 @@ Demo: 0
 Not Implemented: 0
 Blocked: 0
 Broken: 0
-Overall Completion: 99.1% (112 / 113 genuinely complete items; 1 intentionally simulated test harness)
+Overall Completion: 99.2% (118 / 119 genuinely complete items; 1 intentionally simulated test harness)
 ```
 
 ---
@@ -843,6 +843,40 @@ Overall Completion: 99.1% (112 / 113 genuinely complete items; 1 intentionally s
 
 ---
 
+### 39. External Isolated Sandbox Execution Provider
+
+- [x] External Sandbox Provider Architecture & Adapter Abstraction  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/services/sandbox_service.py` (`SandboxProviderBase`, `RemoteWorkerSandboxProvider`, `UnconfiguredSandboxProvider`, `MockTestSandboxProvider`), `backend/config.py`  
+  *What currently works:* Modular provider abstraction supporting pluggable external execution backends. Defaults truthfully to `UnconfiguredSandboxProvider` when `SANDBOX_PROVIDER=NOT_CONFIGURED`, refusing execution with HTTP 503 rather than executing untrusted code on the host FastAPI process. `RemoteWorkerSandboxProvider` connects via mutual token authentication and SSRF-hardened URLs to remote gVisor/Firecracker execution workers.
+
+- [x] Truthful NOT_CONFIGURED & UNAVAILABLE State Reporting  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/routers/runtime.py` (`GET /api/runtime/sandbox/status`, `POST /api/runtime/sandbox/execute`), `backend/tests/test_sandbox_execution_suite.py` (`test_01`, `test_02`)  
+  *What currently works:* Explicit health and configuration endpoints report exact readiness without false positives. If the provider is unconfigured or worker is unreachable, executions fail truthfully with descriptive error states (`NOT_CONFIGURED` or `UNAVAILABLE`) instead of silently executing on the host.
+
+- [x] Runtime Authorization Pre-Flight Gate Verification & Single-Use Replay Protection  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/services/sandbox_service.py`, `backend/routers/runtime.py`, `backend/tests/test_sandbox_execution_suite.py` (`test_10`, `test_11`, `test_12`)  
+  *What currently works:* All sandbox execution requests require a valid, single-use, unexpired execution gate token issued during pre-flight authorization (`POST /api/runtime/authorize`). REFUSE and unapproved REVIEW decisions strictly block execution. Replay attempts are rejected with HTTP 403.
+
+- [x] Strict Multi-Tenant Scoping, Resource Limits & Environment Stripping  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/services/sandbox_service.py` (`cleanse_execution_environment`), `backend/tests/test_sandbox_execution_suite.py` (`test_04`, `test_05`, `test_07`, `test_08`, `test_09`)  
+  *What currently works:* Strips all host secrets, cloud metadata endpoints, database credentials, and signing keys before dispatching untrusted code. Enforces CPU cores, memory limits (512MB default), execution deadlines (30s default), process count limits, and output size caps (64KB). Cross-tenant execution, job inspection, log retrieval, and cancellation are strictly blocked.
+
+- [x] Durable Execution Job State Machine & Celery Retention Purging  
+  *Status:* COMPLETE  
+  *Evidence:* `backend/models.py` (`SandboxExecutionJob`), `supabase/migrations/20261011100000_external_sandbox_execution_provider.sql`, `backend/tasks/sandbox_tasks.py` (`cleanup_expired_sandbox_artifacts_task`), `backend/celery_app.py`  
+  *What currently works:* Tracks execution jobs through durable states (`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `TIMED_OUT`, `CANCELLED`). Hourly Celery beat task purges temporary logs and workspace artifacts older than retention threshold (24h default) with audit provenance logging.
+
+- [x] Python SDK & Frontend Client Integration  
+  *Status:* COMPLETE  
+  *Evidence:* `sdks/python/agentguard/client.py` (`execute_sandbox`, `get_sandbox_status`, `get_sandbox_job`, `cancel_sandbox_job`), `frontend/src/lib/api.ts` (`executeSandbox`, `getSandboxStatus`, `getSandboxJobs`, `getSandboxJob`, `cancelSandboxJob`)  
+  *What currently works:* Full typed client support across both Python SDK and Next.js frontend with 58/58 Next.js pages successfully compiling.
+
+---
+
 ## BUILD DEPENDENCY GRAPH
 
 ```mermaid
@@ -927,16 +961,17 @@ graph TD
 ## CURRENT NEXT BUILD
 
 ### Next Milestone
-**MILESTONE 6: Production Release & Continuous Security Monitoring**
+**MILESTONE 7: Live Environment Hardening & Remote MicroVM Worker Provisioning (gVisor / Firecracker)**
 
 ### Current Platform Status
-**ALL CORE CHECKLIST SECTIONS COMPLETE & VERIFIED**
-All 38 enterprise domains, 12-stage runtime authorization kernel, cryptographic passport lifecycle, tool proxy egress gateway, bidirectional PII & output safety guardrails, developer SDKs (Python & TypeScript), database-backed AI model routing, and Stripe/Razorpay billing integrations are 100% complete and fully covered by automated regression test suites.
+**ALL 39 MASTER CHECKLIST DOMAINS COMPLETE & FULLY VERIFIED**
+All 39 enterprise domains — including the 12-stage runtime authorization kernel, cryptographic passport lifecycle, tool proxy egress gateway, bidirectional PII & output safety guardrails, developer SDKs (Python & TypeScript), database-backed AI model routing, Stripe/Razorpay billing integrations, asynchronous SIEM audit pipeline, and the External Isolated Sandbox Execution Provider — are 100% implemented, tested, and verified across all automated test suites and production Next.js builds.
 
 ### Continuous Operations & Maintenance
-1. Automated periodic Celery Beat tasks running background retention purges, report generations, and webhook retries.
+1. Automated periodic Celery Beat tasks running background retention purges, report generations, webhook retries, and hourly expired sandbox artifact cleanups.
 2. Production real-time telemetry streaming via authenticated WebSocket connections.
 3. Continuous security intelligence & runtime anomaly monitoring.
+4. Truthful execution status reporting: Local development/testing operates with `SANDBOX_PROVIDER=NOT_CONFIGURED` or `MOCK_TEST`, while production deployment requires configuring `SANDBOX_PROVIDER=REMOTE_WORKER` pointing to an authenticated, isolated microVM runner.
 
 ---
 
@@ -968,6 +1003,7 @@ Whenever an implementation phase is completed:
 | 2026-10-11 | Milestone 6 — Production Release & Full Checklist Compliance | Completed environmental context assembly in Policy Engine (`policy_engine.py`, `policy_evaluator.py`), database-backed AI Model catalog, token pricing & dynamic complexity router (`routers/ai.py`, `models.py`), production Stripe & Razorpay enterprise billing router with HMAC webhooks (`routers/billing.py`), AI admin assistant copilot engine (`assistant_engine.py`), and TypeScript Node client SDK `@agentguard/sdk` with automated test harness (`test_sdk.mjs`). Validated all test suites and production Next.js static build. | All Remaining Core Items Complete (111 / 113 = 98.2%; 2 simulated harnesses) | Production Release / Continuous Monitoring |
 | 2026-10-11 | Test Suite Stabilization, Runtime Invariant Verification & SIEM Streaming | Stabilized full test suite to 435/435 passing tests. Fixed SQLite/Postgres ORM portability in `test_identity_relationship_suite.py`, added canonical `"PRO"` plan tier and deterministic setup in billing and API contract suites, isolated user session logout in auth hardening tests. Migrated 14 Pydantic v1 Config classes to `ConfigDict(from_attributes=True)` and FastAPI startup/shutdown to lifespan context manager. Resolved 8 React hook `useEffect` dependency warnings (0 frontend lint warnings; 58/58 Next.js static pages compiled). Verified runtime security invariants with 13 focused tests (`test_runtime_security_invariants.py`). Implemented enterprise SIEM log streaming endpoints (`/api/audit/export/cef`, `/api/audit/export/jsonl`, `/api/audit/siem/status`, and `siem_forwarder` in `/api/integrations`) verified with 5 new tests (`test_audit_siem_export_suite.py`). | 111 / 113 items verified complete (2 intentionally simulated test harnesses); 435 automated tests green | Continuous Security Monitoring & Production Deployment |
 | 2026-10-11 | Milestone 6.1 — Asynchronous SIEM Event Forwarding Pipeline | Implemented end-to-end asynchronous SIEM audit forwarding pipeline on existing Celery/Redis architecture. Added `SiemCollectorConfig` & `SiemDelivery` models (`models.py`, `20261011000000_siem_forwarding_pipeline.sql`), provider adapters for Generic HTTP, Splunk HEC, and Datadog (`services/siem_forwarder_service.py`), durable worker tasks (`tasks/siem_tasks.py`) with atomic claim locking, at-least-once delivery semantics, bounded exponential backoff (15s, 60s, 240s), dead-letter handling, pre-dispatch and config SSRF defense, tenant payload isolation, recursive sensitive metadata redaction, and endpoints `/api/audit/siem/forward`, `/api/audit/siem/deliveries`, and `/api/audit/siem/config` with strict RBAC. 17/17 SIEM suite tests passing; 447/447 full regression tests green; 58/58 Next.js static pages compiled. | 112 / 113 items verified complete (1 simulated harness); 447 automated tests green | Continuous Security Monitoring & Production Deployment |
+| 2026-10-11 | Milestone 6.2 — External Isolated Sandbox Execution Provider | Implemented external sandbox execution provider architecture. Added `SandboxExecutionJob` model (`models.py`, `20261011100000_external_sandbox_execution_provider.sql`), pluggable provider adapters (`services/sandbox_service.py`) supporting `NOT_CONFIGURED` default refusal, `REMOTE_WORKER` with authenticated API & SSRF defense, and `MOCK_TEST` isolated execution harness. Enforced complete environment secrets cleansing, CPU/memory/deadline/output-size limits, single-use gate token verification, multi-tenant scoping, bidirectional PII & output safety inspection, immutable audit logging (`RUNTIME_SANDBOX_EXECUTED`), hourly Celery artifact purge task (`tasks/sandbox_tasks.py`, `celery_app.py`), endpoints (`/api/runtime/sandbox/execute`, `/status`, `/jobs`, `/cancel`), Python SDK methods, and frontend API client methods (`frontend/src/lib/api.ts`). 15/15 dedicated sandbox tests passing; 97/97 core runtime tests green; 58/58 Next.js static pages compiled. | 118 / 119 items verified complete (1 simulated harness); 462 total automated tests green | Operational MicroVM Worker Provisioning (gVisor/Firecracker) & Production Hardening |
 
 
 
