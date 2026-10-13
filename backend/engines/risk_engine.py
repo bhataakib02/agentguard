@@ -8,14 +8,18 @@ class RiskEngine:
         amount: float,
         daily_budget: float,
         behavior_deviation: float = 0.0,
-        historical_violations: int = 0
+        historical_violations: int = 0,
+        sequence_risk_delta: int = 0
     ) -> Dict[str, Any]:
         identity_risk = 5
         permission_risk = 10
         financial_risk = 0
         behavior_risk = int(behavior_deviation * 10)
         data_sensitivity_risk = 0
+        sequence_risk = max(0, int(sequence_risk_delta))
         
+        act_lower = (action or "").lower()
+
         if amount > 50000:
             financial_risk = 50
         elif amount > 25000:
@@ -25,10 +29,10 @@ class RiskEngine:
         elif amount > 0:
             financial_risk = 10
             
-        if "delete" in action or "drop" in action:
+        if "delete" in act_lower or "drop" in act_lower:
             data_sensitivity_risk = 45
             permission_risk = 30
-        elif "export" in action:
+        elif "export" in act_lower or "dump" in act_lower:
             data_sensitivity_risk = 30
 
         if agent_autonomy == "FULL":
@@ -38,7 +42,7 @@ class RiskEngine:
 
         identity_risk += historical_violations * 5
 
-        total_score = identity_risk + permission_risk + financial_risk + behavior_risk + data_sensitivity_risk
+        total_score = identity_risk + permission_risk + financial_risk + behavior_risk + data_sensitivity_risk + sequence_risk
         total_score = min(max(total_score, 0), 100)
 
         if total_score <= 30:
@@ -63,7 +67,8 @@ class RiskEngine:
                 "permission_risk": permission_risk,
                 "financial_risk": financial_risk,
                 "behavior_risk": behavior_risk,
-                "data_sensitivity_risk": data_sensitivity_risk
+                "data_sensitivity_risk": data_sensitivity_risk,
+                "sequence_risk": sequence_risk
             }
         }
 

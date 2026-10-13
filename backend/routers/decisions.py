@@ -1,4 +1,5 @@
 import datetime, uuid
+from typing import Any, Optional, List, Dict
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
@@ -284,6 +285,51 @@ async def evaluate_decision(
     })
 
     return decision
+
+from core.deps import get_current_user, get_authenticated_entity
+from engines.predictive_action_control_engine import predictive_action_control_engine
+
+# ============================================================================
+# PREDICTIVE ACTION CONTROL ENGINE (PACE) CANONICAL ENDPOINTS - PHASE 1
+# ============================================================================
+
+@router.post("/control/evaluate", response_model=schemas.ActionControlEvaluationResponse)
+async def evaluate_action_control(
+    req: schemas.ActionControlEvaluationRequest,
+    entity: Any = Depends(get_authenticated_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    Canonical Predictive Action Control Engine Pre-Flight Evaluator.
+    Authenticates caller, verifies tenant context & machine passport, validates permissions,
+    computes bounded sequence-aware risk, applies deterministic policy constraints,
+    records immutable audit decision, and returns structured governance result.
+    """
+    return predictive_action_control_engine.evaluate_action(
+        db=db,
+        caller_entity=entity,
+        request=req
+    )
+
+
+@router.post("/control/execute", response_model=schemas.ActionControlExecuteResponse)
+async def execute_action_control(
+    req: schemas.ActionControlEvaluationRequest,
+    entity: Any = Depends(get_authenticated_entity),
+    db: Session = Depends(get_db)
+):
+    """
+    Enforces decision strictly at the Action Execution Boundary.
+    - ALLOW: Dispatches to real downstream tool execution through the Forward Tool Proxy.
+    - REVIEW: Strictly prevents execution and records pending human approval request.
+    - REFUSE: Strictly blocks execution with complete policy and security refusal reasons.
+    """
+    return predictive_action_control_engine.execute_action(
+        db=db,
+        caller_entity=entity,
+        request=req
+    )
+
 
 @router.get("/{id}")
 def get_decision_detail(

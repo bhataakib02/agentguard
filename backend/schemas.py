@@ -796,4 +796,73 @@ class SandboxCancelResponse(BaseModel):
     message: str
 
 
+# ============================================================================
+# PREDICTIVE ACTION CONTROL ENGINE (PACE) SCHEMAS - PHASE 1
+# ============================================================================
+
+class ActionControlEvaluationRequest(BaseModel):
+    action_type: str
+    target_resource: str
+    operation: Optional[str] = None
+    agent_id: Optional[str] = None
+    agent_code: Optional[str] = None
+    parameters: Optional[Dict[str, Any]] = None
+    amount: Optional[float] = 0.0
+    context: Optional[Dict[str, Any]] = None
+    correlation_id: Optional[str] = None
+    prompt: Optional[str] = None
+    history_window_size: Optional[int] = 10
+    history_window_seconds: Optional[int] = 900
+
+
+class SequencePatternDetection(BaseModel):
+    pattern_name: str
+    severity: str
+    description: str
+    risk_delta: int
+
+
+class SequenceIndicators(BaseModel):
+    window_size: int
+    window_seconds: int
+    events_evaluated: int
+    missing_history: bool
+    patterns_detected: List[SequencePatternDetection] = []
+    sequence_risk_delta: int = 0
+    explanation: str
+    features: Dict[str, Any] = {}
+
+
+class ActionControlEvaluationResponse(BaseModel):
+    decision: str  # ALLOW, REVIEW, REFUSE
+    risk_score: int
+    risk_level: str  # LOW, MEDIUM, HIGH, CRITICAL
+    risk_scale: str = "0-100 (LOW <=30, MEDIUM <=60, HIGH <=80, CRITICAL >80)"
+    reason: str
+    policy_applied: Optional[str] = None
+    policy_id: Optional[str] = None
+    rule_id: Optional[str] = None
+    risk_breakdown: Optional[Dict[str, Any]] = None
+    sequence_indicators: Optional[SequenceIndicators] = None
+    approval_required: bool = False
+    approval_status: Optional[str] = None  # PENDING, APPROVED, REJECTED, NOT_REQUIRED
+    approval_id: Optional[str] = None
+    execution_gate_token: Optional[str] = None
+    agent_code: str
+    org_id: str
+    action_type: str
+    target_resource: str
+    correlation_id: str
+    evaluated_at: datetime.datetime
+
+
+class ActionControlExecuteResponse(BaseModel):
+    evaluation: ActionControlEvaluationResponse
+    executed: bool
+    execution_status: str  # EXECUTED, BLOCKED, PENDING_APPROVAL, EXECUTION_FAILED
+    execution_result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+
 

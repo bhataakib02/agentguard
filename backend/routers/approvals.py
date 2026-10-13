@@ -67,8 +67,31 @@ async def act_on_approval(
         if new_status == "APPROVED":
             dec.decision = "ALLOW"
             dec.execution_status = "EXECUTED"
+            if not dec.execution_gate_token:
+                import uuid
+                dec.execution_gate_token = f"gate_{uuid.uuid4().hex[:16]}"
+                dec.gate_token_used = False
         else:
             dec.execution_status = "BLOCKED"
+
+    # Immutable Audit Log for Approval Resolution
+    if agent:
+        audit = models.AuditLog(
+            org_id=agent.org_id,
+            event_type=f"APPROVAL_{new_status}",
+            actor_type="USER",
+            actor_id=str(current_user.id),
+            action="RESOLVE_APPROVAL",
+            resource=f"approval:{id}",
+            result="SUCCESS" if new_status == "APPROVED" else "DENIED",
+            metadata_json={
+                "approval_id": id,
+                "decision_id": str(app_req.decision_id),
+                "resolution": new_status,
+                "resolver_email": current_user.email
+            }
+        )
+        db.add(audit)
 
     db.commit()
 
