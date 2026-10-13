@@ -20,8 +20,8 @@ import {
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const isSuperAdminUser = user?.role === "SUPER_ADMIN" || user?.email?.toLowerCase() === "thefreelancer2076@gmail.com";
-  const userRole = isSuperAdminUser ? "SUPER_ADMIN" : (user?.role || "USER");
+  const isSuperAdminUser = user?.role === "SUPER_ADMIN";
+  const userRole = user?.role || "USER";
 
   const [overview, setOverview] = useState<any>(null);
   const [agents, setAgents] = useState<any[]>([]);

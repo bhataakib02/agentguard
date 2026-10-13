@@ -74,8 +74,9 @@ class TestProductionReadiness(unittest.TestCase):
         print("  [PASS] Test 1: Production deployment config files (vercel.json, next.config.mjs, Dockerfile, render.yaml) exist")
 
     def test_02_websocket_heartbeat_ping_pong(self):
-        """TEST 2: Verify WebSocket /ws endpoint accepts connection and returns PONG for PING heartbeat"""
-        with client.websocket_connect("/ws") as websocket:
+        """TEST 2: Verify WebSocket /ws endpoint accepts authenticated connection and returns PONG for PING heartbeat"""
+        token = security.create_access_token(self.super_admin.id)
+        with client.websocket_connect(f"/ws?token={token}") as websocket:
             websocket.send_text("PING")
             data = websocket.receive_text()
             self.assertEqual(data, "PONG")

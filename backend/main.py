@@ -15,11 +15,18 @@ from routers import (
     telemetry, tools, billing
 )
 
-from bootstrap import bootstrap_database
+from bootstrap import bootstrap_database, ensure_canonical_plans
 
 # Initialize DB Tables and Canonical Reference Data if enabled
 if getattr(settings, "AUTO_BOOTSTRAP_DB", True):
     bootstrap_database()
+else:
+    # Safely and idempotently ensure canonical plans exist without executing DDL table migrations
+    try:
+        ensure_canonical_plans()
+    except Exception as _init_err:
+        import logging
+        logging.getLogger("agentguard.startup").warning(f"[Startup] Canonical plan check notice: {_init_err}")
 
 from contextlib import asynccontextmanager
 import logging
@@ -146,10 +153,82 @@ def health_readiness(response: Response, db: SessionLocal = Depends(get_db)):
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    # Accept org_id and role from query params for tenant-isolated streaming
-    org_id = websocket.query_params.get("org_id")
-    role = websocket.query_params.get("role", "USER")
-    await ws_manager.connect(websocket, org_id=org_id, role=role)
+    # 1. Extract token from query params or Authorization header
+    token = websocket.query_params.get("token")
+    if not token and "authorization" in websocket.headers:
+        auth_header = websocket.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split("Bearer ", 1)[1].strip()
+
+    if not token:
+        # Reject unauthenticated connection prior to acceptance
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication token required")
+        return
+
+    # 2. Authoritative verification of user identity against database
+    db = SessionLocal()
+    try:
+        user_id = None
+        email = None
+        # Check local backend JWT
+        try:
+            from jose import jwt
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            user_id = payload.get("sub")
+            email = payload.get("email")
+        except Exception:
+            # Check Supabase JWT
+            from core.deps import verify_supabase_token
+            verified = verify_supabase_token(token)
+            if verified:
+                user_id, email = verified
+
+        if not user_id and not email:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid, expired, or unverified credentials")
+            return
+
+        user = None
+        if user_id:
+            user = db.query(models.User).filter(
+                (models.User.id == user_id) | (models.User.auth_user_id == user_id)
+            ).first()
+        if not user and email:
+            from sqlalchemy import func
+            user = db.query(models.User).filter(
+                (models.User.email == email) | (func.lower(models.User.email) == email.lower().strip())
+            ).first()
+
+        if not user:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authenticated user profile not found")
+            return
+
+        if user.status != "ACTIVE":
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=f"Account status is {user.status}")
+            return
+
+        # Check organization status for non-super-admins
+        if user.role != "SUPER_ADMIN":
+            if not user.org_id:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User has no assigned organization")
+                return
+            org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
+            if not org or org.status != "ACTIVE":
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Organization is inactive or suspended")
+                return
+
+        # Authoritatively derive tenant and role from database, never from query parameters
+        auth_org_id = str(user.org_id) if user.org_id else None
+        auth_role = user.role
+        auth_user_id = str(user.id)
+    except Exception as e:
+        logger.warning(f"[WebSocket Auth] Verification error: {e}")
+        await websocket.close(code=status.WS_1011_INTERNAL_ERROR, reason="Authentication failed")
+        return
+    finally:
+        db.close()
+
+    # 3. Accept and register connection with strictly verified tenant context
+    await ws_manager.connect(websocket, org_id=auth_org_id, role=auth_role, user_id=auth_user_id)
     try:
         while True:
             data = await websocket.receive_text()

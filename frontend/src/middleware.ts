@@ -76,12 +76,23 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
     const claims = parseJwtPayload(token);
+    if (!claims) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    // Expired token check
+    if (claims.exp && claims.exp * 1000 < Date.now()) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    // Only trust server-controlled claims: app_metadata.role or backend-issued JWT role
+    // NEVER trust user-editable user_metadata or hardcoded email addresses
     const isSuperAdmin =
-      claims?.role === "SUPER_ADMIN" ||
-      claims?.app_metadata?.role === "SUPER_ADMIN" ||
-      claims?.user_metadata?.role === "SUPER_ADMIN" ||
-      claims?.email === "thefreelancer2076@gmail.com";
-    if (!claims || !isSuperAdmin) {
+      claims.role === "SUPER_ADMIN" ||
+      claims.app_metadata?.role === "SUPER_ADMIN";
+    if (!isSuperAdmin) {
       return NextResponse.redirect(new URL("/403", request.url));
     }
   }
@@ -100,9 +111,7 @@ export function middleware(request: NextRequest) {
     const claims = parseJwtPayload(token);
     const isSuperAdmin =
       claims?.role === "SUPER_ADMIN" ||
-      claims?.app_metadata?.role === "SUPER_ADMIN" ||
-      claims?.user_metadata?.role === "SUPER_ADMIN" ||
-      claims?.email === "thefreelancer2076@gmail.com";
+      claims?.app_metadata?.role === "SUPER_ADMIN";
     return NextResponse.redirect(new URL(isSuperAdmin ? "/platform" : "/dashboard", request.url));
   }
 

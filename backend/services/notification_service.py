@@ -162,8 +162,9 @@ class NotificationService:
         }
         payload_bytes = json.dumps(full_payload, separators=(',', ':'), default=str).encode("utf-8")
 
-        # Compute HMAC signature using stored secret_key
-        signing_key = endpoint.secret_key or endpoint.secret_hash
+        # Compute HMAC signature using decrypted secret_key
+        from core.security import decrypt_secret_at_rest
+        signing_key = decrypt_secret_at_rest(endpoint.secret_key) or endpoint.secret_key or endpoint.secret_hash
         signature = compute_webhook_signature(signing_key, payload_bytes, timestamp_str)
 
         headers = {

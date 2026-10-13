@@ -17,17 +17,30 @@ class Settings:
         self.reload()
 
     def reload(self):
-        raw_secret = os.getenv("SECRET_KEY", "").strip()
-        if not raw_secret or raw_secret == "agentguard-super-secret-production-key-2026":
-            import logging, secrets
-            _cfg_logger = logging.getLogger("agentguard.config")
-            _cfg_logger.warning("[SECURITY WARNING] SECRET_KEY is using a default or empty value. Set a secure random SECRET_KEY in production.")
-            self.SECRET_KEY = raw_secret or secrets.token_hex(32)
-        else:
-            self.SECRET_KEY = raw_secret
-
         # Environment configuration
         self.ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
+
+        raw_secret = os.getenv("SECRET_KEY", "").strip()
+        insecure_placeholders = {
+            "",
+            "change-this-to-a-secure-random-32-byte-hex-key",
+            "agentguard-super-secret-production-key-2026",
+            "agentguard-default-signing-key",
+        }
+
+        if self.ENVIRONMENT == "production":
+            if not raw_secret or raw_secret in insecure_placeholders or len(raw_secret) < 32:
+                raise RuntimeError(
+                    "[AgentGuard Security Error] Production environment requires a strong, securely provisioned SECRET_KEY (minimum 32 characters). "
+                    "Ephemeral key generation or insecure default keys in production are strictly prohibited."
+                )
+            self.SECRET_KEY = raw_secret
+        else:
+            # In development/testing, use a stable deterministic key if not set
+            if not raw_secret or raw_secret in insecure_placeholders:
+                self.SECRET_KEY = "agentguard-dev-stable-signing-key-2026-secure"
+            else:
+                self.SECRET_KEY = raw_secret
 
         # CORS configuration
         cors_origins_env = os.getenv("CORS_ORIGINS", "")
@@ -65,7 +78,11 @@ class Settings:
         self.DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
 
         # Database Initialization / Migration Strategy
-        self.AUTO_BOOTSTRAP_DB = os.getenv("AUTO_BOOTSTRAP_DB", "True").lower() in ("true", "1")
+        # In production, do not run automated DDL schema migrations during web startup
+        self.AUTO_BOOTSTRAP_DB = os.getenv(
+            "AUTO_BOOTSTRAP_DB",
+            "False" if self.ENVIRONMENT == "production" else "True"
+        ).lower() in ("true", "1")
 
         # Supabase PostgreSQL Configuration
         self.SUPABASE_URL = os.getenv("SUPABASE_URL", "https://xjragvyzlailmtfwjfnm.supabase.co")

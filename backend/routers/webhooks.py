@@ -9,6 +9,8 @@ import models
 import schemas
 from services.notification_service import validate_webhook_url, notification_service
 
+from core.security import encrypt_secret_at_rest
+
 router = APIRouter(prefix="/webhooks", tags=["Webhook Notification Infrastructure"])
 
 
@@ -45,10 +47,11 @@ def create_webhook(
     if not is_valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err)
 
-    # 2. Generate Cryptographic Secret
+    # 2. Generate Cryptographic Secret & Encrypt at Rest
     raw_secret = f"whsec_{secrets.token_hex(24)}"
     secret_hash = hashlib.sha256(raw_secret.encode("utf-8")).hexdigest()
     secret_preview = f"whsec_****{raw_secret[-6:]}"
+    encrypted_secret = encrypt_secret_at_rest(raw_secret)
 
     endpoint = models.WebhookEndpoint(
         org_id=current_user.org_id,
@@ -56,7 +59,7 @@ def create_webhook(
         url=req.url.strip(),
         secret_hash=secret_hash,
         secret_preview=secret_preview,
-        secret_key=raw_secret,
+        secret_key=encrypted_secret,
         is_active=True,
         event_types=req.event_types or ["*"]
     )

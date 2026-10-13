@@ -22,7 +22,8 @@ class PassportSigningService:
     def __init__(self):
         self._private_key: Optional[ed25519.Ed25519PrivateKey] = None
         self._public_key: Optional[ed25519.Ed25519PublicKey] = None
-        self._key_id = "agentguard-root-ed25519-v1"
+        self._key_id = os.getenv("AGENTGUARD_PASSPORT_KEY_ID", "agentguard-root-ed25519-v1")
+        self._trusted_keys: Dict[str, ed25519.Ed25519PublicKey] = {}
         self._initialize_keys()
 
     def _initialize_keys(self):
@@ -58,6 +59,12 @@ class PassportSigningService:
             logger.info("[PassportService] Initialized deterministic platform Ed25519 root key")
 
         self._public_key = self._private_key.public_key()
+        self._trusted_keys[self._key_id] = self._public_key
+
+    def register_rotation_public_key(self, key_id: str, public_key_bytes: bytes):
+        """Registers a historical or rotated public key into the verification keyring."""
+        pub = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+        self._trusted_keys[key_id] = pub
 
     @property
     def key_id(self) -> str:

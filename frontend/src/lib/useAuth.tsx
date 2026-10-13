@@ -39,8 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const profile = await fetchApi("/auth/me");
       if (profile && profile.email) {
-        const isSuperAdminEmail = profile.email?.toLowerCase() === "thefreelancer2076@gmail.com";
-        const authoritativeRole = isSuperAdminEmail ? "SUPER_ADMIN" : (profile.role || "USER");
+        const authoritativeRole = profile.role || "USER";
         const fullProfile: UserProfile = {
           id: profile.id,
           auth_user_id: profile.auth_user_id || authUserId,
@@ -68,10 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.cookie = `agentguard_token=${currentSession.access_token}; path=/; max-age=86400; SameSite=Lax`;
         localStorage.setItem("agentguard_token", currentSession.access_token);
 
-        const isSuperAdminEmail = currentSession.user.email?.toLowerCase() === "thefreelancer2076@gmail.com";
-        const initialRole = isSuperAdminEmail
-          ? "SUPER_ADMIN"
-          : (currentSession.user.app_metadata?.role || currentSession.user.user_metadata?.role || "USER");
+        // Only server-controlled app_metadata is trusted before authoritative profile fetch
+        const initialRole = currentSession.user.app_metadata?.role || "USER";
 
         setUser((prev) => prev || {
           id: currentSession.user.id,
