@@ -143,6 +143,19 @@ class PassportSigningService:
 
         return sig_str
 
+    def rotate_active_key(self, new_key_id: str, new_private_key: ed25519.Ed25519PrivateKey):
+        """
+        Rotates the active platform signing key.
+        The previous active key remains in _trusted_keys to verify historical passports.
+        """
+        if not new_key_id:
+            raise ValueError("New key_id cannot be empty.")
+        self._key_id = new_key_id
+        self._private_key = new_private_key
+        self._public_key = new_private_key.public_key()
+        self._trusted_keys[new_key_id] = self._public_key
+        logger.info(f"[PassportService] Rotated active signing key to '{new_key_id}'")
+
     def verify_passport(
         self,
         passport: Any,
@@ -152,6 +165,8 @@ class PassportSigningService:
         """
         Cryptographically verifies the digital signature, validity period,
         and revocation status of an Agent Passport.
+        Strictly selects trusted public keys using the passport's key_id.
+        Rejects unknown or missing key IDs safely.
         """
         if not passport:
             return {
@@ -189,7 +204,25 @@ class PassportSigningService:
                     "reason": f"Associated AI agent is currently {agent_status}."
                 }
 
-        # 4. Check digital signature
+        # 4. Check Key ID: Must be present and registered in trusted keys keyring
+        key_id = getattr(passport, "key_id", None)
+        if not key_id:
+            return {
+                "valid": False,
+                "status": "UNKNOWN_KEY_ID",
+                "reason": "Passport is missing required key_id."
+            }
+
+        if key_id not in self._trusted_keys:
+            return {
+                "valid": False,
+                "status": "UNKNOWN_KEY_ID",
+                "reason": f"Untrusted or unrecognized passport key ID '{key_id}'."
+            }
+
+        trusted_pub = self._trusted_keys[key_id]
+
+        # 5. Check digital signature
         sig_raw = getattr(passport, "digital_signature", "")
         if not sig_raw or not sig_raw.startswith("ed25519:"):
             # Legacy or unverified dummy hash
@@ -206,16 +239,16 @@ class PassportSigningService:
             # Reconstruct canonical bytes
             canonical_bytes = self.canonicalize_passport_data(agent, passport, capabilities)
             
-            # Verify signature with public key
-            self._public_key.verify(signature_bytes, canonical_bytes)
+            # Verify signature with the selected trusted public key
+            trusted_pub.verify(signature_bytes, canonical_bytes)
             
             passport.verification_status = "VERIFIED"
             return {
                 "valid": True,
                 "status": "VERIFIED",
                 "algorithm": "Ed25519",
-                "key_id": getattr(passport, "key_id", self._key_id),
-                "reason": "Cryptographically verified with platform Ed25519 root public key."
+                "key_id": key_id,
+                "reason": f"Cryptographically verified with trusted Ed25519 public key '{key_id}'."
             }
         except Exception as e:
             logger.warning(f"[PassportService] Verification failed for passport {getattr(passport, 'passport_number', 'unknown')}: {e}")

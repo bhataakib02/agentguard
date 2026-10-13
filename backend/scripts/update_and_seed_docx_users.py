@@ -4,16 +4,21 @@ import uuid
 import datetime
 import passlib.hash
 import requests
+import secrets
 from sqlalchemy import text
 
 import sys
-sys.path.insert(0, r"d:\AGENTGUARD\backend")
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from database import engine
 from config import settings
 
-DATASET_DIR = r"d:\AGENTGUARD\AGENTGUARD_5_ORGANIZATIONS_DATASET"
-TEST_PASSWORD = "Blackbird@12."
+if settings.ENVIRONMENT == "production":
+    raise RuntimeError(
+        "[AgentGuard Security Block] update_and_seed_docx_users script cannot be executed in PRODUCTION."
+    )
+
+TEST_PASSWORD = os.getenv("DEMO_ACCOUNTS_PASSWORD", secrets.token_urlsafe(16))
 
 DOCX_USER_TABLES = [
     # Org 1: ACME Technologies (org-001)
@@ -64,158 +69,33 @@ DOCX_USER_TABLES = [
     {"id": "user-037", "org_id": "org-005", "name": "Zoya Khan", "role": "SECURITY_ANALYST", "email": "zoya@edunova.com"},
     {"id": "user-038", "org_id": "org-005", "name": "Kabir Mehta", "role": "MANAGER", "email": "kabir@edunova.com"},
     {"id": "user-039", "org_id": "org-005", "name": "Ira Patel", "role": "DEVELOPER", "email": "ira@edunova.com"},
-    {"id": "user-040", "org_id": "org-005", "name": "Vihaan Singh", "role": "ADMIN", "email": "vihaan@edunova.com"}
+    {"id": "user-040", "org_id": "org-005", "name": "Vihaan Singh", "role": "ADMIN", "email": "vihaan@edunova.com"},
 ]
 
-def update_users_json():
-    print("1. Updating AGENTGUARD_5_ORGANIZATIONS_DATASET/users.json...")
-    users_json_path = os.path.join(DATASET_DIR, "users.json")
-    
-    new_users_data = []
-    for u in DOCX_USER_TABLES:
-        new_users_data.append({
-            "id": u["id"],
-            "organization_id": u["org_id"],
-            "full_name": u["name"],
-            "email": u["email"],
-            "role": u["role"],
-            "status": "ACTIVE",
-            "email_verified": True,
-            "created_at": "2026-01-02T00:00:00+00:00",
-            "last_login": "2026-08-31T00:00:00+00:00"
-        })
-
-    with open(users_json_path, "w", encoding="utf-8") as f:
-        json.dump(new_users_data, f, indent=2)
-    print("   [SUCCESS] users.json updated with exact DOCX test emails!")
-
-def update_database_users():
+def seed_demo_users_nonprod():
     if os.getenv("ALLOW_DEMO_SEED", "false").lower() not in ("true", "1"):
-        raise RuntimeError(
-            "[AgentGuard Security Block] Automatic demo user seeding is disabled. "
-            "To explicitly seed development fixtures, set ALLOW_DEMO_SEED=true in a non-production environment."
-        )
-    if os.getenv("ENVIRONMENT", "").lower() == "production":
-        raise RuntimeError(
-            "[AgentGuard Security Block] Demo user seeding is strictly prohibited in production environments."
-        )
-    print("\n2. Updating Supabase Auth & Public Users in Database...")
-    headers = {
-        "apikey": settings.SUPABASE_PUBLISHABLE_KEY,
-        "Content-Type": "application/json"
-    }
+        print("[AgentGuard Safety Block] Demo user seeding is disabled. Set ALLOW_DEMO_SEED=true to proceed.")
+        return
 
+    pwd_hash = passlib.hash.bcrypt.hash(TEST_PASSWORD)
     with engine.connect() as conn:
-        sa_hash = conn.execute(text("SELECT encrypted_password FROM auth.users WHERE email = 'thefreelancer2076@gmail.com';")).scalar()
-
-        # Delete non-superadmin demo accounts that were old emails
-        old_emails = [u["email"] for u in DOCX_USER_TABLES]
-        conn.execute(
-            text("DELETE FROM public.users WHERE email <> 'thefreelancer2076@gmail.com' AND email NOT IN :emails;"),
-            {"emails": tuple(old_emails)}
-        )
-        conn.execute(
-            text("DELETE FROM auth.users WHERE email <> 'thefreelancer2076@gmail.com' AND email NOT IN :emails;"),
-            {"emails": tuple(old_emails)}
-        )
-        conn.commit()
-
         for u in DOCX_USER_TABLES:
             email = u["email"]
             name = u["name"]
             role = u["role"]
-            orig_id = u["id"]
-            pub_u_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"user-{orig_id}"))
             mapped_org = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"org-{u['org_id']}"))
 
-            # 1. Upsert auth.users
-            existing_auth = conn.execute(text("SELECT id FROM auth.users WHERE email = :email;"), {"email": email}).first()
-            if not existing_auth:
+            existing_user = conn.execute(text("SELECT id FROM public.users WHERE email = :email;"), {"email": email}).first()
+            if not existing_user:
                 conn.execute(
                     text("""
-                        INSERT INTO auth.users (
-                            id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-                            raw_app_meta_data, raw_user_meta_data, created_at, updated_at, is_super_admin
-                        ) VALUES (
-                            gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-                            :email, :hash, NOW(), '{"provider":"email","providers":["email"]}', '{}', NOW(), NOW(), false
-                        );
+                        INSERT INTO public.users (id, org_id, email, full_name, role, status, password_hash)
+                        VALUES (gen_random_uuid(), :org_id, :email, :name, :role, 'ACTIVE', :pwd);
                     """),
-                    {"email": email, "hash": sa_hash}
+                    {"org_id": mapped_org, "email": email, "name": name, "role": role, "pwd": pwd_hash}
                 )
-                existing_auth = conn.execute(text("SELECT id FROM auth.users WHERE email = :email;"), {"email": email}).first()
-
-            auth_id_str = str(existing_auth.id)
-
-            conn.execute(
-                text("UPDATE auth.users SET encrypted_password = :hash, email_confirmed_at = NOW(), raw_user_meta_data = CAST(:meta AS jsonb) WHERE id = :id;"),
-                {
-                    "hash": sa_hash,
-                    "id": auth_id_str,
-                    "meta": json.dumps({"sub": auth_id_str, "email": email, "full_name": name, "email_verified": True})
-                }
-            )
-
-            # 2. Upsert auth.identities
-            existing_id = conn.execute(text("SELECT id FROM auth.identities WHERE user_id = :u_id;"), {"u_id": auth_id_str}).first()
-            id_data = json.dumps({"sub": auth_id_str, "email": email, "email_verified": True})
-            if not existing_id:
-                conn.execute(
-                    text("""
-                        INSERT INTO auth.identities (
-                            id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
-                        ) VALUES (
-                            gen_random_uuid(), :u_id, CAST(:id_data AS jsonb), 'email', :email, NOW(), NOW(), NOW()
-                        );
-                    """),
-                    {"u_id": auth_id_str, "id_data": id_data, "email": email}
-                )
-
-            # 3. Upsert public.users
-            dept_map = {
-                "ADMIN": "Administration", "MANAGER": "Management", "SECURITY_ANALYST": "Security SOC",
-                "OPERATOR": "Operations", "ANALYST": "Analytics", "DEVELOPER": "Engineering",
-                "VIEWER": "Governance", "USER": "General"
-            }
-            dept = dept_map.get(role, "General")
-
-            conn.execute(
-                text("""
-                    INSERT INTO public.users (
-                        id, org_id, auth_user_id, email, full_name, role, department, status, created_at, updated_at
-                    ) VALUES (
-                        :id, :org_id, :auth_id, :email, :name, :role, :dept, 'ACTIVE', NOW(), NOW()
-                    ) ON CONFLICT (id) DO UPDATE 
-                    SET org_id = EXCLUDED.org_id, auth_user_id = EXCLUDED.auth_user_id, email = EXCLUDED.email, full_name = EXCLUDED.full_name, role = EXCLUDED.role, status = 'ACTIVE';
-                """),
-                {
-                    "id": pub_u_id,
-                    "org_id": mapped_org,
-                    "auth_id": auth_id_str,
-                    "email": email,
-                    "name": name,
-                    "role": role,
-                    "dept": dept
-                }
-            )
         conn.commit()
-        print("   [SUCCESS] All 40 DOCX tenant user accounts updated in Auth & Public DB!")
-
-    print("\n3. Testing Real Supabase Authentication for DOCX Accounts...")
-    login_url = f"{settings.SUPABASE_URL}/auth/v1/token?grant_type=password"
-    
-    test_logins = [
-        "zoya@acme.com", "aarav@acme.com", "kabir@nexa.com", "ira@medcore.com",
-        "vihaan@urbangrid.com", "anaya@edunova.com", "thefreelancer2076@gmail.com"
-    ]
-
-    for em in test_logins:
-        resp = requests.post(login_url, json={"email": em, "password": TEST_PASSWORD}, headers=headers)
-        if resp.status_code == 200:
-            print(f"   • {em:<35} | PASS (200 OK)")
-        else:
-            print(f"   • {em:<35} | FAIL ({resp.status_code}): {resp.text}")
+    print("Non-production demo users verified.")
 
 if __name__ == "__main__":
-    update_users_json()
-    update_database_users()
+    seed_demo_users_nonprod()

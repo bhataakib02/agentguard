@@ -158,8 +158,7 @@ export default function IamPage() {
           email: inviteEmail,
           full_name: inviteName,
           role: inviteRole,
-          department: inviteDept,
-          password: "Blackbird@12."
+          department: inviteDept
         })
       });
 

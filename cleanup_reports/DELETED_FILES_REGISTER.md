@@ -576,4 +576,65 @@ The following files were identified during repository inspection and intentional
 5. `AGENTGUARD_5_ORGANIZATIONS_DATASET/`: Synthetic reference dataset preserved for reference.
 6. `backend/agentguard`: Directory junction linking `sdks/python/agentguard` for local SDK resolution.
 7. `backend/storage/reports/.gitkeep`: Preserved directory root for runtime report outputs.
-8. `implementation_plan.md`: Preserved per explicit instruction.
+8. `implementation_plan.md`: Preserved per explicit instruction (now removed in Section 5).
+
+---
+
+## 5. Security Remediation and Controlled Repository Cleanup (2026-10-13)
+
+The following files and directories were removed in accordance with the AGENTGUARD Critical Security Remediation & Controlled Repository Cleanup directive:
+
+### A. Exposed Database Backups and Dumps (Forensically Preserved Externally)
+| Original Path | File Type | Size | Rationale | External Retention Path |
+| :--- | :--- | :--- | :--- | :--- |
+| `cleanup_reports/backups/agentguard_backup_20261011_093951.json` | JSON Database Dump | 595 KB | Contained plaintext agent API credentials, bcrypt user password hashes, active session tokens, webhook HMAC secrets (`whsec_...`), and external SIEM endpoints. | `C:\Users\bhata\.gemini\antigravity-ide\brain\0d4b2c7c-621b-499d-b853-aa455c8853b2\forensic_backups_retained\agentguard_backup_20261011_093951.json` |
+| `cleanup_reports/backups/agentguard_backup_20261011_093951.sql` | SQL Database Dump | 466 KB | Contained raw SQL insert statements with user passwords, credential hashes, and tenant schema records. | `C:\Users\bhata\.gemini\antigravity-ide\brain\0d4b2c7c-621b-499d-b853-aa455c8853b2\forensic_backups_retained\agentguard_backup_20261011_093951.sql` |
+
+### B. Explicitly Unwanted Planning Documents
+| Original Path | File Type | Size | Rationale |
+| :--- | :--- | :--- | :--- |
+| `AGENTGUARD_MASTER_BUILD_CHECKLIST.md` | Markdown Checklist | 42 KB | Explicitly authorized for removal. Contains superseded planning notes and implementation milestones. |
+| `implementation_plan.md` | Markdown Specification | 18 KB | Explicitly authorized for removal. Build roadmap artifact not required for runtime or production execution. |
+
+### C. Synthetic Reference Dataset (Forensically Preserved Externally)
+| Original Path | File Count | Rationale | External Retention Path |
+| :--- | :--- | :--- | :--- |
+| `AGENTGUARD_5_ORGANIZATIONS_DATASET/` | 25 files (JSON/CSV/TXT) | Explicitly authorized for removal. Contains synthetic multi-tenant test data. Preserved externally to prevent loss while removing from public repo. Seeding script (`seed_5_orgs_dataset.py`) guarded against missing directory. | `C:\Users\bhata\.gemini\antigravity-ide\brain\0d4b2c7c-621b-499d-b853-aa455c8853b2\forensic_dataset_retained\` |
+
+Files within `AGENTGUARD_5_ORGANIZATIONS_DATASET/` removed:
+1. `README.txt`
+2. `agent_passports.csv`
+3. `agent_passports.json`
+4. `agents.csv`
+5. `agents.json`
+6. `approval_requests.csv`
+7. `approval_requests.json`
+8. `audit_logs.csv`
+9. `audit_logs.json`
+10. `capability_tokens.csv`
+11. `capability_tokens.json`
+12. `decisions.csv`
+13. `decisions.json`
+14. `licenses.csv`
+15. `licenses.json`
+16. `notifications.csv`
+17. `notifications.json`
+18. `organizations.csv`
+19. `organizations.json`
+20. `policies.csv`
+21. `policies.json`
+22. `security_events.csv`
+23. `security_events.json`
+24. `users.csv`
+25. `users.json`
+
+### D. Unnecessary Tracked SQLite Databases
+| Original Path | File Type | Size | Rationale |
+| :--- | :--- | :--- | :--- |
+| `test_machine_identity.db` | SQLite Database Binary | ~100 KB | Test artifact checked into root. Recreated dynamically on-demand during isolated test runs. Added to `.gitignore`. |
+| `test_runtime_authorization.db` | SQLite Database Binary | ~120 KB | Test artifact checked into root. Recreated dynamically on-demand during isolated test runs. Added to `.gitignore`. |
+
+### E. Prevention & Governance Controls
+- `.gitignore` was updated with explicit rules: `*.db`, `*.sqlite`, `*.sqlite3`, `*.dump`, `cleanup_reports/backups/`, `*.sql.bak`.
+- Git history removal procedures documented to ensure sensitive backups are purged from shared history before public publication.
+

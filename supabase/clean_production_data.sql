@@ -1,34 +1,62 @@
--- AGENTGUARD Complete Database Reset & Clean Production Data Script
--- Preserves Super Admin (thefreelancer2076@gmail.com) and Platform Metadata
--- Run in Supabase SQL Editor: https://supabase.com/dashboard/project/xjragvyzlailmtfwjfnm/sql/new
+-- AGENTGUARD Controlled Database Reset & Maintenance Script
+-- STRICT SAFETY CONTROLS:
+-- 1. This script FAILS CLOSED unless explicitly authorized by setting:
+--      SET agentguard.destructive_maintenance_confirmed = 'YES_DELETE_ALL_DATA';
+-- 2. Never run against a live production database with active customers.
+-- 3. The Super Admin email must be supplied via session variable or explicitly declared:
+--      SET agentguard.preserve_admin_email = 'admin@yourcompany.com';
 
 DO $$
 DECLARE
+    confirmed_flag text;
+    target_admin_email text;
     sa_auth_id UUID;
     sa_public_id UUID;
 BEGIN
-    -- 1. SAFETY CHECK: Resolve Super Admin from auth.users
-    SELECT id INTO sa_auth_id FROM auth.users WHERE email = 'thefreelancer2076@gmail.com';
-    IF sa_auth_id IS NULL THEN
-        RAISE EXCEPTION 'SAFETY ABORT: Super Admin account (thefreelancer2076@gmail.com) not found in auth.users!';
+    -- 1. SAFETY ENVIRONMENT CHECK: Require explicit confirmation setting
+    BEGIN
+        confirmed_flag := current_setting('agentguard.destructive_maintenance_confirmed', true);
+    EXCEPTION WHEN OTHERS THEN
+        confirmed_flag := NULL;
+    END;
+
+    IF confirmed_flag IS NULL OR confirmed_flag <> 'YES_DELETE_ALL_DATA' THEN
+        RAISE EXCEPTION 'SAFETY ABORT: Destructive maintenance requires explicit confirmation. Execute: SET agentguard.destructive_maintenance_confirmed = ''YES_DELETE_ALL_DATA''; prior to running.';
     END IF;
 
-    -- 2. SAFETY CHECK: Resolve Super Admin from public.users
-    SELECT id INTO sa_public_id FROM public.users WHERE email = 'thefreelancer2076@gmail.com';
+    -- 2. RESOLVE TARGET ADMIN EMAIL (Configurable, never hardcoded personal email)
+    BEGIN
+        target_admin_email := current_setting('agentguard.preserve_admin_email', true);
+    EXCEPTION WHEN OTHERS THEN
+        target_admin_email := NULL;
+    END;
+
+    IF target_admin_email IS NULL OR target_admin_email = '' THEN
+        -- Resolve the first existing SUPER_ADMIN account
+        SELECT email INTO target_admin_email FROM public.users WHERE role = 'SUPER_ADMIN' AND status = 'ACTIVE' LIMIT 1;
+        IF target_admin_email IS NULL THEN
+            RAISE EXCEPTION 'SAFETY ABORT: No active SUPER_ADMIN account found in public.users to preserve!';
+        END IF;
+    END IF;
+
+    -- 3. RESOLVE PRESERVED ADMIN IDENTITY
+    SELECT id INTO sa_auth_id FROM auth.users WHERE email = target_admin_email;
+    SELECT id INTO sa_public_id FROM public.users WHERE email = target_admin_email;
+
     IF sa_public_id IS NULL THEN
-        RAISE EXCEPTION 'SAFETY ABORT: Super Admin account (thefreelancer2076@gmail.com) not found in public.users!';
+        RAISE EXCEPTION 'SAFETY ABORT: Preserved Admin account (%) not found in public.users!', target_admin_email;
     END IF;
 
-    RAISE NOTICE 'Super Admin Verified. Auth ID: %, Public ID: %', sa_auth_id, sa_public_id;
+    RAISE NOTICE 'Preserving Super Admin (%). Public ID: %, Auth ID: %', target_admin_email, sa_public_id, sa_auth_id;
 
-    -- 3. Detach Super Admin from tenant organization and explicitly ensure SUPER_ADMIN role & ACTIVE status
+    -- 4. Detach Super Admin from tenant organization and ensure active status
     UPDATE public.users 
     SET org_id = NULL, 
         role = 'SUPER_ADMIN', 
         status = 'ACTIVE' 
-    WHERE email = 'thefreelancer2076@gmail.com';
+    WHERE id = sa_public_id;
 
-    -- 4. Purge all tenant data in foreign-key safe order
+    -- 5. Purge tenant data in foreign-key safe dependency order
     DELETE FROM public.provenance_events;
     DELETE FROM public.approval_requests;
     DELETE FROM public.decisions;
@@ -53,22 +81,24 @@ BEGIN
     DELETE FROM public.policies;
     DELETE FROM public.audit_logs;
     DELETE FROM public.notifications;
-    DELETE FROM public.sessions;
+    DELETE FROM public.sessions WHERE user_id <> sa_public_id;
     DELETE FROM public.api_keys;
     DELETE FROM public.report_histories;
     DELETE FROM public.scheduled_reports;
     DELETE FROM public.license_usages;
     DELETE FROM public.licenses;
 
-    -- 5. Remove non-Super Admin application users & tenant organizations
-    DELETE FROM public.users WHERE email <> 'thefreelancer2076@gmail.com';
+    -- 6. Remove non-Super Admin application users & tenant organizations
+    DELETE FROM public.users WHERE id <> sa_public_id;
     DELETE FROM public.organizations;
 
-    -- 6. Purge non-Super Admin accounts from Supabase Auth schema
-    DELETE FROM auth.refresh_tokens;
-    DELETE FROM auth.sessions;
-    DELETE FROM auth.identities WHERE user_id <> sa_auth_id;
-    DELETE FROM auth.users WHERE id <> sa_auth_id;
+    -- 7. Purge non-Super Admin identities from Supabase Auth schema if available
+    IF sa_auth_id IS NOT NULL THEN
+        DELETE FROM auth.refresh_tokens WHERE user_id <> sa_auth_id::text;
+        DELETE FROM auth.sessions WHERE user_id <> sa_auth_id;
+        DELETE FROM auth.identities WHERE user_id <> sa_auth_id;
+        DELETE FROM auth.users WHERE id <> sa_auth_id;
+    END IF;
 
-    RAISE NOTICE 'SUCCESS: Database successfully purged of all tenant data. Super Admin preserved.';
+    RAISE NOTICE 'SUCCESS: Maintenance purge completed. Super Admin (%) preserved.', target_admin_email;
 END $$;

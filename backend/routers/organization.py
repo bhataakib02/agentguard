@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import datetime
 import os
+import secrets
 
 from database import get_db
 from core.deps import get_current_user, require_admin, check_org_isolation, check_license_limit, get_effective_org_id, HUMAN_ROLES
@@ -299,7 +300,7 @@ def invite_user_to_organization(
             raise HTTPException(status_code=400, detail="User with this email already belongs to another organization")
 
     # 4. Create User — register in Supabase Auth first, then in app DB
-    plain_password = payload.password or "Blackbird@12."
+    plain_password = payload.password or secrets.token_urlsafe(16)
     auth_uid = supabase_admin.create_user(
         email=payload.email,
         password=plain_password,

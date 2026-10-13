@@ -76,6 +76,28 @@ class ConnectionManager:
         self._role_map.pop(ws_id, None)
         self._user_map.pop(ws_id, None)
 
+    async def disconnect_user(self, user_id: str):
+        """Disconnects all active connections belonging to a user (e.g. upon suspension or logout)."""
+        target_uid = str(user_id)
+        for ws in list(self.active_connections):
+            if self._user_map.get(id(ws)) == target_uid:
+                try:
+                    await ws.close(code=1008, reason="User session revoked or suspended")
+                except Exception:
+                    pass
+                self.disconnect(ws)
+
+    async def disconnect_organization(self, org_id: str):
+        """Disconnects all active connections belonging to an organization (e.g. upon org suspension)."""
+        target_oid = str(org_id)
+        for ws in list(self.active_connections):
+            if self._org_map.get(id(ws)) == target_oid:
+                try:
+                    await ws.close(code=1008, reason="Organization suspended")
+                except Exception:
+                    pass
+                self.disconnect(ws)
+
     async def broadcast(self, message: dict, org_id: Optional[str] = None):
         """
         Broadcasts a message with strict tenant isolation.
@@ -128,3 +150,85 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+ws_manager = manager
+
+
+import threading
+import time
+import uuid
+from jose import jwt, JWTError
+
+
+class WebSocketTicketManager:
+    """
+    Manages short-lived, single-use authenticated tickets for WebSocket handshakes.
+    Eliminates persistent bearer tokens from WebSocket query strings.
+    """
+    def __init__(self, ttl_seconds: int = 60):
+        self.ttl_seconds = ttl_seconds
+        self._active_tickets: Dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def issue_ticket(
+        self,
+        user_id: str,
+        org_id: Optional[str],
+        role: str,
+        email: Optional[str] = None,
+        ttl_seconds: Optional[float] = None
+    ) -> str:
+        now = time.time()
+        ttl = ttl_seconds if ttl_seconds is not None else self.ttl_seconds
+        exp = now + ttl
+        ticket_id = str(uuid.uuid4())
+
+        with self._lock:
+            self._cleanup_expired(now)
+            self._active_tickets[ticket_id] = exp
+
+        payload = {
+            "ticket_id": ticket_id,
+            "sub": str(user_id),
+            "user_id": str(user_id),
+            "org_id": str(org_id) if org_id else None,
+            "role": role,
+            "email": email or "",
+            "token_type": "ws_ticket",
+            "iat": int(now),
+            "exp": int(exp)
+        }
+        return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    def consume_ticket(self, ticket_token: str) -> Optional[Dict[str, Any]]:
+        try:
+            payload = jwt.decode(ticket_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        except JWTError:
+            return None
+
+        if payload.get("token_type") != "ws_ticket":
+            return None
+
+        ticket_id = payload.get("ticket_id")
+        if not ticket_id:
+            return None
+
+        now = time.time()
+        with self._lock:
+            self._cleanup_expired(now)
+            if ticket_id not in self._active_tickets:
+                # Ticket unknown or already consumed (single-use enforcement)
+                return None
+            exp = self._active_tickets.pop(ticket_id)
+            if now > exp:
+                return None
+
+        return payload
+
+    def _cleanup_expired(self, now: float):
+        expired = [tid for tid, exp in self._active_tickets.items() if exp < now]
+        for tid in expired:
+            del self._active_tickets[tid]
+
+
+ws_ticket_manager = WebSocketTicketManager()
+

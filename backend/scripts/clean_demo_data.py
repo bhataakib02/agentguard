@@ -4,13 +4,19 @@ sys.path.append(os.path.dirname(__file__))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import engine, SessionLocal
+from config import settings
 
 def clean_all_demo_data():
+    if settings.ENVIRONMENT == "production":
+        raise RuntimeError(
+            "[AgentGuard Security Block] Database cleanup and purge scripts are strictly prohibited in PRODUCTION environments."
+        )
+
     if os.getenv("ALLOW_RAW_PURGE", "false").lower() not in ("true", "1"):
-        print("[AgentGuard Safety Block] Broad table purge is disabled by default.")
+        print("[AgentGuard Safety Block] Broad table purge is disabled by default. Set ALLOW_RAW_PURGE=true in development to execute.")
         return
     print("=" * 60)
-    print("  AGENTGUARD PRODUCTION DATABASE CLEANUP & PURGE SCRIPT  ")
+    print("  AGENTGUARD DEVELOPMENT DATABASE CLEANUP & PURGE SCRIPT  ")
     print("=" * 60)
 
     db = SessionLocal()

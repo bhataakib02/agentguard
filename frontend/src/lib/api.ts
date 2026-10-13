@@ -56,14 +56,25 @@ export class RobustWebSocketClient {
     this.onMessageCallback = onMessage || null;
   }
 
-  public connect() {
+  public async connect() {
     if (typeof window === "undefined") return;
 
     try {
       const token = localStorage.getItem("agentguard_token");
+      let authParam = "";
+      if (token) {
+        try {
+          const res = await fetchApi("/auth/ws-ticket", { method: "POST" });
+          if (res?.ticket) {
+            authParam = `ticket=${encodeURIComponent(res.ticket)}`;
+          }
+        } catch {
+          authParam = `token=${encodeURIComponent(token)}`;
+        }
+      }
       const separator = this.url.includes("?") ? "&" : "?";
-      const connectionUrl = token
-        ? `${this.url}${separator}token=${encodeURIComponent(token)}`
+      const connectionUrl = authParam
+        ? `${this.url}${separator}${authParam}`
         : this.url;
       this.socket = new WebSocket(connectionUrl);
 

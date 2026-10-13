@@ -46,6 +46,11 @@ class Settings:
         cors_origins_env = os.getenv("CORS_ORIGINS", "")
         if cors_origins_env:
             self.CORS_ORIGINS = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+        elif self.ENVIRONMENT == "production":
+            self.CORS_ORIGINS = [
+                "https://agentguard.vercel.app",
+                "https://agentguard-beta-ten.vercel.app",
+            ]
         else:
             self.CORS_ORIGINS = [
                 "http://localhost:3000",
@@ -55,7 +60,7 @@ class Settings:
                 "https://agentguard.vercel.app",
                 "https://agentguard-beta-ten.vercel.app",
             ]
-        self.CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"^https://([a-zA-Z0-9_-]+\.)?vercel\.app$")
+        self.CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", None if self.ENVIRONMENT == "production" else r"^https://([a-zA-Z0-9_-]+\.)?vercel\.app$")
 
         # Trusted Hosts Configuration
         trusted_hosts_env = os.getenv("TRUSTED_HOSTS", "")

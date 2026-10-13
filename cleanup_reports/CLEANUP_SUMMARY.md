@@ -119,15 +119,20 @@ This comprehensive cleanup operation purged all synthetic, test, demo, and gener
   - Obsolete tenant report folders in `storage/reports/`: 111 directories.
 *(Note: Python bytecode `.pyc` and isolated `.db` files are re-generated dynamically by the interpreter and pytest during subsequent automated test suite runs).*
 
-### B. Important Files Intentionally Preserved
-1. `AGENTGUARD_MASTER_BUILD_CHECKLIST.md` — Living roadmap and authoritative source of truth.
-2. `implementation_plan.md` — Explicitly preserved untouched per prompt instructions.
-3. `test_machine_identity.db` and `test_runtime_authorization.db` (root) — Retained as Git-tracked test targets.
-4. `scripts/audit_phase6c.py` — Preserved static code analysis scanner.
-5. `backend/scripts/*.py` — Preserved all migration and utility scripts with new security opt-in guards.
-6. `AGENTGUARD_5_ORGANIZATIONS_DATASET/` — Preserved synthetic reference files.
-7. `backend/agentguard` — Preserved directory junction for Python SDK local resolution.
-8. `backend/storage/reports/.gitkeep` — Preserved report directory root for future operational generation.
+### B. Repository Cleanup & Sensitive Asset Remediation (2026-10-13)
+The following files and directories were removed from git tracking and the working tree:
+1. `cleanup_reports/backups/agentguard_backup_20261011_093951.*` — **REMOVED** (Sensitive exposed backups containing credentials; forensically preserved outside the repository at `C:\Users\bhata\.gemini\antigravity-ide\brain\0d4b2c7c-621b-499d-b853-aa455c8853b2\forensic_backups_retained\`).
+2. `AGENTGUARD_MASTER_BUILD_CHECKLIST.md` — **REMOVED** (Explicitly authorized planning checklist).
+3. `implementation_plan.md` — **REMOVED** (Explicitly authorized build roadmap document).
+4. `AGENTGUARD_5_ORGANIZATIONS_DATASET/` — **REMOVED** (25 synthetic dataset files; forensically preserved outside the repository at `C:\Users\bhata\.gemini\antigravity-ide\brain\0d4b2c7c-621b-499d-b853-aa455c8853b2\forensic_dataset_retained\`).
+5. `test_machine_identity.db` and `test_runtime_authorization.db` — **REMOVED** (Transient test databases erroneously tracked in Git; recreated on demand during pytest).
+6. `.gitignore` — **HARDENED** to permanently block local databases, backups, and dumps.
+
+### C. Retained Operational Assets
+1. `scripts/audit_phase6c.py` — Preserved static code analysis scanner.
+2. `backend/scripts/*.py` — Preserved all migration and utility scripts with new security opt-in guards.
+3. `backend/agentguard` — Preserved directory junction for Python SDK local resolution.
+4. `backend/storage/reports/.gitkeep` — Preserved report directory root for future operational generation.
 
 ---
 

@@ -62,11 +62,14 @@ AGENTGUARD operates as a distributed runtime governance plane consisting of:
 # Environment Mode
 ENVIRONMENT=production
 
-# Core Cryptographic Secret (Minimum 64-char hex key, random)
-SECRET_KEY=e4a8b79c6aea1c744068f7046870088e24672b497c01146f1f3f8ef01ba603cf
+# Core Cryptographic Secret (Minimum 64-char hex key, random; NEVER commit real secrets)
+SECRET_KEY=[GENERATE-STRONG-64-CHAR-HEX-OR-BASE64-SECRET]
 
 # Authoritative PostgreSQL Database URL (Strictly required in production)
 DATABASE_URL=postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/[DATABASE]
+
+# Database DDL Bootstrap: MUST remain false in production to prevent unexpected DDL changes during service startup
+AUTO_BOOTSTRAP_DB=false
 
 # Connection Pooling Tuning
 DB_POOL_SIZE=10
@@ -249,3 +252,43 @@ python backend/scripts/backup_restore.py
 - [x] SSRF blocking active for all outbound webhook requests
 - [x] HMAC-SHA256 signatures generated for all webhook dispatches
 - [x] Unconfigured cloud services truthfully declare `NOT_CONFIGURED`
+
+---
+
+## 9. Cryptographic Key Rotation Runbook
+
+### A. Passport Signing Key Rotation (Ed25519)
+AGENTGUARD employs asymmetric Ed25519 digital signatures for agent passports. Each passport is stamped with the `key_id` of the platform signing key active at issuance.
+
+1. **Architecture & Multi-Key Keyring**:
+   - `PassportSigningService` maintains an in-memory keyring `_trusted_keys = {key_id: public_key}`.
+   - When a new key is rotated in via `rotate_active_key(new_key_id, new_private_key)`, the previous active key remains in the trusted keyring.
+   - Historical passports signed by older keys continue to verify cleanly until their natural expiration.
+   - Any passport presenting an unrecognized or missing `key_id` fails closed (`UNKNOWN_KEY_ID`).
+
+2. **Rotation Procedure**:
+   - Generate a new Ed25519 platform private key using a secure offline utility or AWS KMS / Vault.
+   - Provision the new key and key identifier to backend configuration.
+   - Restart the backend instances; new agent passports will automatically receive signatures using the new key ID while existing passports verify against the trusted historical keys.
+
+### B. Webhook Secret Encryption-At-Rest Rotation (AES-256-GCM)
+Outbound webhook secrets are encrypted at rest using AES-256-GCM authenticated encryption prefixed with `enc:aesgcm:<nonce_b64>:<ciphertext_b64>`.
+
+1. **Key Derivation**:
+   - Encryption keys are derived via HKDF-SHA256 from `settings.SECRET_KEY`.
+   - Tampered ciphertext or corrupted authentication tags fail closed and halt outbound delivery with a security alert.
+
+2. **Legacy Secret Migration**:
+   - For environments with existing unencrypted webhook secrets, run the idempotent migration tool:
+     ```bash
+     python backend/scripts/migrate_webhook_secrets.py --dry-run
+     python backend/scripts/migrate_webhook_secrets.py --execute
+     ```
+   - The script encrypts unencrypted records without logging secret values.
+
+3. **Master Secret Key Rotation Procedure**:
+   - In the event of `SECRET_KEY` rotation:
+     a. Decrypt existing webhook secrets into transient memory using the current `SECRET_KEY`.
+     b. Re-encrypt all secrets with the new `SECRET_KEY`.
+     c. Commit re-encrypted records and update environment configuration.
+

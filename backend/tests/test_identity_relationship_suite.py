@@ -106,27 +106,18 @@ class TestIdentityRelationships(unittest.TestCase):
                 cls.db.refresh(platform_org)
 
             # Ensure SUPER_ADMIN
-            sa = cls.db.query(models.User).filter(models.User.email == "thefreelancer2076@gmail.com").first()
+            sa = cls.db.query(models.User).filter(models.User.role == "SUPER_ADMIN").first()
             if not sa:
-                sa = cls.db.query(models.User).filter(models.User.role == "SUPER_ADMIN").first()
-                if not sa:
-                    sa = models.User(
-                        org_id=platform_org.id,
-                        email="thefreelancer2076@gmail.com",
-                        full_name="Platform Super Admin",
-                        role="SUPER_ADMIN",
-                        status="ACTIVE"
-                    )
-                    cls.db.add(sa)
-                    cls.db.commit()
-                    cls.db.refresh(sa)
-                else:
-                    sa.email = "thefreelancer2076@gmail.com"
-                    cls.db.commit()
-            else:
-                if sa.role != "SUPER_ADMIN":
-                    sa.role = "SUPER_ADMIN"
-                    cls.db.commit()
+                sa = models.User(
+                    org_id=platform_org.id,
+                    email="superadmin_test@agentguard.internal",
+                    full_name="Platform Super Admin",
+                    role="SUPER_ADMIN",
+                    status="ACTIVE"
+                )
+                cls.db.add(sa)
+                cls.db.commit()
+                cls.db.refresh(sa)
             cls.super_admin = sa
 
             # Ensure Agent in Org A
@@ -167,11 +158,14 @@ class TestIdentityRelationships(unittest.TestCase):
             decision = cls.db.query(models.Decision).first()
             if not decision:
                 decision = models.Decision(
-                    org_id=org_a.id,
                     agent_id=agent_a.id,
+                    user_id=cls.user_acme.id,
+                    intent_summary="Test automated query",
                     decision="ALLOW",
-                    action_type="DATA_QUERY",
-                    risk_score=0.1
+                    action_requested="DATA_QUERY",
+                    resource_target="account:123",
+                    risk_score=0.1,
+                    explanation="Automated policy check passed"
                 )
                 cls.db.add(decision)
                 cls.db.commit()
@@ -233,7 +227,7 @@ class TestIdentityRelationships(unittest.TestCase):
         headers_admin = {"Authorization": f"Bearer {self.token_acme_admin}"}
         resp_users = self.client.get("/api/admin/users", headers=headers_admin)
         emails = [u["email"] for u in resp_users.json()]
-        self.assertNotIn("thefreelancer2076@gmail.com", emails)
+        self.assertNotIn(self.super_admin.email, emails)
         print("  [PASS] Test E & F: SUPER_ADMIN global access verified & excluded from org employee lists")
 
     def test_06_agent_creation_and_ownership(self):
