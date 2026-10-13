@@ -163,11 +163,36 @@ class WebSocketTicketManager:
     """
     Manages short-lived, single-use authenticated tickets for WebSocket handshakes.
     Eliminates persistent bearer tokens from WebSocket query strings.
+    Supports multi-instance distributed deployments via Redis, with automatic
+    thread-safe in-memory fallback when running in single-instance mode.
     """
-    def __init__(self, ttl_seconds: int = 60):
+    def __init__(self, ttl_seconds: int = 60, redis_client=None):
         self.ttl_seconds = ttl_seconds
         self._active_tickets: Dict[str, float] = {}
         self._lock = threading.Lock()
+        self._redis_client = redis_client
+        self._redis_checked = False
+
+    def _get_redis(self):
+        if self._redis_client is not None:
+            return self._redis_client
+        if not self._redis_checked:
+            self._redis_checked = True
+            if settings.REDIS_URL:
+                try:
+                    import redis
+                    r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=1.0, socket_timeout=1.0)
+                    r.ping()
+                    self._redis_client = r
+                    logger.info("[WebSocketTicketManager] Connected to Redis for distributed ticket store (MULTI_INSTANCE mode)")
+                except Exception as e:
+                    logger.info(f"[WebSocketTicketManager] Redis unavailable ({type(e).__name__}); using in-memory store (SINGLE_INSTANCE mode).")
+                    self._redis_client = None
+        return self._redis_client
+
+    def get_mode(self) -> str:
+        r = self._get_redis()
+        return "REDIS_DISTRIBUTED" if r is not None else "SINGLE_INSTANCE_IN_MEMORY"
 
     def issue_ticket(
         self,
@@ -182,9 +207,20 @@ class WebSocketTicketManager:
         exp = now + ttl
         ticket_id = str(uuid.uuid4())
 
-        with self._lock:
-            self._cleanup_expired(now)
-            self._active_tickets[ticket_id] = exp
+        r = self._get_redis()
+        if r is not None:
+            try:
+                # Distributed store: store ticket ID with TTL in Redis
+                r.set(f"agentguard:ws_ticket:{ticket_id}", "ACTIVE", ex=max(int(ttl), 1))
+            except Exception as e:
+                logger.warning(f"[WebSocketTicketManager] Redis set ticket failed: {e}; falling back to local memory.")
+                with self._lock:
+                    self._cleanup_expired(now)
+                    self._active_tickets[ticket_id] = exp
+        else:
+            with self._lock:
+                self._cleanup_expired(now)
+                self._active_tickets[ticket_id] = exp
 
         payload = {
             "ticket_id": ticket_id,
@@ -213,14 +249,31 @@ class WebSocketTicketManager:
             return None
 
         now = time.time()
-        with self._lock:
-            self._cleanup_expired(now)
-            if ticket_id not in self._active_tickets:
-                # Ticket unknown or already consumed (single-use enforcement)
-                return None
-            exp = self._active_tickets.pop(ticket_id)
-            if now > exp:
-                return None
+        r = self._get_redis()
+        if r is not None:
+            try:
+                # Atomic consumption in Redis: delete key and verify it was present
+                deleted = r.delete(f"agentguard:ws_ticket:{ticket_id}")
+                if deleted != 1:
+                    # Already consumed or expired
+                    return None
+            except Exception as e:
+                logger.warning(f"[WebSocketTicketManager] Redis delete ticket failed: {e}; checking local memory.")
+                with self._lock:
+                    if ticket_id not in self._active_tickets:
+                        return None
+                    exp = self._active_tickets.pop(ticket_id)
+                    if now > exp:
+                        return None
+        else:
+            with self._lock:
+                self._cleanup_expired(now)
+                if ticket_id not in self._active_tickets:
+                    # Ticket unknown or already consumed (single-use enforcement)
+                    return None
+                exp = self._active_tickets.pop(ticket_id)
+                if now > exp:
+                    return None
 
         return payload
 

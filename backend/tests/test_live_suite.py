@@ -187,12 +187,23 @@ def run_live_test_suite():
     # 6. WEBSOCKET BROADCAST TEST
     print("\n--- 6. WEBSOCKET BROADCAST TEST ---")
     try:
-        with client.websocket_connect("/ws") as websocket:
-            websocket.send_text("PING")
-            data = websocket.receive_json()
-            if data.get("type") == "PONG":
-                print("[SUCCESS] WebSocket Echo & Real-Time Broadcast Verified!")
-                results["websocket"] = True
+        from ws_manager import ws_ticket_manager
+        # Confirm anonymous is blocked
+        anon_blocked = False
+        try:
+            with client.websocket_connect("/ws"):
+                pass
+        except Exception:
+            anon_blocked = True
+
+        if anon_blocked:
+            ticket = ws_ticket_manager.issue_ticket(user_id=str(user.id), org_id=str(user.org_id), role=user.role)
+            with client.websocket_connect(f"/ws?ticket={ticket}") as websocket:
+                websocket.send_text("PING")
+                pong_data = websocket.receive_text()
+                if pong_data == "PONG":
+                    print("[SUCCESS] WebSocket Echo & Real-Time Broadcast Verified (Ticket-Authenticated)!")
+                    results["websocket"] = True
     except Exception as e:
         print(f"[FAIL] WebSocket Error: {e}")
 

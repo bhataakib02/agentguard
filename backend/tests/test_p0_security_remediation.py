@@ -195,8 +195,10 @@ class TestP0SecurityRemediation(unittest.TestCase):
         self.assertEqual(excinfo.value.code, 1008)
 
     def test_ws_06_verified_user_connects_and_pings(self):
-        """Legitimate verified user connects successfully and can ping/pong."""
-        with client.websocket_connect(f"/ws?token={self.token_user_alpha}") as ws:
+        """Legitimate verified user connects successfully using ticket and can ping/pong."""
+        from ws_manager import ws_ticket_manager
+        ticket = ws_ticket_manager.issue_ticket(user_id=str(self.user_alpha.id), org_id=str(self.org_alpha.id), role=self.user_alpha.role)
+        with client.websocket_connect(f"/ws?ticket={ticket}") as ws:
             ws.send_text("PING")
             data = ws.receive_text()
             self.assertEqual(data, "PONG")
@@ -204,8 +206,10 @@ class TestP0SecurityRemediation(unittest.TestCase):
     def test_ws_07_verified_role_derived_from_db_not_query_params(self):
         """A normal user attempting to pass ?role=SUPER_ADMIN in query param does NOT get SUPER_ADMIN privilege."""
         import asyncio
-        # Connect user_alpha with ?role=SUPER_ADMIN
-        with client.websocket_connect(f"/ws?token={self.token_user_alpha}&role=SUPER_ADMIN") as ws_alpha:
+        from ws_manager import ws_ticket_manager
+        ticket = ws_ticket_manager.issue_ticket(user_id=str(self.user_alpha.id), org_id=str(self.org_alpha.id), role=self.user_alpha.role)
+        # Connect user_alpha with ticket and ?role=SUPER_ADMIN
+        with client.websocket_connect(f"/ws?ticket={ticket}&role=SUPER_ADMIN") as ws_alpha:
             self.assertTrue(len(ws_manager.active_connections) > 0)
             server_conn = ws_manager.active_connections[-1]
             server_id = id(server_conn)

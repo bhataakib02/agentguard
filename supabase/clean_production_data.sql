@@ -13,7 +13,12 @@ DECLARE
     sa_auth_id UUID;
     sa_public_id UUID;
 BEGIN
-    -- 1. SAFETY ENVIRONMENT CHECK: Require explicit confirmation setting
+    -- 1. HARD SAFETY CHECK: Disallow execution if connected to a database containing 'prod'
+    IF current_database() ~* 'prod' THEN
+        RAISE EXCEPTION 'CRITICAL SAFETY ABORT: Destructive maintenance script cannot be executed on production database "%".', current_database();
+    END IF;
+
+    -- 2. SAFETY ENVIRONMENT CHECK: Require explicit confirmation setting
     BEGIN
         confirmed_flag := current_setting('agentguard.destructive_maintenance_confirmed', true);
     EXCEPTION WHEN OTHERS THEN

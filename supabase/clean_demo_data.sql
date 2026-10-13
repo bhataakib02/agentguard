@@ -38,6 +38,11 @@ DECLARE
         'organizations'
     ];
 BEGIN
+    -- 1. HARD SAFETY CHECK: Disallow execution on any database containing 'prod'
+    IF current_database() ~* 'prod' THEN
+        RAISE EXCEPTION 'CRITICAL SAFETY ABORT: Demo purge script cannot be executed on production database "%".', current_database();
+    END IF;
+
     BEGIN
         confirmed_flag := current_setting('agentguard.allow_demo_purge', true);
     EXCEPTION WHEN OTHERS THEN

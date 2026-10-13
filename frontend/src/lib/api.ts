@@ -61,21 +61,29 @@ export class RobustWebSocketClient {
 
     try {
       const token = localStorage.getItem("agentguard_token");
-      let authParam = "";
-      if (token) {
-        try {
-          const res = await fetchApi("/auth/ws-ticket", { method: "POST" });
-          if (res?.ticket) {
-            authParam = `ticket=${encodeURIComponent(res.ticket)}`;
-          }
-        } catch {
-          authParam = `token=${encodeURIComponent(token)}`;
-        }
+      if (!token) {
+        return;
       }
+
+      let ticket = "";
+      try {
+        const res = await fetchApi("/auth/ws-ticket", { method: "POST" });
+        if (res?.ticket) {
+          ticket = res.ticket;
+        }
+      } catch (err) {
+        console.error("[WebSocket] Failed to acquire single-use WebSocket ticket:", err);
+        this.scheduleReconnect();
+        return;
+      }
+
+      if (!ticket) {
+        this.scheduleReconnect();
+        return;
+      }
+
       const separator = this.url.includes("?") ? "&" : "?";
-      const connectionUrl = authParam
-        ? `${this.url}${separator}${authParam}`
-        : this.url;
+      const connectionUrl = `${this.url}${separator}ticket=${encodeURIComponent(ticket)}`;
       this.socket = new WebSocket(connectionUrl);
 
       this.socket.onopen = () => {
