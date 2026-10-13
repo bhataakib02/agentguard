@@ -280,6 +280,24 @@ class MachineAuthService:
         if str(agent.org_id) != payload.get("org_id"):
             raise ValueError("Cross-tenant machine identity mismatch.")
 
+        # Check organization status
+        org = db.query(models.Organization).filter(models.Organization.id == agent.org_id).first()
+        if not org or org.status != "ACTIVE":
+            raise ValueError("Organization is inactive or suspended.")
+
+        # If token was issued for a specific credential, check that the credential is still active
+        credential_id = payload.get("credential_id")
+        if credential_id:
+            cred = db.query(models.AgentCredential).filter(
+                models.AgentCredential.id == credential_id,
+                models.AgentCredential.agent_id == agent.id
+            ).first()
+            if not cred or cred.status == "REVOKED" or cred.revoked_at is not None:
+                raise ValueError("Machine credential has been revoked.")
+            now = datetime.datetime.utcnow()
+            if cred.expires_at and cred.expires_at < now:
+                raise ValueError("Machine credential has expired.")
+
         return {
             "agent": agent,
             "payload": payload,

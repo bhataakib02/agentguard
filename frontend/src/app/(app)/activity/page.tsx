@@ -12,11 +12,16 @@ export default function ActivityFeedPage() {
     let ws: WebSocket | null = null;
 
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("agentguard_token") : null;
       const defaultWsUrl = typeof window !== "undefined" && window.location.protocol === "https:"
         ? `wss://${window.location.host}/ws`
         : "ws://localhost:8000/ws";
       const wsUrl = process.env.NEXT_PUBLIC_WS_URL || defaultWsUrl;
-      ws = new WebSocket(wsUrl);
+      const separator = wsUrl.includes("?") ? "&" : "?";
+      const connectionUrl = token
+        ? `${wsUrl}${separator}token=${encodeURIComponent(token)}`
+        : wsUrl;
+      ws = new WebSocket(connectionUrl);
 
       ws.onopen = () => {
         setWsConnected(true);

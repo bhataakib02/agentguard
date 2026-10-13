@@ -60,10 +60,15 @@ export class RobustWebSocketClient {
     if (typeof window === "undefined") return;
 
     try {
-      this.socket = new WebSocket(this.url);
+      const token = localStorage.getItem("agentguard_token");
+      const separator = this.url.includes("?") ? "&" : "?";
+      const connectionUrl = token
+        ? `${this.url}${separator}token=${encodeURIComponent(token)}`
+        : this.url;
+      this.socket = new WebSocket(connectionUrl);
 
       this.socket.onopen = () => {
-        console.log("WebSocket connection established:", this.url);
+        console.log("WebSocket connection established");
         this.reconnectAttempts = 0;
         this.startHeartbeat();
       };

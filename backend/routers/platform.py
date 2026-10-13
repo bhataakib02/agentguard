@@ -324,8 +324,13 @@ def update_platform_user_status(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if user.id == current_user.id and new_status != "ACTIVE":
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot suspend or deactivate your own account")
+
     old_status = user.status
     user.status = new_status
+    if new_status in ["SUSPENDED", "INACTIVE", "DEACTIVATED"]:
+        db.query(models.Session).filter(models.Session.user_id == user.id).update({"revoked": True})
     db.commit()
     db.refresh(user)
 

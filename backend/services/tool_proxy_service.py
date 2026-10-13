@@ -137,6 +137,15 @@ class ToolProxyService:
                 "gate_token": gate_token
             }
 
+        # Check agent lifecycle status
+        if agent.status in ("SUSPENDED", "CIRCUIT_BREAK"):
+            return {
+                "success": False,
+                "status": "NOT_AUTHORIZED",
+                "error": f"Agent {agent.agent_code} is currently in {agent.status} state. Tool execution blocked.",
+                "gate_token": gate_token
+            }
+
         # Check decision outcome
         if decision.decision != "ALLOW":
             return {

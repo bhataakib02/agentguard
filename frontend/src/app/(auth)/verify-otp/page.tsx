@@ -57,7 +57,7 @@ function VerifyOtpForm() {
           localStorage.setItem("agentguard_token", backendUser.access_token);
         }
 
-        const isSuperAdmin = backendUser?.role === "SUPER_ADMIN" || email.trim().toLowerCase() === "thefreelancer2076@gmail.com" || data.user?.email?.toLowerCase() === "thefreelancer2076@gmail.com";
+        const isSuperAdmin = backendUser?.role === "SUPER_ADMIN";
         if (isSuperAdmin) {
           router.push("/platform");
         } else {

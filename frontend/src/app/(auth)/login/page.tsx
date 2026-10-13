@@ -92,7 +92,7 @@ export default function LoginPage() {
       }
 
       // 4. Authoritative routing based purely on role
-      const isSuperAdmin = targetRole === "SUPER_ADMIN" || email.trim().toLowerCase() === "thefreelancer2076@gmail.com";
+      const isSuperAdmin = targetRole === "SUPER_ADMIN";
       if (isSuperAdmin) {
         router.push("/platform");
       } else {
