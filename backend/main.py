@@ -154,66 +154,37 @@ def health_readiness(response: Response, db: SessionLocal = Depends(get_db)):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     from ws_manager import ws_ticket_manager
-    # 1. Extract ticket, query token, or Authorization header
+    # 1. Strictly require short-lived, single-use ticket for WebSocket handshake.
+    # Legacy long-lived bearer tokens in query string or headers are strictly rejected.
     ticket = websocket.query_params.get("ticket")
-    token = websocket.query_params.get("token")
-    if not ticket and not token and "authorization" in websocket.headers:
-        auth_header = websocket.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header.split("Bearer ", 1)[1].strip()
-
-    if not ticket and not token:
-        # Reject unauthenticated connection prior to acceptance
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication ticket or token required")
+    if not ticket:
+        # Explicit rejection of legacy long-lived bearer tokens and unauthenticated connections
+        if websocket.query_params.get("token") or "authorization" in websocket.headers:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Legacy bearer tokens are rejected. Acquire a single-use ticket via POST /api/v1/auth/ws-ticket"
+            )
+        else:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Authentication ticket required (exchange JWT at POST /api/v1/auth/ws-ticket)"
+            )
         return
 
-    # 2. Authoritative verification of user identity against database
+    # 2. Authoritative verification of ticket and user identity against database
+    ticket_payload = ws_ticket_manager.consume_ticket(ticket)
+    if not ticket_payload:
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Invalid, expired, or already-consumed WebSocket ticket"
+        )
+        return
+
+    user_id = ticket_payload.get("user_id") or ticket_payload.get("sub")
+    email = ticket_payload.get("email")
+
     db = SessionLocal()
     try:
-        user_id = None
-        email = None
-
-        if ticket:
-            # Single-use authenticated ticket handshake
-            ticket_payload = ws_ticket_manager.consume_ticket(ticket)
-            if not ticket_payload:
-                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid, expired, or already-consumed WebSocket ticket")
-                return
-            user_id = ticket_payload.get("user_id") or ticket_payload.get("sub")
-        else:
-            # Bearer token verification
-            now_ts = datetime.datetime.now(datetime.timezone.utc)
-            # Check local backend JWT
-            try:
-                from jose import jwt
-                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-                user_id = payload.get("sub")
-                email = payload.get("email")
-            except Exception:
-                # Check Supabase JWT
-                from core.deps import verify_supabase_token
-                verified = verify_supabase_token(token)
-                if verified:
-                    user_id, email = verified
-
-            if not user_id and not email:
-                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid, expired, or unverified credentials")
-                return
-
-            # Check if session has been revoked in database
-            db_session = db.query(models.Session).filter(models.Session.token == token).first()
-            if db_session:
-                if db_session.revoked:
-                    await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Session has been revoked")
-                    return
-                if db_session.expires_at:
-                    exp = db_session.expires_at
-                    if exp.tzinfo is None:
-                        exp = exp.replace(tzinfo=datetime.timezone.utc)
-                    if exp < now_ts:
-                        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Session has expired")
-                        return
-
         user = None
         if user_id:
             user = db.query(models.User).filter(
@@ -243,7 +214,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Organization is inactive or suspended")
                 return
 
-        # Authoritatively derive tenant and role from database, never from query parameters
+        # Authoritatively derive tenant and role from database, never from ticket claims or query parameters
         auth_org_id = str(user.org_id) if user.org_id else None
         auth_role = user.role
         auth_user_id = str(user.id)

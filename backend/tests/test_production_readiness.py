@@ -5,7 +5,8 @@ import sys
 import os
 import json
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import pytest
+from starlette.websockets import WebSocketDisconnect
 from starlette.testclient import TestClient
 from main import app
 from database import SessionLocal
@@ -74,9 +75,18 @@ class TestProductionReadiness(unittest.TestCase):
         print("  [PASS] Test 1: Production deployment config files (vercel.json, next.config.mjs, Dockerfile, render.yaml) exist")
 
     def test_02_websocket_heartbeat_ping_pong(self):
-        """TEST 2: Verify WebSocket /ws endpoint accepts authenticated connection and returns PONG for PING heartbeat"""
+        """TEST 2: Verify WebSocket /ws endpoint accepts ticket authenticated connection and returns PONG for PING heartbeat"""
+        from ws_manager import ws_ticket_manager
+        # 1. Verify legacy bearer token without ticket is rejected
         token = security.create_access_token(self.super_admin.id)
-        with client.websocket_connect(f"/ws?token={token}") as websocket:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            with client.websocket_connect(f"/ws?token={token}"):
+                pass
+        self.assertEqual(exc.value.code, 1008)
+
+        # 2. Verify ticket authenticated connection succeeds
+        ticket = ws_ticket_manager.issue_ticket(user_id=str(self.super_admin.id), org_id=None, role="SUPER_ADMIN")
+        with client.websocket_connect(f"/ws?ticket={ticket}") as websocket:
             websocket.send_text("PING")
             data = websocket.receive_text()
             self.assertEqual(data, "PONG")
@@ -85,7 +95,7 @@ class TestProductionReadiness(unittest.TestCase):
             json_resp = websocket.receive_json()
             self.assertEqual(json_resp["type"], "PONG")
             self.assertEqual(json_resp["received"], "HELLO_AGENTGUARD")
-        print("  [PASS] Test 2: Native WebSocket /ws endpoint verified with PING/PONG heartbeat & JSON broadcast")
+        print("  [PASS] Test 2: Native WebSocket /ws endpoint verified with single-use ticket, PING/PONG heartbeat & JSON broadcast")
 
     def test_03_streaming_pdf_and_excel_report_generation(self):
         """TEST 3: Verify ReportLab PDF & OpenPyXL Excel report endpoints stream binary byte buffers"""
