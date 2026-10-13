@@ -30,6 +30,7 @@ Overall Completion: 99.1% (116 VERIFIED, 1 PARTIAL, 2 SIMULATED by design; 472/4
 ## 0. Repository Baseline
 
 ### Backend Architecture
+
 - **Framework:** FastAPI (Python 3.10+) running with ASGI.
 - **Entrypoints:** `backend/main.py` mounting 36 domain routers under `/api` and `/api/v1`.
 - **Database Layer:** SQLAlchemy 2.0 ORM with PostgreSQL (Supabase pooler) as primary and SQLite as development fallback (`backend/database.py`).
@@ -40,6 +41,7 @@ Overall Completion: 99.1% (116 VERIFIED, 1 PARTIAL, 2 SIMULATED by design; 472/4
 - **Reporting Engine:** Native streaming PDF via ReportLab, native multi-tab Excel via OpenPyXL, and CSV generation (`backend/routers/reports.py`).
 
 ### Frontend Architecture
+
 - **Framework:** Next.js 14+ (App Router) with React 18 and TypeScript.
 - **Styling:** Vanilla Tailwind CSS with custom enterprise design system (`#1F1F1F`, `#666666`, `#8064C8`, `#2E9D50`, `#E53935`).
 - **Routing Structure:**
@@ -50,6 +52,7 @@ Overall Completion: 99.1% (116 VERIFIED, 1 PARTIAL, 2 SIMULATED by design; 472/4
 - **API Client:** `frontend/src/lib/api.ts` with auto-injected JWT, tenant context header (`X-Organization-Context`), and robust reconnecting WebSocket client with ping/pong heartbeat.
 
 ### Database Architecture
+
 - **Migrations:** Dual setup:
   - Supabase SQL migrations (`supabase/migrations/20260831000000_agentguard_schema.sql`).
   - Auto-bootstrapping ORM metadata (`Base.metadata.create_all`) via `backend/bootstrap.py` on startup.
@@ -57,11 +60,13 @@ Overall Completion: 99.1% (116 VERIFIED, 1 PARTIAL, 2 SIMULATED by design; 472/4
 - **Row-Level Isolation:** Application-level tenant scoping in every router; optional PostgreSQL RLS policies in `backend/migrations/rls_tenant_policies.sql`.
 
 ### Infrastructure & Deployment
+
 - **Containerization:** `Dockerfile` and `docker-compose.yml` defining `backend`, `celery_worker`, `celery_beat`, `redis`, and `frontend`.
 - **Cloud Configurations:** `render.yaml` for backend + worker deployment; `vercel.json` for frontend deployment.
 - **External Integrations:** S3/Local object storage abstraction (`storage_service.py`), SMTP/Mock email service (`email_service.py`), Supabase Admin Auth (`supabase_admin.py`).
 
 ### Major Source Files
+
 - **Server Startup:** [`backend/main.py`](file:///d:/AGENTGUARD/backend/main.py)
 - **Configuration:** [`backend/config.py`](file:///d:/AGENTGUARD/backend/config.py)
 - **Database Engine:** [`backend/database.py`](file:///d:/AGENTGUARD/backend/database.py)
@@ -88,7 +93,7 @@ Overall Completion: 99.1% (116 VERIFIED, 1 PARTIAL, 2 SIMULATED by design; 472/4
 *Components that are genuinely implemented, tested, and MUST NOT be rewritten or dismantled during future build phases:*
 
 | Component | Status | Relevant Files | Reason to Preserve |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Human Authentication & Sessions** | COMPLETE | `backend/core/deps.py`, `backend/routers/auth.py`, `backend/core/security.py` | Handles local bcrypt and Supabase JWT verification, active session tracking, and revocation. |
 | **Enterprise Human RBAC Matrix** | COMPLETE | `backend/core/permissions.py`, `backend/core/deps.py`, `frontend/src/lib/permissions.ts` | 9-level hierarchical role system (USER through SUPER_ADMIN) with fine-grained permission constants. |
 | **Multi-Tenancy & Platform Licensing** | COMPLETE | `backend/routers/platform.py`, `backend/routers/organization.py`, `backend/models.py` | Enforces organization isolation, license quota checks (max users, max agents), plan limits, and super-admin controls. |
@@ -105,6 +110,7 @@ Overall Completion: 99.1% (116 VERIFIED, 1 PARTIAL, 2 SIMULATED by design; 472/4
 ## CURRENT GAPS
 
 ### Status: ALL CORE ROADMAP GAPS RESOLVED & PRODUCTION VERIFIED
+
 1. **P0 — Core Architecture Blockers:** **RESOLVED** — Machine credentials issued with secure SHA-256 hashing, asymmetric Ed25519 cryptographic passport signing & verification, 12-stage non-bypassable runtime authorization enforcement kernel, and dedicated `/api/runtime/*` gateway endpoints.
 2. **P1 — Enterprise Control Plane:** **RESOLVED** — Egress tool proxy with SSRF defense (blocking cloud metadata and loopback), schema-based function validation and prompt injection defenses, bidirectional PII & sensitive data redaction, multi-vector output guardrails, and Python/TypeScript SDKs with LangChain & CrewAI integrations.
 3. **P2 — Advanced Governance & AI Intelligence:** **RESOLVED** — Behavioral baselining and statistical anomaly detection, dynamic adversarial prompt fuzzer (`/api/red-team/fuzz`), multi-provider LLM AI Admin Assistant with zero-failure local database synthesis fallback, database-backed AI model catalog, token pricing schedule, dynamic complexity-based router, and production Stripe & Razorpay billing gateways with HMAC webhook verification.
@@ -915,6 +921,7 @@ graph TD
 ## BUILD MILESTONES
 
 ### MILESTONE 1: Machine Agent Identity, Authentication & Cryptographic Passport
+
 - **Goal:** Enable autonomous AI agents to possess genuine machine credentials, authenticate themselves, and present a cryptographically verifiable passport.
 - **Dependencies:** Complete Human Auth and Organization models.
 - **Deliverables:**
@@ -924,6 +931,7 @@ graph TD
   4. Authentication middleware supporting `X-Agent-Code` and `X-Agent-Key` or Bearer agent tokens.
 
 ### MILESTONE 2: Runtime Authorization Kernel & Gateways
+
 - **Goal:** Transform passive policy checks into an active runtime authorization kernel enforcing permissions and capabilities.
 - **Dependencies:** Milestone 1.
 - **Deliverables:**
@@ -933,6 +941,7 @@ graph TD
   4. Automatic circuit breaker tripping on consecutive policy violations.
 
 ### MILESTONE 3: Intent Understanding & Execution Proxy
+
 - **Goal:** Replace primitive regex matching with structured tool call verification and add outbound action dispatching.
 - **Dependencies:** Milestone 2.
 - **Deliverables:**
@@ -941,6 +950,7 @@ graph TD
   3. Outbound execution dispatcher for approved actions.
 
 ### MILESTONE 4: AI Guardrails & Security Intelligence
+
 - **Goal:** Implement content safety, PII protection, and dynamic red-teaming.
 - **Dependencies:** Milestone 3.
 - **Deliverables:**
@@ -949,6 +959,7 @@ graph TD
   3. Automated adversarial policy fuzzing lab.
 
 ### MILESTONE 5: Developer SDKs & External Integrations
+
 - **Goal:** Provide first-class developer tooling to seamlessly bind Python and TypeScript agents to AGENTGUARD.
 - **Dependencies:** Milestone 4.
 - **Deliverables:**
@@ -961,13 +972,15 @@ graph TD
 ## CURRENT NEXT BUILD
 
 ### Next Milestone
-**MILESTONE 7: Live Environment Hardening & Remote MicroVM Worker Provisioning (gVisor / Firecracker)**
+
+#### Milestone 7: Live Environment Hardening & Remote MicroVM Worker Provisioning (gVisor / Firecracker)
 
 ### Current Platform Status
-**ALL 39 MASTER CHECKLIST DOMAINS COMPLETE & AUTHORITATIVE DATABASE / REPO CLEANED**
+
 All 39 enterprise domains — including the 12-stage runtime authorization kernel, cryptographic passport lifecycle, tool proxy egress gateway, bidirectional PII & output safety guardrails, developer SDKs (Python & TypeScript), database-backed AI model routing, Stripe/Razorpay billing integrations, asynchronous SIEM audit pipeline, External Isolated Sandbox Execution Provider, and the Authoritative Database & Repository Cleanup — are 100% implemented, tested, and verified across all automated test suites and production Next.js builds.
 
 ### Database & Repository Hygiene Verification
+
 1. **Database Schema Preserved:** All 47 existing database tables, columns, indexes, constraints, enums, triggers, and migrations remain 100% intact (0 tables dropped, recreated, or altered).
 2. **Database Cleaned:** 676 confirmed dummy, demo, and disposable test records purged in an atomic transaction; 202 records preserved (175 immutable audit logs, 10 genuine registered users, 2 genuine enterprise organizations, 12 canonical reference records, 3 genuine notifications).
 3. **Backup Verified:** Complete pre-cleanup JSON snapshot (`cleanup_reports/backups/agentguard_backup_20261011_093951.json`) and SQL dump (`cleanup_reports/backups/agentguard_backup_20261011_093951.sql`) verified 100% readable and recoverable.
@@ -979,6 +992,7 @@ All 39 enterprise domains — including the 12-stage runtime authorization kerne
    - [`cleanup_reports/DELETED_FILES_REGISTER.md`](file:///d:/AGENTGUARD/cleanup_reports/DELETED_FILES_REGISTER.md)
 
 ### Continuous Operations & Maintenance
+
 1. Automated periodic Celery Beat tasks running background retention purges, report generations, webhook retries, and hourly expired sandbox artifact cleanups.
 2. Production real-time telemetry streaming via authenticated WebSocket connections.
 3. Continuous security intelligence & runtime anomaly monitoring.
@@ -991,6 +1005,7 @@ All 39 enterprise domains — including the 12-stage runtime authorization kerne
 This document is the **Living Master Checklist** for AGENTGUARD.
 
 Whenever an implementation phase is completed:
+
 1. Open this file (`AGENTGUARD_MASTER_BUILD_CHECKLIST.md`).
 2. Update the specific checkbox items from `[ ]` to `[x]`.
 3. Update their status (e.g. `NOT_IMPLEMENTED` $\rightarrow$ `COMPLETE`).
@@ -1004,7 +1019,7 @@ Whenever an implementation phase is completed:
 ## CHECKLIST CHANGE HISTORY
 
 | Date | Phase / Milestone | Changes Made | Items Completed | Next Target |
-|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- |
 | 2026-10-01 | Baseline Forensic Audit | Inspected full codebase, verified 299 tests, established baseline status across 38 domains, created persistent living checklist. | 58 items confirmed complete | Feature 1.1: Agent Machine Credential Issuance |
 | 2026-10-01 | Milestone 1 — Machine Identity | Implemented agent credentials (generation, SHA-256 hashing, rotation, revocation), Ed25519 asymmetric cryptographic passport signing & verification, machine JWT auth `/api/runtime/auth`, direct headers auth, agent runtime sessions & heartbeats. | 5 items completed | Milestone 2: Runtime Authorization Kernel |
 | 2026-10-01 | Milestone 2 — Runtime Authorization Kernel | Implemented permission grant/revoke CRUD & Stage 5 permission enforcement gate, Stage 6 dynamic single-use capability token validation gate, unified pre-flight authorization endpoint `/api/runtime/authorize`, automatic circuit breaker tripping on consecutive refusals with operator reset. | 4 items completed | Milestone 3: Intent & Tool Proxy Gateway |
@@ -1018,9 +1033,3 @@ Whenever an implementation phase is completed:
 | 2026-10-11 | Milestone 6.3 — Authoritative Database & Repository Cleanup | Cleaned live PostgreSQL database: 676 dummy/demo/test records removed across 34 tables in an atomic transaction; 47/47 tables (100%) preserved; 202 genuine records retained (175 immutable audit logs, 10 genuine users, 2 genuine orgs, 12 canonical reference items, 3 notifications); full JSON and SQL recoverable backups verified; seeding scripts hardened with production environment safety blocks; 410 disposable files (.pyc, temp DBs, test reports) and 123 cache directories removed; created permanent forensic registers `DELETED_FILES_REGISTER.md`, `DELETED_DATABASE_RECORDS.md`, and `CLEANUP_SUMMARY.md`. Full regression test suite passing (462/462 tests green); 58/58 Next.js static pages compiled; 0 frontend lint errors. | 119 / 119 items verified complete (100%); zero dummy data; zero regressions | Operational MicroVM Worker Provisioning (gVisor/Firecracker) & Production Hardening |
 | 2026-10-13 | Security Remediation & P0-P5 Production Hardening | Fixed WebSocket authentication & tenant isolation (/ws strictly requires verified JWT, DB-backed role/org check, rejected 1008 on anonymous/forged; isolated broadcast); eliminated unverified user_metadata role and hardcoded personal email overrides in frontend middleware & UI (server-controlled app_metadata.role only); hardened machine auth and forward tool proxy against suspended agents and revoked credentials; enforced fail-closed SECRET_KEY requirement in production (min 32 chars) and disabled AUTO_BOOTSTRAP_DB in production; implemented Ed25519 passport public key rotation keyring; encrypted webhook secrets at rest using AES-256-GCM HKDF with transparent HMAC decryption; verified immutability and preserved 80 disassociated audit logs; verified all 15 stages of runtime authorization kernel; 472/472 backend tests passing (100%); 58/58 Next.js pages cleanly compiled; 0 lint errors. | 117 COMPLETE, 2 SIMULATED; 472/472 tests green; 58/58 Next.js pages compiled | Continuous Security Monitoring & Production Deployment |
 | 2026-10-13 | Independent Adversarial Verification & Release Gate Audit | Adversarial verification executed across WebSocket isolation, RBAC/IAM authorization, machine credential revocation, cryptographic key fail-safe invariants, and webhook encryption at rest. Confirmed 472/472 backend tests green (116.24s), 0 ESLint errors (4 Next.js img warnings), 58/58 Next.js static pages compiled. Identified key-rotation verification gap in `passport_service.py` where `_trusted_keys` lookup is bypassed during verification. Release gate classified: CONDITIONAL GO. | 116 VERIFIED, 1 PARTIAL, 2 SIMULATED | Resolve Passport Keyring lookup in verify_passport & provision production secrets |
-
-
-
-
-
-
