@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict, Any
+import logging
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
@@ -6,6 +7,8 @@ from database import get_db
 import models, schemas
 from core import security
 from core.deps import get_current_user
+
+logger = logging.getLogger("agentguard.auth")
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -273,11 +276,19 @@ def issue_ws_ticket(current_user: models.User = Depends(get_current_user)):
     Prevents long-lived bearer tokens from persisting in WebSocket query strings or logs.
     """
     from ws_manager import ws_ticket_manager
-    ticket = ws_ticket_manager.issue_ticket(
-        user_id=str(current_user.id),
-        org_id=str(current_user.org_id) if current_user.org_id else None,
-        role=current_user.role
-    )
+    try:
+        ticket = ws_ticket_manager.issue_ticket(
+            user_id=str(current_user.id),
+            org_id=str(current_user.org_id) if current_user.org_id else None,
+            role=current_user.role,
+            email=current_user.email
+        )
+    except RuntimeError as e:
+        logger.error(f"[WebSocket Ticket] Issuance blocked: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Distributed session storage unavailable in production environment"
+        )
     return {"ticket": ticket, "expires_in": 60, "token_type": "ws_ticket"}
 
 @router.post("/resend-verification")

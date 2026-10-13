@@ -194,6 +194,10 @@ class WebSocketTicketManager:
         r = self._get_redis()
         return "REDIS_DISTRIBUTED" if r is not None else "SINGLE_INSTANCE_IN_MEMORY"
 
+    def _is_production(self) -> bool:
+        env = getattr(settings, "ENVIRONMENT", "production").lower()
+        return env == "production"
+
     def issue_ticket(
         self,
         user_id: str,
@@ -208,19 +212,33 @@ class WebSocketTicketManager:
         ticket_id = str(uuid.uuid4())
 
         r = self._get_redis()
-        if r is not None:
+        if self._is_production():
+            if r is None:
+                raise RuntimeError(
+                    "[AgentGuard Security Error] Production environment requires shared Redis ticket storage for multi-instance WebSocket security. "
+                    "In-memory fallback is strictly prohibited in production."
+                )
             try:
                 # Distributed store: store ticket ID with TTL in Redis
                 r.set(f"agentguard:ws_ticket:{ticket_id}", "ACTIVE", ex=max(int(ttl), 1))
             except Exception as e:
-                logger.warning(f"[WebSocketTicketManager] Redis set ticket failed: {e}; falling back to local memory.")
+                logger.error(f"[WebSocketTicketManager] Production Redis ticket storage write failure: {e}")
+                raise RuntimeError(
+                    f"[AgentGuard Security Error] Failed to persist distributed WebSocket ticket in Redis: {e}"
+                )
+        else:
+            if r is not None:
+                try:
+                    r.set(f"agentguard:ws_ticket:{ticket_id}", "ACTIVE", ex=max(int(ttl), 1))
+                except Exception as e:
+                    logger.warning(f"[WebSocketTicketManager] Redis set ticket failed in dev: {e}; using local memory.")
+                    with self._lock:
+                        self._cleanup_expired(now)
+                        self._active_tickets[ticket_id] = exp
+            else:
                 with self._lock:
                     self._cleanup_expired(now)
                     self._active_tickets[ticket_id] = exp
-        else:
-            with self._lock:
-                self._cleanup_expired(now)
-                self._active_tickets[ticket_id] = exp
 
         payload = {
             "ticket_id": ticket_id,
@@ -250,26 +268,34 @@ class WebSocketTicketManager:
 
         now = time.time()
         r = self._get_redis()
-        if r is not None:
+
+        if self._is_production():
+            if r is None:
+                logger.error(
+                    "[AgentGuard Security Error] Production environment requires Redis for ticket redemption. In-memory fallback is disallowed."
+                )
+                return None
             try:
-                # Atomic consumption in Redis: delete key and verify it was present
+                # Atomic single-use redemption in Redis
                 deleted = r.delete(f"agentguard:ws_ticket:{ticket_id}")
                 if deleted != 1:
                     # Already consumed or expired
                     return None
             except Exception as e:
-                logger.warning(f"[WebSocketTicketManager] Redis delete ticket failed: {e}; checking local memory.")
-                with self._lock:
-                    if ticket_id not in self._active_tickets:
-                        return None
-                    exp = self._active_tickets.pop(ticket_id)
-                    if now > exp:
-                        return None
+                logger.error(f"[WebSocketTicketManager] Production Redis ticket redemption error: {e}")
+                return None
         else:
+            if r is not None:
+                try:
+                    deleted = r.delete(f"agentguard:ws_ticket:{ticket_id}")
+                    if deleted == 1:
+                        return payload
+                except Exception as e:
+                    logger.warning(f"[WebSocketTicketManager] Redis delete ticket error in dev: {e}")
+
             with self._lock:
                 self._cleanup_expired(now)
                 if ticket_id not in self._active_tickets:
-                    # Ticket unknown or already consumed (single-use enforcement)
                     return None
                 exp = self._active_tickets.pop(ticket_id)
                 if now > exp:

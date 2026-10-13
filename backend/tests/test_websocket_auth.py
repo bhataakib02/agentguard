@@ -271,3 +271,36 @@ class TestWebSocketAuthAndTickets:
                 ws_b.send_text("PING")
                 pong_b = ws_b.receive_text()
                 assert pong_b == "PONG"
+
+    def test_10_production_fails_closed_when_redis_unavailable(self):
+        """
+        Production environment MUST fail closed if Redis is unavailable or unconfigured.
+        In-memory fallback is strictly prohibited in production.
+        """
+        from unittest.mock import patch
+        from config import settings
+
+        prod_manager = WebSocketTicketManager()
+        prod_manager._redis_client = None
+        prod_manager._redis_checked = True
+
+        with patch.object(settings, "ENVIRONMENT", "production"):
+            # 1. Issue ticket must raise RuntimeError in production without Redis
+            with pytest.raises(RuntimeError, match="Production environment requires shared Redis ticket storage"):
+                prod_manager.issue_ticket(
+                    user_id=str(self.user_a.id),
+                    org_id=str(self.org_a.id),
+                    role="USER"
+                )
+
+            # 2. Consume ticket must fail closed and return None
+            test_token = security.create_access_token({"ticket_id": "fake_id", "token_type": "ws_ticket", "sub": str(self.user_a.id)})
+            consumed = prod_manager.consume_ticket(test_token)
+            assert consumed is None, "Production without Redis must fail closed on ticket redemption"
+
+            # 3. HTTP endpoint /auth/ws-ticket returns 503 Service Unavailable
+            with patch("ws_manager.ws_ticket_manager", prod_manager):
+                headers = {"Authorization": f"Bearer {self.token_user_a}"}
+                res = client.post("/api/v1/auth/ws-ticket", headers=headers)
+                assert res.status_code == 503
+                assert "Distributed session storage unavailable in production" in res.json()["detail"]

@@ -12,13 +12,27 @@ DECLARE
     target_admin_email text;
     sa_auth_id UUID;
     sa_public_id UUID;
+    curr_db text := current_database();
+    allowed_dbs text[] := ARRAY['agentguard_dev', 'agentguard_test', 'agentguard_local', 'agentguard_ci', 'test_agentguard'];
+    env_guard text;
 BEGIN
-    -- 1. HARD SAFETY CHECK: Disallow execution if connected to a database containing 'prod'
-    IF current_database() ~* 'prod' THEN
-        RAISE EXCEPTION 'CRITICAL SAFETY ABORT: Destructive maintenance script cannot be executed on production database "%".', current_database();
+    -- 1. FAIL-CLOSED ALLOWLIST GUARD: Unknown and unapproved databases are rejected by default
+    IF NOT (curr_db = ANY(allowed_dbs)) THEN
+        RAISE EXCEPTION 'CRITICAL SAFETY ABORT: Database "%" is not in the approved non-production allowlist (%). Unknown and production databases are rejected by default.', curr_db, array_to_string(allowed_dbs, ', ');
     END IF;
 
-    -- 2. SAFETY ENVIRONMENT CHECK: Require explicit confirmation setting
+    -- 2. INDEPENDENT ENVIRONMENT GUARD: System environment must be explicitly non-production
+    BEGIN
+        env_guard := current_setting('agentguard.environment', true);
+    EXCEPTION WHEN OTHERS THEN
+        env_guard := NULL;
+    END;
+
+    IF env_guard IS NULL OR env_guard NOT IN ('development', 'test', 'local', 'ci') THEN
+        RAISE EXCEPTION 'CRITICAL SAFETY ABORT: Independent environment guard failed. agentguard.environment must be explicitly set to development, test, local, or ci (current: "%").', coalesce(env_guard, 'UNSET');
+    END IF;
+
+    -- 3. EXPLICIT OPERATOR CONFIRMATION: Require explicit confirmation setting
     BEGIN
         confirmed_flag := current_setting('agentguard.destructive_maintenance_confirmed', true);
     EXCEPTION WHEN OTHERS THEN

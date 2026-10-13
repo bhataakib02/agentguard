@@ -6,9 +6,21 @@ import requests
 import time
 from config import settings
 
-if settings.ENVIRONMENT == "production":
+APPROVED_NON_PROD_DATABASES = {
+    "agentguard_dev", "agentguard_test", "agentguard_local", "agentguard_ci", "test_agentguard"
+}
+
+if settings.ENVIRONMENT not in ("development", "test", "local", "ci"):
     raise RuntimeError(
-        "[AgentGuard Security Block] clean_and_signup_accounts script cannot be executed in PRODUCTION."
+        f"[AgentGuard Security Block] clean_and_signup_accounts script cannot be executed outside development/test (current environment: '{settings.ENVIRONMENT}')."
+    )
+
+from urllib.parse import urlparse
+parsed = urlparse(settings.DATABASE_URL)
+target_db = parsed.path.lstrip("/").split("?")[0]
+if target_db not in APPROVED_NON_PROD_DATABASES:
+    raise RuntimeError(
+        f"[AgentGuard Security Block] Target database '{target_db}' is not in the approved non-production allowlist: {APPROVED_NON_PROD_DATABASES}."
     )
 
 SUPABASE_URL = settings.SUPABASE_URL
