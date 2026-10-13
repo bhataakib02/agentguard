@@ -89,7 +89,22 @@ def dispatch_webhook_task(self, delivery_id: str, max_attempts: int = MAX_WEBHOO
         }
         payload_bytes = json.dumps(full_payload, separators=(',', ':'), default=str).encode("utf-8")
 
-        signing_key = endpoint.secret_key or endpoint.secret_hash
+        from core.security import decrypt_secret_at_rest
+        raw_key = endpoint.secret_key
+        if raw_key:
+            if raw_key.startswith("enc:aesgcm:"):
+                signing_key = decrypt_secret_at_rest(raw_key)
+                if not signing_key:
+                    logger.error(f"[dispatch_webhook_task] Decryption failed for webhook {endpoint.id} secret. Failing closed.")
+                    delivery.status = "FAILED"
+                    delivery.error_message = "Cryptographic integrity failure: webhook secret could not be decrypted."
+                    db.commit()
+                    return {"status": "FAILED", "error": "Decryption failed (tampered ciphertext)"}
+            else:
+                signing_key = raw_key
+        else:
+            signing_key = endpoint.secret_hash
+
         signature = compute_webhook_signature(signing_key, payload_bytes, timestamp_str)
 
         headers = {

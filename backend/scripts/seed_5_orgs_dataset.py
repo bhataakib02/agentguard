@@ -12,8 +12,13 @@ sys.path.insert(0, r"d:\AGENTGUARD\backend")
 from database import engine
 from config import settings
 
-DATASET_DIR = r"d:\AGENTGUARD\AGENTGUARD_5_ORGANIZATIONS_DATASET"
-TEST_PASSWORD = "Blackbird@12."
+if settings.ENVIRONMENT == "production":
+    raise RuntimeError(
+        "[AgentGuard Security Block] seed_5_orgs_dataset cannot be executed in PRODUCTION."
+    )
+
+DATASET_DIR = os.getenv("AGENTGUARD_DATASET_DIR", r"d:\AGENTGUARD\AGENTGUARD_5_ORGANIZATIONS_DATASET")
+TEST_PASSWORD = os.getenv("DEMO_ACCOUNTS_PASSWORD", "DemoPass2026!Secure")
 
 DOCX_USER_TABLES = [
     # Org 1: ACME Technologies (org-001)
@@ -96,6 +101,10 @@ def seed_dataset():
     print("  SEEDING 5-ORGANIZATION DATASET WITH DOCX TESTING CREDENTIALS  ")
     print("=" * 75)
 
+    if not os.path.exists(DATASET_DIR):
+        print(f"[AgentGuard Notice] Dataset directory '{DATASET_DIR}' not found. Skipping dataset seed.")
+        return
+
     # Update users.json
     users_json_path = os.path.join(DATASET_DIR, "users.json")
     new_users_data = []
@@ -138,11 +147,14 @@ def seed_dataset():
     with engine.connect() as conn:
         trans = conn.begin()
         try:
-            # 0. Clean old tenant data first (preserve Super Admin)
-            print("0. Cleaning old tenant data while preserving Super Admin...")
-            sa_hash = conn.execute(text("SELECT encrypted_password FROM auth.users WHERE email = 'thefreelancer2076@gmail.com';")).scalar()
-
-            conn.execute(text("UPDATE public.users SET org_id = NULL WHERE email = 'thefreelancer2076@gmail.com';"))
+            # 0. Clean old tenant data if explicitly authorized
+            if os.getenv("ALLOW_DEMO_SEED", "false").lower() not in ("true", "1"):
+                print("[AgentGuard Safety Block] ALLOW_DEMO_SEED is not set. Aborting seed operation.")
+                return
+            if not os.path.exists(DATASET_DIR):
+                print(f"[AgentGuard Notice] Dataset directory '{DATASET_DIR}' not found. Skipping dataset seed.")
+                return
+            print("0. Cleaning old tenant data while preserving admin accounts...")
             
             tables_to_purge = [
                 'provenance_events', 'approval_requests', 'decisions', 'capability_tokens',
@@ -156,14 +168,8 @@ def seed_dataset():
             for tbl in tables_to_purge:
                 conn.execute(text(f"DELETE FROM public.{tbl};"))
 
-            conn.execute(text("DELETE FROM public.users WHERE email <> 'thefreelancer2076@gmail.com';"))
+            conn.execute(text("DELETE FROM public.users WHERE role <> 'SUPER_ADMIN';"))
             conn.execute(text("DELETE FROM public.organizations;"))
-
-            conn.execute(text("DELETE FROM auth.refresh_tokens;"))
-            conn.execute(text("DELETE FROM auth.sessions;"))
-            conn.execute(text("DELETE FROM auth.identities WHERE email <> 'thefreelancer2076@gmail.com';"))
-            conn.execute(text("DELETE FROM auth.users WHERE email <> 'thefreelancer2076@gmail.com';"))
-
             print("   [CLEANED] Old tenant data purged.")
 
             # 1. ORGANIZATIONS & LICENSES & USAGES
@@ -548,7 +554,7 @@ def seed_dataset():
         ("MEDCORE USER", "ira@medcore.com"),
         ("URBANGRID USER", "vihaan@urbangrid.com"),
         ("EDUNOVA USER", "anaya@edunova.com"),
-        ("SUPER ADMIN", "thefreelancer2076@gmail.com")
+        ("SUPER ADMIN", "superadmin@agentguard.com")
     ]
 
     for label, em in test_logins:

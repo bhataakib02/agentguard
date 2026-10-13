@@ -54,6 +54,7 @@ export default function PlatformDashboardPage() {
   const [newOrgPlan, setNewOrgPlan] = useState("ENTERPRISE");
   const [newOrgAdminEmail, setNewOrgAdminEmail] = useState("");
   const [newOrgAdminName, setNewOrgAdminName] = useState("");
+  const [newOrgAdminPassword, setNewOrgAdminPassword] = useState("");
   const [createMsg, setCreateMsg] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -110,7 +111,7 @@ export default function PlatformDashboardPage() {
           plan_id: newOrgPlan,
           admin_email: newOrgAdminEmail,
           admin_full_name: newOrgAdminName,
-          admin_password: "Blackbird@12."
+          admin_password: newOrgAdminPassword || undefined
         })
       });
       if (res.status === "SUCCESS") {
@@ -120,6 +121,7 @@ export default function PlatformDashboardPage() {
         setNewOrgDomain("");
         setNewOrgAdminEmail("");
         setNewOrgAdminName("");
+        setNewOrgAdminPassword("");
         loadPlatformData();
       } else {
         setCreateMsg(res.detail?.message || res.detail || "Failed to create organization.");
@@ -831,6 +833,17 @@ export default function PlatformDashboardPage() {
                   placeholder="admin@acme.com"
                   value={newOrgAdminEmail}
                   onChange={(e) => setNewOrgAdminEmail(e.target.value)}
+                  className="w-full bg-[#161C2A] border border-[#232F48] rounded-[8px] px-3 py-2 text-white outline-none focus:border-[#2E9D50]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#94A3B8] mb-1">Initial Password (Optional)</label>
+                <input
+                  type="password"
+                  placeholder="Leave blank to auto-generate a secure random password"
+                  value={newOrgAdminPassword}
+                  onChange={(e) => setNewOrgAdminPassword(e.target.value)}
                   className="w-full bg-[#161C2A] border border-[#232F48] rounded-[8px] px-3 py-2 text-white outline-none focus:border-[#2E9D50]"
                 />
               </div>

@@ -162,9 +162,20 @@ class NotificationService:
         }
         payload_bytes = json.dumps(full_payload, separators=(',', ':'), default=str).encode("utf-8")
 
-        # Compute HMAC signature using decrypted secret_key
+        # Compute HMAC signature using decrypted secret_key (failing closed on tampered ciphertext)
         from core.security import decrypt_secret_at_rest
-        signing_key = decrypt_secret_at_rest(endpoint.secret_key) or endpoint.secret_key or endpoint.secret_hash
+        raw_key = endpoint.secret_key
+        if raw_key:
+            if raw_key.startswith("enc:aesgcm:"):
+                signing_key = decrypt_secret_at_rest(raw_key)
+                if not signing_key:
+                    logger.error(f"[Webhook Dispatch] Tampered or corrupt secret ciphertext for webhook {endpoint.id}. Failing closed.")
+                    return None
+            else:
+                signing_key = raw_key
+        else:
+            signing_key = endpoint.secret_hash
+
         signature = compute_webhook_signature(signing_key, payload_bytes, timestamp_str)
 
         headers = {

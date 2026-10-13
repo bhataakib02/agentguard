@@ -153,16 +153,18 @@ def health_readiness(response: Response, db: SessionLocal = Depends(get_db)):
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    # 1. Extract token from query params or Authorization header
+    from ws_manager import ws_ticket_manager
+    # 1. Extract ticket, query token, or Authorization header
+    ticket = websocket.query_params.get("ticket")
     token = websocket.query_params.get("token")
-    if not token and "authorization" in websocket.headers:
+    if not ticket and not token and "authorization" in websocket.headers:
         auth_header = websocket.headers.get("authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header.split("Bearer ", 1)[1].strip()
 
-    if not token:
+    if not ticket and not token:
         # Reject unauthenticated connection prior to acceptance
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication token required")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication ticket or token required")
         return
 
     # 2. Authoritative verification of user identity against database
@@ -170,22 +172,47 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         user_id = None
         email = None
-        # Check local backend JWT
-        try:
-            from jose import jwt
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-            user_id = payload.get("sub")
-            email = payload.get("email")
-        except Exception:
-            # Check Supabase JWT
-            from core.deps import verify_supabase_token
-            verified = verify_supabase_token(token)
-            if verified:
-                user_id, email = verified
 
-        if not user_id and not email:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid, expired, or unverified credentials")
-            return
+        if ticket:
+            # Single-use authenticated ticket handshake
+            ticket_payload = ws_ticket_manager.consume_ticket(ticket)
+            if not ticket_payload:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid, expired, or already-consumed WebSocket ticket")
+                return
+            user_id = ticket_payload.get("user_id") or ticket_payload.get("sub")
+        else:
+            # Bearer token verification
+            now_ts = datetime.datetime.now(datetime.timezone.utc)
+            # Check local backend JWT
+            try:
+                from jose import jwt
+                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+                user_id = payload.get("sub")
+                email = payload.get("email")
+            except Exception:
+                # Check Supabase JWT
+                from core.deps import verify_supabase_token
+                verified = verify_supabase_token(token)
+                if verified:
+                    user_id, email = verified
+
+            if not user_id and not email:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid, expired, or unverified credentials")
+                return
+
+            # Check if session has been revoked in database
+            db_session = db.query(models.Session).filter(models.Session.token == token).first()
+            if db_session:
+                if db_session.revoked:
+                    await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Session has been revoked")
+                    return
+                if db_session.expires_at:
+                    exp = db_session.expires_at
+                    if exp.tzinfo is None:
+                        exp = exp.replace(tzinfo=datetime.timezone.utc)
+                    if exp < now_ts:
+                        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Session has expired")
+                        return
 
         user = None
         if user_id:

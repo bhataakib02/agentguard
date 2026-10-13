@@ -2,6 +2,11 @@
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+node_modules/
+.next/
+out/
+build/
+
 # Environment files & Secrets
 *.env
 *.env.*
@@ -13,7 +18,20 @@ frontend/.env.local
 frontend/.env*.local
 backend/.env
 
+# Database files & Backups
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+cleanup_reports/backups/
+backups/
+*.sql.bak
+
 # Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
 backend/__pycache__/
 backend/*/__pycache__/
 backend/*/*/__pycache__/
@@ -21,9 +39,18 @@ backend/*.pyc
 backend/*.db
 backend/venv/
 backend/.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Storage / Generated reports
+backend/storage/reports/*
+!backend/storage/reports/.gitkeep
 
 # IDE / System
 .vscode/
 .idea/
 .DS_Store
 *.log
+
+

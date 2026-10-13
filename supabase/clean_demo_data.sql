@@ -1,8 +1,12 @@
--- AGENTGUARD Fail-Safe Supabase PostgreSQL Demo Data Purge Script
--- Run this script in your Supabase Dashboard SQL Editor (https://supabase.com/dashboard/project/xjragvyzlailmtfwjfnm/sql/new)
+-- AGENTGUARD Fail-Safe Demo Data Purge Script
+-- SAFETY RULES:
+-- Requires explicit session variable confirmation prior to execution:
+--   SET agentguard.allow_demo_purge = 'CONFIRMED_NON_PRODUCTION';
+-- This script will ABORT immediately if executed without this setting.
 
 DO $$
 DECLARE
+    confirmed_flag text;
     tbl text;
     tbls text[] := ARRAY[
         'provenance_events',
@@ -34,6 +38,16 @@ DECLARE
         'organizations'
     ];
 BEGIN
+    BEGIN
+        confirmed_flag := current_setting('agentguard.allow_demo_purge', true);
+    EXCEPTION WHEN OTHERS THEN
+        confirmed_flag := NULL;
+    END;
+
+    IF confirmed_flag IS NULL OR confirmed_flag <> 'CONFIRMED_NON_PRODUCTION' THEN
+        RAISE EXCEPTION 'SAFETY ABORT: Demo data purge requires explicit non-production confirmation. Execute: SET agentguard.allow_demo_purge = ''CONFIRMED_NON_PRODUCTION'';';
+    END IF;
+
     FOREACH tbl IN ARRAY tbls LOOP
         BEGIN
             EXECUTE format('DELETE FROM %I;', tbl);
@@ -44,7 +58,7 @@ BEGIN
     END LOOP;
 END $$;
 
--- Verification Query (All counts should return 0)
+-- Verification Query
 SELECT 
     (SELECT COUNT(*) FROM users) AS remaining_users,
     (SELECT COUNT(*) FROM agents) AS remaining_agents,

@@ -266,6 +266,20 @@ def logout(
 
     return {"status": "SUCCESS", "message": "Logged out successfully and session revoked"}
 
+@router.post("/ws-ticket")
+def issue_ws_ticket(current_user: models.User = Depends(get_current_user)):
+    """
+    Issues a short-lived (60s), single-use authenticated ticket for WebSocket connection.
+    Prevents long-lived bearer tokens from persisting in WebSocket query strings or logs.
+    """
+    from ws_manager import ws_ticket_manager
+    ticket = ws_ticket_manager.issue_ticket(
+        user_id=str(current_user.id),
+        org_id=str(current_user.org_id) if current_user.org_id else None,
+        role=current_user.role
+    )
+    return {"ticket": ticket, "expires_in": 60, "token_type": "ws_ticket"}
+
 @router.post("/resend-verification")
 def resend_verification_email(req: dict, db: Session = Depends(get_db)):
     email = req.get("email")

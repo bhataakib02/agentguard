@@ -78,7 +78,7 @@ class TestPhase6cTruthfulness(unittest.TestCase):
                         email=email,
                         full_name=full_name,
                         role=role,
-                        password_hash=security.get_password_hash("Blackbird@12."),
+                        password_hash=security.get_password_hash("TestAuthFixture2026!"),
                         status="ACTIVE"
                     )
                     cls.db.add(u)
