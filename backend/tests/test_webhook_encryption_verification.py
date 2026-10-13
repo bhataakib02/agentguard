@@ -10,6 +10,7 @@ Verifies requirement B6 & Section 6 of Post-Remediation Security Rules:
 """
 
 import uuid
+import datetime
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -143,3 +144,93 @@ def test_webhook_tampered_ciphertext_fails_closed(setup_webhook_test_db):
         payload_data={"resource_id": "res_123", "action": "BLOCKED"}
     )
     assert delivery_result is None, "Dispatch must fail closed and return None when secret is tampered"
+
+
+def test_passport_keyring_selection_and_rotation(setup_webhook_test_db):
+    from services.passport_service import passport_service
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    db, org = setup_webhook_test_db
+
+    owner = models.User(
+        org_id=org.id,
+        email=f"owner_{uuid.uuid4().hex[:6]}@example.com",
+        full_name="Passport Owner",
+        role="ADMIN",
+        status="ACTIVE"
+    )
+    db.add(owner)
+    db.commit()
+    db.refresh(owner)
+
+    agent = models.Agent(
+        org_id=org.id,
+        owner_id=owner.id,
+        name="Crypto Agent",
+        agent_code="AG-CRYPTO-01",
+        purpose="Automated cryptographic governance tests",
+        status="ACTIVE"
+    )
+    db.add(agent)
+    db.commit()
+    db.refresh(agent)
+
+    # 1. Sign passport with initial active key
+    initial_key_id = passport_service.key_id
+    passport = models.AgentPassport(
+        agent_id=agent.id,
+        passport_number="AG-PASS-TEST-KEYRING-01",
+        passport_version="1.0",
+        key_id=initial_key_id,
+        verification_status="PENDING",
+        issued_at=datetime.datetime.utcnow(),
+        expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=30)
+    )
+    passport_service.sign_passport(agent, passport)
+    db.add(passport)
+    db.commit()
+    db.refresh(passport)
+
+    # Initial passport verifies cleanly
+    verif = passport_service.verify_passport(passport, agent)
+    assert verif["valid"] is True
+    assert verif["key_id"] == initial_key_id
+
+    # 2. Unknown key ID fails closed
+    passport.key_id = "unknown-rogue-key-id-999"
+    unknown_verif = passport_service.verify_passport(passport, agent)
+    assert unknown_verif["valid"] is False
+    assert unknown_verif["status"] == "UNKNOWN_KEY_ID"
+    passport.key_id = initial_key_id
+
+    # 3. Rotate active key: old passport must STILL verify via historical trusted key
+    new_priv = ed25519.Ed25519PrivateKey.generate()
+    new_key_id = f"agentguard-rotated-ed25519-{uuid.uuid4().hex[:6]}"
+    passport_service.rotate_active_key(new_key_id, new_priv)
+    assert passport_service.key_id == new_key_id
+
+    # Verify old passport signed with initial_key_id continues to verify
+    hist_verif = passport_service.verify_passport(passport, agent)
+    assert hist_verif["valid"] is True
+    assert hist_verif["key_id"] == initial_key_id
+
+    # Sign a second passport with new key
+    passport_v2 = models.AgentPassport(
+        agent_id=agent.id,
+        passport_number="AG-PASS-TEST-KEYRING-02",
+        passport_version="1.0",
+        key_id=new_key_id,
+        verification_status="PENDING",
+        issued_at=datetime.datetime.utcnow(),
+        expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=30)
+    )
+    passport_service.sign_passport(agent, passport_v2)
+    v2_verif = passport_service.verify_passport(passport_v2, agent)
+    assert v2_verif["valid"] is True
+    assert v2_verif["key_id"] == new_key_id
+
+    # 4. Tampered signature fails closed
+    orig_sig = passport_v2.digital_signature
+    passport_v2.digital_signature = "ed25519:AAAA" + orig_sig[12:]
+    tampered_verif = passport_service.verify_passport(passport_v2, agent)
+    assert tampered_verif["valid"] is False
+    assert tampered_verif["status"] == "TAMPERED"

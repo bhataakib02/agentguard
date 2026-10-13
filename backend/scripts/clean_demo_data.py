@@ -6,10 +6,23 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import engine, SessionLocal
 from config import settings
 
+APPROVED_NON_PROD_DATABASES = {
+    "agentguard_dev", "agentguard_test", "agentguard_local", "agentguard_ci", "test_agentguard"
+}
+
 def clean_all_demo_data():
-    if settings.ENVIRONMENT == "production":
+    if settings.ENVIRONMENT not in ("development", "test", "local", "ci"):
         raise RuntimeError(
-            "[AgentGuard Security Block] Database cleanup and purge scripts are strictly prohibited in PRODUCTION environments."
+            f"[AgentGuard Security Block] Database cleanup and purge scripts are strictly prohibited outside development/test (current environment: '{settings.ENVIRONMENT}')."
+        )
+
+    # 2. Inspect target database identity from DATABASE_URL
+    from urllib.parse import urlparse
+    parsed = urlparse(settings.DATABASE_URL)
+    target_db = parsed.path.lstrip("/").split("?")[0]
+    if target_db not in APPROVED_NON_PROD_DATABASES:
+        raise RuntimeError(
+            f"[AgentGuard Security Block] Target database '{target_db}' is not in the approved non-production allowlist: {APPROVED_NON_PROD_DATABASES}. Unknown databases are rejected by default."
         )
 
     if os.getenv("ALLOW_RAW_PURGE", "false").lower() not in ("true", "1"):
