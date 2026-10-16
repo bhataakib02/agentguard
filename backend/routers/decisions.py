@@ -288,9 +288,10 @@ async def evaluate_decision(
 
 from core.deps import get_current_user, get_authenticated_entity
 from engines.predictive_action_control_engine import predictive_action_control_engine
+from engines.pace_evaluator import pace_evaluator
 
 # ============================================================================
-# PREDICTIVE ACTION CONTROL ENGINE (PACE) CANONICAL ENDPOINTS - PHASE 1
+# PREDICTIVE ACTION CONTROL ENGINE (PACE) CANONICAL ENDPOINTS - PHASE 1 & 2
 # ============================================================================
 
 @router.post("/control/evaluate", response_model=schemas.ActionControlEvaluationResponse)
@@ -303,7 +304,8 @@ async def evaluate_action_control(
     Canonical Predictive Action Control Engine Pre-Flight Evaluator.
     Authenticates caller, verifies tenant context & machine passport, validates permissions,
     computes bounded sequence-aware risk, applies deterministic policy constraints,
-    records immutable audit decision, and returns structured governance result.
+    estimates candidate future actions & Markov transitions, runs bounded reachability analysis,
+    formulates minimal intervention plan, records immutable audit decision, and returns structured result.
     """
     return predictive_action_control_engine.evaluate_action(
         db=db,
@@ -329,6 +331,18 @@ async def execute_action_control(
         caller_entity=entity,
         request=req
     )
+
+
+@router.get("/control/metrics", response_model=schemas.EvaluationMetrics)
+async def get_pace_evaluation_metrics(
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Returns deterministic, reproducible benchmark evaluation metrics of PACE Phase 2
+    across synthetic evaluation scenarios (precision, recall, FPR, F1, calibration).
+    """
+    return pace_evaluator.evaluate_benchmark()
+
 
 
 @router.get("/{id}")

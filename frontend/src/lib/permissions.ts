@@ -51,6 +51,10 @@ export const ROUTE_PERMISSIONS: Record<string, { roles: string[]; requiredPermis
     roles: ["ANALYST", "MANAGER", "ADMIN", "SUPER_ADMIN"],
     requiredPermission: "decisions:read",
   },
+  "/simulation": {
+    roles: ["ANALYST", "SECURITY_ANALYST", "MANAGER", "ADMIN", "SUPER_ADMIN"],
+    requiredPermission: "simulation:read",
+  },
   "/provenance": {
     roles: ["ANALYST", "SECURITY_ANALYST", "ADMIN", "SUPER_ADMIN"],
     requiredPermission: "provenance:read",

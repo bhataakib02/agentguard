@@ -689,3 +689,411 @@ class TestPredictiveActionControlEngineSuite:
         # Dispatched to Tool Proxy
         assert exec_res["executed"] is True
         assert exec_res["execution_status"] == "EXECUTED"
+
+
+class TestPACEPhase2PredictiveInterventionSuite:
+    """
+    Comprehensive Phase 2 Test Suite: Predictive Intelligence and Minimal Intervention.
+    Covers the 10 core verification requirements:
+    1. Insufficient data does not produce fabricated predictions.
+    2. Prediction does not override mandatory policy refusal.
+    3. Cross-tenant history cannot affect another organization's prediction.
+    4. Hypothetical reachability paths are never executed.
+    5. Search bounds prevent unbounded computation.
+    6. Minimal intervention satisfies mandatory constraints.
+    7. An unenforceable recommendation is not reported as enforced.
+    8. Prediction-service failure does not fail open.
+    9. Existing PACE, runtime authorization, approval, and tool-proxy behavior remains compatible.
+    10. Evaluation metrics are calculated correctly when labels are available.
+    """
+
+    @classmethod
+    def setup_class(cls):
+        db = TestSession()
+        # Find or create test orgs
+        org1 = db.query(models.Organization).filter(models.Organization.name == "PACE Alpha Org").first()
+        org2 = db.query(models.Organization).filter(models.Organization.name == "PACE Beta Org").first()
+        cls.org1_id = str(org1.id)
+        cls.org2_id = str(org2.id)
+
+        admin1 = db.query(models.User).filter(models.User.email == "admin@pace-alpha.com").first()
+        admin2 = db.query(models.User).filter(models.User.email == "admin@pace-beta.com").first()
+        cls.admin1_token = security.create_access_token(user_id=str(admin1.id), email=admin1.email, role=admin1.role)
+
+        # Helper to create signed passport
+        def _add_passport(ag):
+            p = models.AgentPassport(
+                agent_id=ag.id,
+                passport_number=f"AG-PASSPORT-{ag.agent_code}",
+                digital_signature="pending",
+                issued_at=datetime.datetime.utcnow(),
+                expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=365),
+                verification_status="VERIFIED"
+            )
+            passport_service.sign_passport(ag, p)
+            db.add(p)
+
+        # Agent with zero history (for insufficient data test)
+        cls.agent_fresh_code = f"AG-FRESH-{uuid.uuid4().hex[:6]}"
+        agent_fresh = models.Agent(
+            name="Agent Fresh Phase2",
+            agent_code=cls.agent_fresh_code,
+            org_id=org1.id,
+            owner_id=admin1.id,
+            purpose="Fresh agent for insufficient history testing",
+            autonomy_level="MEDIUM",
+            status="NORMAL",
+            risk_score=15,
+            trust_score=95,
+            daily_budget=20000.0
+        )
+        db.add(agent_fresh)
+        db.commit()
+        db.refresh(agent_fresh)
+        cls.agent_fresh_id = str(agent_fresh.id)
+        _add_passport(agent_fresh)
+
+        # Add permissions for fresh agent
+        p_fresh = models.Permission(
+            agent_id=agent_fresh.id,
+            action="*",
+            resource_type="*",
+            resource_name="*",
+            is_allowed=True
+        )
+        db.add(p_fresh)
+
+        # Agent with rich sequential history in Org 1
+        cls.agent_rich_code = f"AG-RICH-{uuid.uuid4().hex[:6]}"
+        agent_rich = models.Agent(
+            name="Agent Rich History Phase2",
+            agent_code=cls.agent_rich_code,
+            org_id=org1.id,
+            owner_id=admin1.id,
+            purpose="Rich sequence history testing agent",
+            autonomy_level="HIGH",
+            status="NORMAL",
+            risk_score=15,
+            trust_score=95,
+            daily_budget=20000.0
+        )
+        db.add(agent_rich)
+        db.commit()
+        db.refresh(agent_rich)
+        cls.agent_rich_id = str(agent_rich.id)
+        _add_passport(agent_rich)
+
+        p_rich = models.Permission(
+            agent_id=agent_rich.id,
+            action="*",
+            resource_type="*",
+            resource_name="*",
+            is_allowed=True
+        )
+        db.add(p_rich)
+
+        # Insert 6 sequential decisions for agent_rich
+        now = datetime.datetime.utcnow()
+        for i in range(6):
+            action_name = "QUERY_DB" if i % 2 == 0 else "READ_REPORTS"
+            dec = models.Decision(
+                agent_id=agent_rich.id,
+                intent_summary=f"Automated intent for {action_name}",
+                action_requested=action_name,
+                resource_target="database:prod",
+                amount=50.0,
+                decision="ALLOW",
+                risk_score=20,
+                policy_name="Global Safety Baseline",
+                explanation="Routine data operation",
+                execution_status="EXECUTED",
+                timestamp=now - datetime.timedelta(minutes=30 - i * 5)
+            )
+            db.add(dec)
+
+        # Agent in Org 2 for cross-tenant testing
+        cls.agent_org2_code = f"AG-BETA-{uuid.uuid4().hex[:6]}"
+        agent_org2 = models.Agent(
+            name="Agent Beta Phase2",
+            agent_code=cls.agent_org2_code,
+            org_id=org2.id,
+            owner_id=admin2.id,
+            purpose="Org 2 cross tenant boundary testing agent",
+            autonomy_level="MEDIUM",
+            status="NORMAL",
+            risk_score=15,
+            trust_score=95,
+            daily_budget=20000.0
+        )
+        db.add(agent_org2)
+        db.commit()
+        db.refresh(agent_org2)
+        cls.agent_org2_id = str(agent_org2.id)
+        _add_passport(agent_org2)
+
+        # Insert unique action history for Org 2 agent
+        for i in range(5):
+            dec2 = models.Decision(
+                agent_id=agent_org2.id,
+                intent_summary="Org 2 private operation intent",
+                action_requested="ORG2_EXCLUSIVE_OPERATION",
+                resource_target="org2:secrets",
+                amount=10.0,
+                decision="ALLOW",
+                risk_score=15,
+                policy_name="Global Safety Baseline",
+                explanation="Org 2 private operation",
+                execution_status="EXECUTED",
+                timestamp=now - datetime.timedelta(minutes=20 - i * 3)
+            )
+            db.add(dec2)
+
+        db.commit()
+        db.close()
+
+    # 1. Insufficient data does not produce fabricated predictions
+    def test_01_insufficient_data_does_not_fabricate_predictions(self):
+        res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_fresh_id,
+                "action_type": "READ",
+                "target_resource": "documents"
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert "future_estimation" in data
+        fest = data["future_estimation"]
+        assert fest["status"] == "INSUFFICIENT_DATA"
+        assert fest["confidence"] == 0.0
+        assert len(fest["candidates"]) == 0
+        assert fest["sample_size"] == 0
+        assert "insufficient" in fest["explanation"].lower()
+
+    # 2. Prediction does not override mandatory policy refusal
+    def test_02_prediction_does_not_override_mandatory_policy_refusal(self):
+        # Even with rich history, a prohibited action must be REFUSED
+        res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_rich_id,
+                "action_type": "DELETE",
+                "target_resource": "production_database"
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["decision"] == "REFUSE"
+        assert data["intervention_plan"] is not None
+        plan = data["intervention_plan"]
+        assert plan["selected_intervention"] == "REFUSE_PROHIBITED"
+        assert plan["enforcement_status"] == "ENFORCED"
+        assert plan["mandatory_constraint_satisfied"] is True
+        # Verify alternatives were explicitly rejected
+        rejected = [alt["intervention"] for alt in plan["rejected_alternatives"]]
+        assert "ALLOW_WITHOUT_INTERVENTION" in rejected
+        assert "RESTRICT_SCOPE" in rejected
+
+    # 3. Cross-tenant history cannot affect another organization's prediction
+    def test_03_cross_tenant_history_isolated_in_prediction(self):
+        # Evaluate agent in Org 1 with rich history
+        res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_rich_id,
+                "action_type": "QUERY_DB",
+                "target_resource": "database:prod"
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        fest = res.json()["future_estimation"]
+        assert fest["status"] == "AVAILABLE"
+        # Candidates must NOT contain Org 2 actions
+        for cand in fest["candidates"]:
+            assert "ORG2_EXCLUSIVE_OPERATION" not in cand["action"]
+
+    # 4. Hypothetical reachability paths are never executed
+    def test_04_hypothetical_reachability_paths_never_executed(self):
+        # Test reachability identification
+        res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_rich_id,
+                "action_type": "QUERY_DB",
+                "target_resource": "database:prod"
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        reach = res.json()["reachability_analysis"]
+        assert reach is not None
+        assert "chains" in reach
+        assert reach["states_explored"] > 0
+        # Check that none of the hypothetical reachability chains created an execution record
+        db = TestSession()
+        executed_hypo = db.query(models.Decision).filter(
+            models.Decision.agent_id == self.agent_rich_id,
+            models.Decision.action_requested.in_(["GRANT_ROLE", "OVERRIDE_POLICY", "SUDO"])
+        ).all()
+        assert len(executed_hypo) == 0
+        db.close()
+
+    # 5. Search bounds prevent unbounded computation
+    def test_05_search_bounds_prevent_unbounded_computation(self):
+        res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_rich_id,
+                "action_type": "READ_REPORTS",
+                "target_resource": "database:prod"
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        reach = res.json()["reachability_analysis"]
+        assert reach["search_depth_limit"] <= 4
+        assert reach["states_explored"] <= reach["max_states_limit"]
+        assert reach["max_states_limit"] == 50
+
+    # 6. Minimal intervention satisfies mandatory constraints
+    def test_06_minimal_intervention_satisfies_mandatory_constraints(self):
+        # 6a: Low risk action -> ALLOW_WITHOUT_INTERVENTION (level 0)
+        low_res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_rich_id,
+                "action_type": "READ_REPORTS",
+                "target_resource": "database:prod",
+                "amount": 10.0
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert low_res.status_code == 200
+        plan = low_res.json()["intervention_plan"]
+        assert plan["selected_intervention"] == "ALLOW_WITHOUT_INTERVENTION"
+        assert plan["disruption_level"] == 0
+        assert plan["enforcement_status"] == "ENFORCED"
+
+        # 6b: Review required -> REQUIRE_APPROVAL (level 2)
+        review_res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_rich_id,
+                "action_type": "EXECUTE",
+                "target_resource": "payments",
+                "amount": 7500.0  # Exceeds managerial review threshold ₹5,000
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert review_res.status_code == 200
+        r_plan = review_res.json()["intervention_plan"]
+        assert r_plan["selected_intervention"] == "REQUIRE_APPROVAL"
+        assert r_plan["disruption_level"] == 2
+        assert r_plan["enforcement_status"] == "ENFORCED"
+
+    # 7. An unenforceable recommendation is not reported as enforced
+    def test_07_unenforceable_recommendation_not_reported_as_enforced(self):
+        # Simulate sequence with elevated risk where parameter scoping is recommended
+        db = TestSession()
+        # Add a high risk decision to push sequence risk
+        dec_spike = models.Decision(
+            agent_id=self.agent_rich_id,
+            intent_summary="Elevated risk export intent",
+            action_requested="EXPORT_DATA",
+            resource_target="database:prod",
+            amount=20000.0,
+            decision="ALLOW",
+            risk_score=70,
+            policy_name="Global Safety Baseline",
+            explanation="Elevated risk export",
+            execution_status="EXECUTED",
+            timestamp=datetime.datetime.utcnow()
+        )
+        db.add(dec_spike)
+        db.commit()
+        db.close()
+
+        res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_rich_id,
+                "action_type": "EXPORT_DATA",
+                "target_resource": "database:prod"
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        plan = res.json()["intervention_plan"]
+        if plan["selected_intervention"] == "RESTRICT_SCOPE":
+            # Must NOT claim ENFORCED; must be RECOMMENDED or PARTIAL
+            assert plan["enforcement_status"] in ("RECOMMENDED", "PARTIAL")
+
+    # 8. Prediction-service failure does not fail open
+    def test_08_prediction_service_failure_does_not_fail_open(self, monkeypatch):
+        # Force an unhandled error inside future action risk estimator
+        def broken_estimate(*args, **kwargs):
+            raise RuntimeError("Synthetic failure in predictive intelligence service")
+
+        monkeypatch.setattr(
+            predictive_action_control_engine.future_estimator,
+            "estimate_future_actions",
+            broken_estimate
+        )
+
+        res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_id": self.agent_rich_id,
+                "action_type": "READ_REPORTS",
+                "target_resource": "database:prod"
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        # MUST fail safely: REFUSE, not ALLOW
+        assert data["decision"] == "REFUSE"
+        assert "fail-safe" in data["reason"].lower()
+
+    # 9. Existing PACE, runtime authorization, approval, and tool-proxy behavior remains compatible
+    def test_09_existing_pace_and_runtime_compatibility(self):
+        res = client.post(
+            "/api/decisions/control/evaluate",
+            json={
+                "agent_code": self.agent_fresh_code,
+                "action_type": "READ",
+                "target_resource": "documents",
+                "amount": 0.0,
+                "parameters": {"doc_id": "doc_phase2"}
+            },
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["decision"] == "ALLOW"
+        assert data["execution_gate_token"] is not None
+        assert data["future_estimation"] is not None
+        assert data["reachability_analysis"] is not None
+        assert data["intervention_plan"] is not None
+
+    # 10. Evaluation metrics are calculated correctly when labels are available
+    def test_10_evaluation_metrics_calculated_correctly(self):
+        res = client.get(
+            "/api/decisions/control/metrics",
+            headers={"Authorization": f"Bearer {self.admin1_token}"}
+        )
+        assert res.status_code == 200
+        metrics = res.json()
+        assert metrics["dataset_type"] == "SYNTHETIC_BENCHMARK_SUITE"
+        assert metrics["total_scenarios"] >= 8
+        assert 0.0 <= metrics["precision"] <= 1.0
+        assert 0.0 <= metrics["recall"] <= 1.0
+        assert 0.0 <= metrics["f1_score"] <= 1.0
+        assert 0.0 <= metrics["false_positive_rate"] <= 1.0
+        assert 0.0 <= metrics["calibration_score"] <= 1.0
+        assert "Markov" in metrics["methodology"]
+

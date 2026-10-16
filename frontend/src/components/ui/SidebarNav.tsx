@@ -31,7 +31,8 @@ import {
   User,
   Settings,
   UserCircle,
-  ChevronDown
+  ChevronDown,
+  FlaskConical
 } from "lucide-react";
 
 interface SidebarNavProps {
@@ -117,6 +118,7 @@ export default function SidebarNav({ isOpen = false, onClose }: SidebarNavProps)
     { label: "Capability Tokens", href: "/capabilities", icon: Zap },
     { label: "Governance Policies", href: "/policies", icon: Scale },
     { label: "Decision Black Box", href: "/decisions", icon: Shield },
+    { label: "PACE Simulation Lab", href: "/simulation", icon: FlaskConical },
     { label: "Risk Scoring", href: "/risk", icon: Activity },
     { label: "Circuit Breaker", href: "/runtime", icon: Flame },
     { label: "Human Approvals", href: "/approvals", icon: UserCheck },

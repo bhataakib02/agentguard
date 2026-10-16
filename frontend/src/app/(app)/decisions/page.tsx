@@ -4,11 +4,12 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { Shield, GitFork, Activity, Play, CheckCircle2, AlertTriangle, XCircle, Clock } from "lucide-react";
+import { Shield, GitFork, Activity, Play, CheckCircle2, AlertTriangle, XCircle, Clock, Compass, Target, ArrowRight, BarChart2 } from "lucide-react";
 
 export default function DecisionsPage() {
   const [decisions, setDecisions] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   // PACE Form State
@@ -24,12 +25,14 @@ export default function DecisionsPage() {
 
   const loadDecisions = async () => {
     try {
-      const [decData, agData] = await Promise.all([
+      const [decData, agData, metricsData] = await Promise.all([
         fetchApi("/decisions").catch(() => []),
-        fetchApi("/agents").catch(() => [])
+        fetchApi("/agents").catch(() => []),
+        fetchApi("/decisions/control/metrics").catch(() => null)
       ]);
       setDecisions(decData || []);
       setAgents(agData || []);
+      setMetrics(metricsData);
       if (agData && agData.length > 0 && !selectedAgentCode) {
         setSelectedAgentCode(agData[0].agent_code);
       }
@@ -88,9 +91,46 @@ export default function DecisionsPage() {
       <div className="border-b border-[#E8E8E4] pb-5">
         <h1 className="text-[24px] font-bold text-[#1F1F1F]">Predictive Action Control Engine (PACE)</h1>
         <p className="text-[13px] text-[#666666]">
-          Real-Time Action Boundary Enforcement, Sequence-Aware Risk Assessment & Decision Black Box Stream
+          Phase 2: Predictive Intelligence, Action-Chain Reachability & Minimal-Intervention Planning
         </p>
       </div>
+
+      {/* Benchmark Metrics Strip (Real API data) */}
+      {metrics && (
+        <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] p-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E8E8E4] pb-2.5 mb-3">
+            <div className="flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-[#2E9D50]" />
+              <h3 className="text-[13px] font-bold text-[#1F1F1F]">PACE Benchmark Evaluation Metrics</h3>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-[#EAF7EE] text-[#237A3C] border border-[#2E9D50]/30 rounded">
+              Dataset: {metrics.dataset_type} ({metrics.total_scenarios} scenarios)
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-[12px]">
+            <div className="p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[6px]">
+              <span className="text-[10px] text-[#666666] uppercase block">F1 Score</span>
+              <span className="text-[16px] font-bold text-[#2E9D50]">{metrics.f1_score !== null ? (metrics.f1_score * 100).toFixed(1) + "%" : "N/A"}</span>
+            </div>
+            <div className="p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[6px]">
+              <span className="text-[10px] text-[#666666] uppercase block">Precision</span>
+              <span className="text-[16px] font-bold text-[#1F1F1F]">{metrics.precision !== null ? (metrics.precision * 100).toFixed(1) + "%" : "N/A"}</span>
+            </div>
+            <div className="p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[6px]">
+              <span className="text-[10px] text-[#666666] uppercase block">Recall</span>
+              <span className="text-[16px] font-bold text-[#1F1F1F]">{metrics.recall !== null ? (metrics.recall * 100).toFixed(1) + "%" : "N/A"}</span>
+            </div>
+            <div className="p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[6px]">
+              <span className="text-[10px] text-[#666666] uppercase block">False Positive Rate</span>
+              <span className="text-[16px] font-bold text-[#F59A23]">{metrics.false_positive_rate !== null ? (metrics.false_positive_rate * 100).toFixed(1) + "%" : "N/A"}</span>
+            </div>
+            <div className="p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[6px]">
+              <span className="text-[10px] text-[#666666] uppercase block">Calibration (Brier)</span>
+              <span className="text-[16px] font-bold text-[#8064C8]">{metrics.calibration_score !== null ? metrics.calibration_score.toFixed(3) : "N/A"}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PACE Interactive Control Console */}
       <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[12px] p-6 shadow-sm space-y-6">
@@ -100,8 +140,73 @@ export default function DecisionsPage() {
             <h2 className="text-[16px] font-bold text-[#1F1F1F]">Action Control Evaluation & Enforcement Gate</h2>
           </div>
           <span className="text-[11px] font-bold px-2.5 py-0.5 bg-[#EAF7EE] text-[#237A3C] border border-[#2E9D50]/30 rounded-full">
-            PACE Phase 1 Kernel Active
+            PACE Phase 2 Kernel Active
           </span>
+        </div>
+
+        {/* Step 3: Reproducible Three Distinct Action Outcome Presets */}
+        <div className="p-3.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-[#666666] uppercase tracking-wide">
+              Reproducible Demonstration Presets (Phase 4):
+            </span>
+            <span className="text-[10px] font-mono text-[#2E9D50] font-bold">1-Click Load</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[12px]">
+            <button
+              type="button"
+              onClick={() => {
+                setActionType("READ");
+                setTargetResource("orders");
+                setOperation("query_records");
+                setAmount(0);
+                setPrompt("Routine customer purchase orders query within authorized operational limits");
+              }}
+              className="p-2.5 bg-[#FFFFFF] border border-[#2E9D50]/40 hover:bg-[#EAF7EE] rounded-[6px] text-left transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[#237A3C]">1. Authorized (ALLOW)</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 bg-[#EAF7EE] text-[#237A3C] rounded">PASS</span>
+              </div>
+              <p className="text-[10px] text-[#666666] mt-0.5">READ orders &bull; Low Risk &bull; Allowed to Execute</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActionType("EXECUTE");
+                setTargetResource("payments");
+                setOperation("disburse_vendor_payment");
+                setAmount(8500);
+                setPrompt("Vendor payment disbursement ₹8,500 exceeding ₹5,000 threshold requiring approval");
+              }}
+              className="p-2.5 bg-[#FFFFFF] border border-[#F59A23]/40 hover:bg-[#FFF4D9] rounded-[6px] text-left transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[#A56300]">2. Review-Required (REVIEW)</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 bg-[#FFF4D9] text-[#A56300] rounded">HOLD</span>
+              </div>
+              <p className="text-[10px] text-[#666666] mt-0.5">EXECUTE payments ₹8.5k &bull; Escalates to /approvals</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActionType("DELETE");
+                setTargetResource("production_credentials");
+                setOperation("drop_auth_keys");
+                setAmount(0);
+                setPrompt("Purge production authorization credentials and secrets");
+              }}
+              className="p-2.5 bg-[#FFFFFF] border border-[#E05656]/40 hover:bg-[#FDECEC] rounded-[6px] text-left transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[#C62828]">3. Prohibited (REFUSE)</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 bg-[#FDECEC] text-[#C62828] rounded">BLOCK</span>
+              </div>
+              <p className="text-[10px] text-[#666666] mt-0.5">DELETE auth_keys &bull; Strictly Blocked by Policy</p>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-[13px]">
@@ -127,12 +232,11 @@ export default function DecisionsPage() {
               onChange={(e) => setActionType(e.target.value)}
               className="w-full p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] text-[#1F1F1F] font-bold focus:outline-none focus:border-[#2E9D50]"
             >
-              <option value="READ">READ (Database Query / Fetch)</option>
-              <option value="EXECUTE">EXECUTE (API / Tool Dispatch)</option>
-              <option value="WRITE">WRITE (Create / Update Record)</option>
-              <option value="DELETE">DELETE (Remove Resource / Drop)</option>
-              <option value="TRANSFER">TRANSFER (Financial Egress)</option>
-              <option value="EXPORT">EXPORT (Data Exfiltration)</option>
+              <option value="READ">READ (Data Fetch)</option>
+              <option value="QUERY">QUERY (Database Search)</option>
+              <option value="EXECUTE">EXECUTE (API Call / Action)</option>
+              <option value="EXPORT">EXPORT (Data Transfer / Dump)</option>
+              <option value="DELETE">DELETE (Resource Destruction)</option>
             </select>
           </div>
 
@@ -142,8 +246,8 @@ export default function DecisionsPage() {
               type="text"
               value={targetResource}
               onChange={(e) => setTargetResource(e.target.value)}
-              placeholder="e.g. orders, payments, production_db"
-              className="w-full p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] text-[#1F1F1F] focus:outline-none focus:border-[#2E9D50]"
+              placeholder="e.g. orders, payments, database:prod"
+              className="w-full p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] text-[#1F1F1F] font-bold focus:outline-none focus:border-[#2E9D50]"
             />
           </div>
 
@@ -191,12 +295,17 @@ export default function DecisionsPage() {
 
         {/* PACE Real-Time Decision Card */}
         {paceResult && (
-          <div className="border border-[#E8E8E4] rounded-[10px] bg-[#FCFCFA] p-5 space-y-4">
+          <div className="border border-[#E8E8E4] rounded-[10px] bg-[#FCFCFA] p-5 space-y-5">
             {(() => {
               const evalData = paceResult.evaluation || paceResult;
               const isExec = Boolean(paceResult.executed !== undefined);
+              const futureEst = evalData.future_estimation;
+              const reachability = evalData.reachability_analysis;
+              const intervention = evalData.intervention_plan;
+
               return (
                 <>
+                  {/* Primary Decision Banner */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E8E8E4] pb-3">
                     <div className="flex items-center gap-3">
                       <span className="text-[12px] font-bold text-[#666666] uppercase">PACE Decision:</span>
@@ -223,6 +332,7 @@ export default function DecisionsPage() {
                     </div>
                   </div>
 
+                  {/* Core Reason & Sequence Indicators */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[12px]">
                     <div className="space-y-1">
                       <span className="font-bold text-[#1F1F1F] block">Reason & Policy Applied:</span>
@@ -247,6 +357,144 @@ export default function DecisionsPage() {
                     </div>
                   </div>
 
+                  {/* Phase 2: Future Action Risk Estimation */}
+                  {futureEst && (
+                    <div className="p-3.5 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[8px] space-y-2 text-[12px]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Compass className="w-4 h-4 text-[#2E9D50]" />
+                          <span className="font-bold text-[#1F1F1F]">Future-Action Risk Estimation</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            futureEst.status === "AVAILABLE"
+                              ? "bg-[#EAF7EE] text-[#237A3C] border-[#2E9D50]/30"
+                              : "bg-[#FFF4D9] text-[#A56300] border-[#F59A23]/30"
+                          }`}>
+                            {futureEst.status}
+                          </span>
+                          <span className="text-[11px] text-[#666666]">
+                            Confidence: {(futureEst.confidence * 100).toFixed(0)}% (N={futureEst.sample_size})
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[#666666] text-[11px]">{futureEst.explanation}</p>
+
+                      {futureEst.candidates && futureEst.candidates.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                          {futureEst.candidates.map((cand: any, idx: number) => (
+                            <div key={idx} className="p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[6px] space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-[#1F1F1F] font-mono">{cand.action}</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                                  cand.transition_type === "OBSERVED"
+                                    ? "bg-[#EAF7EE] text-[#237A3C] border-[#2E9D50]/30"
+                                    : "bg-[#F0F0EE] text-[#666666] border-[#E8E8E4]"
+                                }`}>
+                                  {cand.transition_type}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px] text-[#666666]">
+                                <span>{cand.probability !== null ? `P: ${(cand.probability * 100).toFixed(1)}%` : "Probability: N/A (Inferred)"}</span>
+                                <span className="font-bold text-[#E76F32]">Risk: {cand.predicted_risk_score}/100</span>
+                              </div>
+                              <p className="text-[10px] text-[#888888]">{cand.rationale}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Phase 2: Action-Chain Reachability Analysis */}
+                  {reachability && (
+                    <div className="p-3.5 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[8px] space-y-2 text-[12px]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Target className="w-4 h-4 text-[#2E9D50]" />
+                          <span className="font-bold text-[#1F1F1F]">Action-Chain Reachability Analysis</span>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                          reachability.prohibited_state_reachable
+                            ? "bg-[#FDECEC] text-[#C62828] border-[#E53935]/30"
+                            : "bg-[#EAF7EE] text-[#237A3C] border-[#2E9D50]/30"
+                        }`}>
+                          {reachability.prohibited_state_reachable ? "PROHIBITED STATE REACHABLE" : "NO PROHIBITED STATE REACHABLE"}
+                        </span>
+                      </div>
+                      <p className="text-[#666666] text-[11px]">{reachability.explanation}</p>
+
+                      {reachability.chains && reachability.chains.length > 0 && (
+                        <div className="space-y-2 pt-1">
+                          {reachability.chains.map((chain: any, idx: number) => (
+                            <div key={idx} className="p-2.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[6px] space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-[#C62828]">{chain.prohibited_target}</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                                  chain.path_type === "OBSERVED"
+                                    ? "bg-[#EAF7EE] text-[#237A3C] border-[#2E9D50]/30"
+                                    : chain.path_type === "INFERRED"
+                                    ? "bg-[#FFF4D9] text-[#A56300] border-[#F59A23]/30"
+                                    : "bg-[#F0F0EE] text-[#666666] border-[#E8E8E4]"
+                                }`}>
+                                  Chain: {chain.path_type} ({chain.risk_severity})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#1F1F1F] bg-[#FFFFFF] p-1.5 border border-[#E8E8E4] rounded">
+                                {chain.path.map((step: string, sIdx: number) => (
+                                  <React.Fragment key={sIdx}>
+                                    <span>{step}</span>
+                                    {sIdx < chain.path.length - 1 && <ArrowRight className="w-3 h-3 text-[#666666]" />}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                              <div className="text-[10px] text-[#666666]">
+                                <span>Policy: {chain.violating_policy}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Phase 2: Minimal-Intervention Planning */}
+                  {intervention && (
+                    <div className="p-3.5 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[8px] space-y-2 text-[12px]">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#1F1F1F]">Minimal-Intervention Plan:</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            intervention.enforcement_status === "ENFORCED"
+                              ? "bg-[#EAF7EE] text-[#237A3C] border-[#2E9D50]/30"
+                              : "bg-[#FFF4D9] text-[#A56300] border-[#F59A23]/30"
+                          }`}>
+                            {intervention.enforcement_status}
+                          </span>
+                          <span className="text-[11px] font-bold text-[#1F1F1F]">
+                            {intervention.selected_intervention} (Level {intervention.disruption_level})
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[#666666] text-[11px]">{intervention.rationale}</p>
+
+                      {intervention.rejected_alternatives && intervention.rejected_alternatives.length > 0 && (
+                        <div className="pt-1 border-t border-[#E8E8E4] space-y-1">
+                          <span className="text-[10px] font-bold text-[#666666] uppercase block">Rejected Alternatives Rationale:</span>
+                          <div className="space-y-1">
+                            {intervention.rejected_alternatives.map((alt: any, aIdx: number) => (
+                              <div key={aIdx} className="text-[10px] text-[#666666]">
+                                <span className="font-bold text-[#1F1F1F]">{alt.intervention}: </span>
+                                <span>{alt.reason_rejected}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Token & Correlation footer */}
                   {evalData.execution_gate_token && (
                     <div className="pt-2 border-t border-[#E8E8E4] flex items-center justify-between text-[11px] font-mono text-[#666666]">
                       <span>Gate Token: {evalData.execution_gate_token}</span>
@@ -280,8 +528,9 @@ export default function DecisionsPage() {
                   <th className="p-4">RESOURCE TARGET</th>
                   <th className="p-4">AMOUNT</th>
                   <th className="p-4">DECISION</th>
+                  <th className="p-4">BOUNDARY EXECUTION</th>
                   <th className="p-4">POLICY APPLIED</th>
-                  <th className="p-4 text-right">PROVENANCE</th>
+                  <th className="p-4 text-right">LIFECYCLE TRACE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8E8E4]">
@@ -290,7 +539,30 @@ export default function DecisionsPage() {
                     <td className="p-4 font-bold text-[#1F1F1F]">{dec.action_requested}</td>
                     <td className="p-4 text-[#666666]">{dec.resource_target}</td>
                     <td className="p-4 font-bold text-[#2E9D50]">₹{dec.amount ? dec.amount.toLocaleString() : "0"}.00</td>
-                    <td className="p-4"><StatusBadge status={dec.decision} /></td>
+                    <td className="p-4">
+                      <div className="space-y-1">
+                        <StatusBadge status={dec.decision} />
+                        {dec.decision === "REVIEW" && (
+                          <Link
+                            href="/approvals"
+                            className="block text-[10px] font-bold text-[#A56300] hover:underline"
+                          >
+                            Review Queue &rarr;
+                          </Link>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                        dec.execution_status === "EXECUTED"
+                          ? "bg-[#EAF7EE] text-[#237A3C] border-[#2E9D50]/30"
+                          : dec.execution_status === "PENDING_APPROVAL"
+                          ? "bg-[#FFF4D9] text-[#A56300] border-[#F59A23]/30"
+                          : "bg-[#FDECEC] text-[#C62828] border-[#E53935]/30"
+                      }`}>
+                        {dec.execution_status || (dec.decision === "ALLOW" ? "EXECUTED" : dec.decision === "REVIEW" ? "PENDING_APPROVAL" : "BLOCKED")}
+                      </span>
+                    </td>
                     <td className="p-4 text-[12px] text-[#666666]">{dec.policy_name}</td>
                     <td className="p-4 text-right">
                       <Link
@@ -298,7 +570,7 @@ export default function DecisionsPage() {
                         className="inline-flex items-center gap-1 text-[12px] font-bold text-[#8064C8] hover:underline"
                       >
                         <GitFork className="w-3.5 h-3.5" />
-                        <span>Trace</span>
+                        <span>Causal Trace</span>
                       </Link>
                     </td>
                   </tr>

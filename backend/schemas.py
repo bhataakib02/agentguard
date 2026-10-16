@@ -833,6 +833,77 @@ class SequenceIndicators(BaseModel):
     features: Dict[str, Any] = {}
 
 
+# PREDICTIVE ACTION CONTROL ENGINE (PACE) SCHEMAS - PHASE 2
+# ============================================================================
+
+class CandidateNextAction(BaseModel):
+    action: str
+    resource: str
+    probability: Optional[float] = None
+    confidence: float
+    transition_type: str  # OBSERVED, INFERRED, HYPOTHETICAL
+    predicted_risk_score: int
+    predicted_risk_level: str
+    rationale: str
+
+
+class FutureActionEstimation(BaseModel):
+    status: str  # AVAILABLE, INSUFFICIENT_DATA
+    confidence: float  # 0.0 to 1.0
+    sample_size: int
+    candidates: List[CandidateNextAction] = []
+    contributing_factors: List[str] = []
+    supporting_events: List[str] = []
+    explanation: str
+
+
+class ReachabilityChain(BaseModel):
+    chain_id: str
+    path: List[str]
+    path_type: str  # OBSERVED, INFERRED, HYPOTHETICAL
+    prohibited_target: str
+    violating_policy: str
+    risk_severity: str  # LOW, MEDIUM, HIGH, CRITICAL
+    supporting_observations: List[str] = []
+    uncertainty_notes: str
+
+
+class ReachabilityAnalysis(BaseModel):
+    prohibited_state_reachable: bool
+    search_depth_limit: int = 4
+    states_explored: int = 0
+    max_states_limit: int = 50
+    chains: List[ReachabilityChain] = []
+    explanation: str
+
+
+class InterventionAlternative(BaseModel):
+    intervention: str
+    reason_rejected: str
+
+
+class InterventionPlan(BaseModel):
+    selected_intervention: str  # ALLOW_WITHOUT_INTERVENTION, RESTRICT_SCOPE, REQUIRE_APPROVAL, DEFER_ACTION, REFUSE_PROHIBITED
+    disruption_level: int  # 0: ALLOW, 1: RESTRICT_SCOPE, 2: REQUIRE_APPROVAL, 3: DEFER_ACTION, 4: REFUSE_PROHIBITED
+    enforcement_status: str  # ENFORCED, RECOMMENDED, PARTIAL
+    rationale: str
+    rejected_alternatives: List[InterventionAlternative] = []
+    mandatory_constraint_satisfied: bool = True
+
+
+class EvaluationMetrics(BaseModel):
+    dataset_type: str = "SYNTHETIC_BENCHMARK_SUITE"
+    total_scenarios: int
+    accuracy: Optional[float] = None
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+    false_positive_rate: Optional[float] = None
+    f1_score: Optional[float] = None
+    calibration_score: Optional[float] = None
+    methodology: str = "Empirical Markov transition frequency + bounded policy reachability graph"
+    evaluated_at: datetime.datetime
+
+
 class ActionControlEvaluationResponse(BaseModel):
     decision: str  # ALLOW, REVIEW, REFUSE
     risk_score: int
@@ -844,6 +915,9 @@ class ActionControlEvaluationResponse(BaseModel):
     rule_id: Optional[str] = None
     risk_breakdown: Optional[Dict[str, Any]] = None
     sequence_indicators: Optional[SequenceIndicators] = None
+    future_estimation: Optional[FutureActionEstimation] = None
+    reachability_analysis: Optional[ReachabilityAnalysis] = None
+    intervention_plan: Optional[InterventionPlan] = None
     approval_required: bool = False
     approval_status: Optional[str] = None  # PENDING, APPROVED, REJECTED, NOT_REQUIRED
     approval_id: Optional[str] = None
@@ -862,6 +936,181 @@ class ActionControlExecuteResponse(BaseModel):
     execution_status: str  # EXECUTED, BLOCKED, PENDING_APPROVAL, EXECUTION_FAILED
     execution_result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+
+
+# ============================================================================
+# PREDICTIVE ACTION CONTROL ENGINE (PACE) SCHEMAS - PHASE 3 (SIMULATION LAB)
+# ============================================================================
+
+class ScenarioActionStep(BaseModel):
+    step_number: int
+    action: str
+    resource: str
+    operation: Optional[str] = None
+    amount: float = 0.0
+    parameters: Optional[Dict[str, Any]] = None
+    prompt: Optional[str] = None
+    is_terminal_step: bool = False
+
+
+class ScenarioAgentProfile(BaseModel):
+    agent_code: str
+    name: str
+    autonomy_level: str  # LOW, MEDIUM, HIGH, FULL
+    department: str
+    granted_permissions: List[Dict[str, Any]] = []
+    daily_budget: float = 10000.0
+
+
+class SimulationScenario(BaseModel):
+    scenario_id: str
+    version: str = "1.0.0"
+    category: str
+    title: str
+    description: str
+    provenance: str = "SYNTHETIC_BENCHMARK_PROVENANCE"
+    agent_profile: ScenarioAgentProfile
+    initial_history: List[Dict[str, Any]] = []
+    action_sequence: List[ScenarioActionStep] = []
+    expected_policy_outcome: str  # ALLOW, REVIEW, REFUSE
+    expected_intervention: str  # ALLOW_WITHOUT_INTERVENTION, RESTRICT_SCOPE, REQUIRE_APPROVAL, DEFER_ACTION, REFUSE_PROHIBITED
+    ground_truth_label: str  # SAFE, RISKY
+    ground_truth_limitations: str
+    why_relevant: str
+
+
+class SimulationStepOutcome(BaseModel):
+    step_number: int
+    action: str
+    resource: str
+    amount: float = 0.0
+    is_terminal_step: bool = False
+    baseline_decision: str  # ALLOW, REVIEW, REFUSE
+    baseline_risk_score: int
+    baseline_reason: str
+    pace_decision: str  # ALLOW, REVIEW, REFUSE
+    pace_risk_score: int
+    pace_reason: str
+    pace_sequence_delta: int = 0
+    pace_reachability_reachable: bool = False
+    pace_reachability_target: Optional[str] = None
+    pace_reachability_chains: List[str] = []
+    pace_intervention: str
+    pace_enforcement_status: str  # ENFORCED, RECOMMENDED
+    early_flagged: bool = False
+    simulated_execution_status: str  # SIMULATED_ALLOW, SIMULATED_REVIEW, SIMULATED_BLOCKED
+
+
+class ScenarioRunResult(BaseModel):
+    scenario_id: str
+    scenario_title: str
+    category: str
+    ground_truth_label: str  # SAFE, RISKY
+    steps: List[SimulationStepOutcome] = []
+    baseline_final_decision: str
+    pace_final_decision: str
+    pace_selected_intervention: str
+    early_detection_lead_steps: int = 0
+    baseline_matches_ground_truth: bool
+    pace_matches_ground_truth: bool
+    detected_before_terminal: bool = False
+
+
+class ConfusionMatrixMetrics(BaseModel):
+    true_positives: int = 0
+    false_positives: int = 0
+    true_negatives: int = 0
+    false_negatives: int = 0
+    accuracy: float = 0.0
+    precision: float = 0.0
+    recall: float = 0.0
+    false_positive_rate: float = 0.0
+    false_negative_rate: float = 0.0
+    f1_score: float = 0.0
+
+
+class SimulationMetricsSummary(BaseModel):
+    unit_of_measurement: str = "scenario"
+    total_scenarios_evaluated: int = 0
+    total_actions_evaluated: int = 0
+    baseline_metrics: ConfusionMatrixMetrics
+    pace_metrics: ConfusionMatrixMetrics
+    avg_detection_lead_steps: float = 0.0
+    intervention_breakdown: Dict[str, int] = {}
+    unenforceable_recommendations_count: int = 0
+    insufficient_data_count: int = 0
+    category_breakdown: Dict[str, Dict[str, Any]] = {}
+    runtime_ms: int = 0
+    provenance: str = "SYNTHETIC_BENCHMARK_SUITE"
+    evaluation_limitations: str
+
+
+class SimulationRunRequest(BaseModel):
+    scenario_ids: Optional[List[str]] = None
+    categories: Optional[List[str]] = None
+    mode: str = "COMPARISON"  # COMPARISON, PACE, BASELINE
+    seed: Optional[int] = 42
+
+
+class SimulationRunResponse(BaseModel):
+    run_id: str
+    status: str  # RUNNING, COMPLETED, CANCELLED, FAILED
+    mode: str
+    created_at: datetime.datetime
+    completed_at: Optional[datetime.datetime] = None
+    scenarios_total: int = 0
+    scenarios_completed: int = 0
+    results: List[ScenarioRunResult] = []
+    metrics: Optional[SimulationMetricsSummary] = None
+    error: Optional[str] = None
+
+
+# ============================================================================
+# PHASE 4: AUTHORIZED EVALUATION-DATA SCHEMAS
+# ============================================================================
+
+class EvaluationDatasetRecord(BaseModel):
+    dataset_id: str
+    record_id: str
+    provenance: str = "AUTHORIZED_LABELED_DATA"
+    agent_profile: ScenarioAgentProfile
+    initial_history: List[Dict[str, Any]] = []
+    action_sequence: List[ScenarioActionStep]
+    ground_truth_label: str  # SAFE, RISKY
+    ground_truth_notes: Optional[str] = None
+    tags: List[str] = []
+
+
+class EvaluationDataImportRequest(BaseModel):
+    dataset_name: str
+    description: Optional[str] = None
+    provenance: str = "AUTHORIZED_LABELED_DATA"
+    records: List[EvaluationDatasetRecord]
+
+
+class EvaluationDataImportResponse(BaseModel):
+    status: str  # SUCCESS, REJECTED, PARTIAL
+    dataset_name: str
+    provenance: str
+    imported_records_count: int
+    validation_errors: List[str] = []
+    notice: str = (
+        "Evaluation records stored in isolated evaluation dataset registry. "
+        "Records are explicitly segregated from production telemetry and will not "
+        "be injected into live policy enforcement or model retraining."
+    )
+
+
+class EvaluationDatasetSummary(BaseModel):
+    dataset_name: str
+    description: Optional[str] = None
+    provenance: str
+    records_count: int
+    created_at: datetime.datetime
+    tags: List[str] = []
+
+
+
 
 
 
