@@ -574,14 +574,22 @@ AGENTGUARD/
 │           ├── errors.ts             # Typed governance and circuit breaker errors
 │           └── index.ts              # Package exports
 │
-├── docs/                             # Authoritative Documentation & Runbooks
-│   ├── architecture/
-│   │   └── AGENTGUARD_MASTER_SYSTEM_FLOW.md # Master architecture and operational specification
-│   ├── runbooks/
-│   │   ├── DEPLOYMENT_RUNBOOK.md     # Production deployment and topology runbook
-│   │   └── DEVELOPMENT_WORKFLOW.md   # Step-by-step local Windows/Linux development guide
-│   └── reports/                      # Architectural verification and audit reports
+├── LICENSE                           # Official Apache License 2.0
+├── SECURITY.md                       # Security policy & vulnerability disclosure guide
+├── CONTRIBUTING.md                   # Contributor guide, code standards & testing workflow
+├── CHANGELOG.md                      # Release notes & version changelog
 │
+├── docs/                             # Authoritative Documentation, Guides & Runbooks
+│   ├── README.md                     # Master documentation index
+│   ├── architecture/                 # System flow & architectural specifications
+│   ├── guides/                       # Local setup, configuration, API, SDK & testing guides
+│   ├── runbooks/                     # Production deployment & development runbooks
+│   ├── security/                     # Enterprise IAM & permission matrix specifications
+│   ├── evaluation/                   # PACE benchmark & dataset evaluation guides
+│   ├── specifications/               # Functional requirements, UI page directory & design system
+│   └── reports/                      # Production readiness, security & UAT audit reports
+│
+├── cleanup_reports/                  # Historical database & repository cleanup audit logs
 └── test_fixtures_uat/                # Test fixtures for dataset validation and penetration testing
 ```
 
@@ -1119,7 +1127,7 @@ To ensure complete technical transparency, the following table lists current lim
 | **Payment Gateways** | Schema Modeled Only | Multi-tenant SaaS billing plans and license limits are modeled in the database (`models.Plan`, `models.License`), but direct integrations with Stripe or Razorpay webhooks are not implemented. |
 | **Evaluation Metrics** | Benchmark-Derived | PACE evaluation metrics (Precision, Recall, FPR, F1, Brier score) are calculated against deterministic benchmark suites and synthetic fixtures, not derived from live production customer telemetry. |
 | **SDK Distribution** | Source Repository Only | Python and TypeScript SDKs reside in `sdks/` and can be built/installed locally, but are not currently published to PyPI or the global npm registry. |
-| **Repository License** | Unspecified at Root | No top-level `LICENSE` file is present in the repository root (the TypeScript SDK lists Apache-2.0 in `package.json`). Users must verify licensing terms with maintainers before redistribution. |
+| **Repository License** | Apache-2.0 | Full open-source [Apache License 2.0](LICENSE) is provided at the repository root and is consistent across repository SDKs and source code. |
 
 ---
 
@@ -1171,7 +1179,9 @@ We welcome contributions to AGENTGUARD. Please adhere to the following workflow:
 
 ## License & Acknowledgments
 
-* **License:** No top-level `LICENSE` file is currently present in the repository root. The TypeScript SDK package manifest specifies `Apache-2.0`. Please contact the project maintainers regarding enterprise licensing terms.
+* **License:** AGENTGUARD is licensed under the [Apache License, Version 2.0](LICENSE). See [LICENSE](LICENSE) for the full license text.
+* **Contributing & Security:** See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [SECURITY.md](SECURITY.md) for vulnerability reporting.
+* **Changelog:** See [CHANGELOG.md](CHANGELOG.md) for release history and unreleased baseline notes.
 * **Acknowledgments:**
   * Built using [FastAPI](https://fastapi.tiangolo.com/), [Next.js](https://nextjs.org/), [SQLAlchemy](https://www.sqlalchemy.org/), [Tailwind CSS](https://tailwindcss.com/), and [Lucide Icons](https://lucide.dev/).
   * Inspired by zero-trust architecture principles and defense-in-depth security engineering for autonomous systems.
@@ -1180,22 +1190,30 @@ We welcome contributions to AGENTGUARD. Please adhere to the following workflow:
 
 ## Documentation Index
 
-For in-depth architectural specifications, operational runbooks, and audit reports, refer to the verified documentation in `docs/`:
+For in-depth architectural specifications, developer guides, operational runbooks, and audit reports, refer to the master index at [docs/README.md](docs/README.md):
 
-* **Architecture & Flow:**
-  * [AGENTGUARD Master System Flow & Operational Specification](docs/architecture/AGENTGUARD_MASTER_SYSTEM_FLOW.md)
+* **Developer & Operator Guides:**
+  * [Local Setup Guide](docs/guides/LOCAL_SETUP.md) — Workstation installation and verification
+  * [Configuration Guide](docs/guides/CONFIGURATION.md) — Environment variables and security keys
+  * [API Reference Guide](docs/guides/API_GUIDE.md) — REST and WebSocket endpoints
+  * [SDK Integration Guide](docs/guides/SDK_GUIDE.md) — Python and TypeScript SDK usage
+  * [Testing & Verification Guide](docs/guides/TESTING_GUIDE.md) — Regression suites and quality verification
+* **Architecture & Security:**
+  * [Master System Flow & Operational Specification](docs/architecture/AGENTGUARD_MASTER_SYSTEM_FLOW.md)
+  * [Enterprise IAM & Permission Matrix](docs/security/IAM_ROLE_MATRIX.md)
+* **Specifications & Design System:**
+  * [UI Design System Specification](docs/specifications/UI_DESIGN_SYSTEM.md)
+  * [Complete UI Page Directory (59 Routes)](docs/specifications/UI_PAGE_DIRECTORY.md)
+  * [Functional Requirements Specification](docs/specifications/FUNCTIONAL_REQUIREMENTS.md)
+  * [Master Feature Matrix](docs/specifications/MASTER_FEATURE_MATRIX.md)
 * **Operational Runbooks:**
   * [Production Deployment Runbook](docs/runbooks/DEPLOYMENT_RUNBOOK.md)
   * [Local Development Workflow Guide](docs/runbooks/DEVELOPMENT_WORKFLOW.md)
-* **Audit, UAT, and Phase Reports:**
+* **Evaluation & Reports:**
+  * [Dynamic Dataset & Benchmark Evaluation](docs/evaluation/DATASET_EVALUATION.md)
   * [Cleanup and Production Consistency Report](docs/reports/CLEANUP_AND_PRODUCTION_CONSISTENCY_REPORT.md)
-  * [Phase 5.1 Persistent Evaluation Datasets Report](docs/reports/PHASE5_1_PERSISTENT_EVALUATION_DATASETS_REPORT.md)
-  * [Phase 5.2 Dataset Manager Report](docs/reports/PHASE5_2_DATASET_MANAGER_REPORT.md)
-  * [Phase 5 Real Environment Validation Report](docs/reports/PHASE5_REAL_ENVIRONMENT_VALIDATION_REPORT.md)
-  * [Phase 6.1 User Acceptance Testing (UAT) Report](docs/reports/PHASE6_1_UAT_REPORT.md)
-  * [Phase 6.2 Metric & Deployment Report](docs/reports/PHASE6_2_METRIC_AND_DEPLOYMENT_REPORT.md)
-  * [Phase 6 Dynamic Dataset Evaluation Report](docs/reports/PHASE6_DYNAMIC_DATASET_EVALUATION_REPORT.md)
   * [Secret Remediation Report](docs/reports/PHASE_SECRET_REMEDIATION_REPORT.md)
+  * [Deployment Configuration Fix Report](docs/reports/PHASE_DEPLOYMENT_FIX_REPORT.md)
 
 ---
 

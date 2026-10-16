@@ -58,7 +58,7 @@
   ```
   Because the port was hardcoded to `8000` and passed as an exec array without shell parameter expansion, Uvicorn bound exclusively to port 8000. Render's health checker probed port 10000 (specified in `$PORT`), detected no listening socket, and terminated the deployment.
 * **Remediation:**
-  Updated both [Dockerfile](file:///d:/AGENTGUARD/Dockerfile#L22) and [backend/Dockerfile](file:///d:/AGENTGUARD/backend/Dockerfile#L22) to use shell expansion with safe fallback:
+  Updated both [Dockerfile](../../Dockerfile#L22) and [backend/Dockerfile](../../backend/Dockerfile#L22) to use shell expansion with safe fallback:
   ```dockerfile
   CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --ws-ping-interval 20 --ws-ping-timeout 20"]
   ```
@@ -69,7 +69,7 @@
 * **Observed Error in Dynamic Dataset Evaluation:**
   When evaluating datasets whose `action_sequence` records contain `initial_history` objects without a recorded `"decision"` key, `backend/engines/simulation_engine.py` threw `KeyError: 'decision'`.
 * **Remediation:**
-  Patched [backend/engines/simulation_engine.py](file:///d:/AGENTGUARD/backend/engines/simulation_engine.py#L1054-L1060) to use `.get("decision", "ALLOW")`, `.get("action", "")`, and `.get("resource", "")`.
+  Patched [backend/engines/simulation_engine.py](../../backend/engines/simulation_engine.py#L1054-L1060) to use `.get("decision", "ALLOW")`, `.get("action", "")`, and `.get("resource", "")`.
 
 ---
 
@@ -83,9 +83,9 @@
 | **Render Service Name** | `agentguard-spfg` | Active hostname `agentguard-spfg.onrender.com` |
 | **Service Type** | Web Service (Docker Container) | Render build logs |
 | **Build Context** | Repository Root (`.`) | Render build step `#12 [6/6] COPY backend/ .` |
-| **Dockerfile Used** | Root [Dockerfile](file:///d:/AGENTGUARD/Dockerfile) | Render build logs cached layers |
-| **Startup Command** | `sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --ws-ping-interval 20 --ws-ping-timeout 20"` | [Dockerfile:L22](file:///d:/AGENTGUARD/Dockerfile#L22) |
-| **Health Check Path** | `/api/health` (also `/api/health/live`, `/api/health/ready`) | [backend/main.py:L106-134](file:///d:/AGENTGUARD/backend/main.py#L106-L134) |
+| **Dockerfile Used** | Root [Dockerfile](../../Dockerfile) | Render build logs cached layers |
+| **Startup Command** | `sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --ws-ping-interval 20 --ws-ping-timeout 20"` | [Dockerfile:L22](../../Dockerfile#L22) |
+| **Health Check Path** | `/api/health` (also `/api/health/live`, `/api/health/ready`) | [backend/main.py:L106-134](../../backend/main.py#L106-L134) |
 | **Database Topology** | Managed PostgreSQL (Supabase `aws-0-ap-south-1.pooler.supabase.com:6543`) | Verified via Supabase Dashboard & `/api/health/ready` |
 | **Frontend URL** | `https://agentguard-beta-ten.vercel.app` (Next.js on Vercel) | Verified CORS preflight |
 
@@ -188,17 +188,17 @@ All probes were executed against the active production service `https://agentgua
 
 ## 8. Files Changed in this Remediation
 
-1. [Dockerfile](file:///d:/AGENTGUARD/Dockerfile):
+1. [Dockerfile](../../Dockerfile):
    - Changed `CMD` to shell form `["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --ws-ping-interval 20 --ws-ping-timeout 20"]`.
-2. [backend/Dockerfile](file:///d:/AGENTGUARD/backend/Dockerfile):
+2. [backend/Dockerfile](../../backend/Dockerfile):
    - Synchronized `CMD` with root Dockerfile for dynamic port expansion.
-3. [.dockerignore](file:///d:/AGENTGUARD/.dockerignore):
+3. [.dockerignore](../../.dockerignore):
    - Added root Docker ignore file excluding `frontend/`, `.git/`, `.env*`, and cache directories to reduce Docker build times.
-4. [backend/engines/simulation_engine.py](file:///d:/AGENTGUARD/backend/engines/simulation_engine.py):
+4. [backend/engines/simulation_engine.py](../../backend/engines/simulation_engine.py):
    - Fixed `KeyError: 'decision'` in `SimulationRunner` when processing action sequence initial histories.
-5. [backend/tests/test_dynamic_dataset_evaluation.py](file:///d:/AGENTGUARD/backend/tests/test_dynamic_dataset_evaluation.py):
+5. [backend/tests/test_dynamic_dataset_evaluation.py](../../backend/tests/test_dynamic_dataset_evaluation.py):
    - Added 4 deterministic mathematical test cases verifying confusion matrix and lead-time calculations.
-6. [frontend/.env.example](file:///d:/AGENTGUARD/frontend/.env.example):
+6. [frontend/.env.example](../../frontend/.env.example):
    - Created safe template with non-sensitive placeholder configuration for frontend developers.
 
 ---

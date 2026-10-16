@@ -175,7 +175,7 @@ The following security hardening changes were made to guarantee that dummy data 
 
 ## 7. Register Links
 
-- **Deleted Files Register:** [`cleanup_reports/DELETED_FILES_REGISTER.md`](file:///d:/AGENTGUARD/cleanup_reports/DELETED_FILES_REGISTER.md)
-- **Deleted Database Records Register:** [`cleanup_reports/DELETED_DATABASE_RECORDS.md`](file:///d:/AGENTGUARD/cleanup_reports/DELETED_DATABASE_RECORDS.md)
+- **Deleted Files Register:** [`cleanup_reports/DELETED_FILES_REGISTER.md`](DELETED_FILES_REGISTER.md)
+- **Deleted Database Records Register:** [`cleanup_reports/DELETED_DATABASE_RECORDS.md`](DELETED_DATABASE_RECORDS.md)
 - **Database Backup Artifact:** `cleanup_reports/backups/agentguard_backup_20261011_093951.json` (595,863 bytes)
 - **SQL Backup Artifact:** `cleanup_reports/backups/agentguard_backup_20261011_093951.sql` (466,973 bytes)
