@@ -1,0 +1,39 @@
+# Git & CI/CD
+.git
+.github
+
+# Frontend source & build output (not needed in Python backend container)
+frontend/
+
+# Local Environment Variables & Secrets
+.env
+.env.*
+*.env
+backend/.env
+backend/.env.*
+
+# Python Cache & Bytecode
+__pycache__
+*.py[cod]
+*$py.class
+backend/__pycache__/
+backend/*/__pycache__/
+backend/*/*/__pycache__/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+test_fixtures_uat/
+scratch/
+
+# Local databases & logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# System & IDE
+.vscode/
+.idea/
+.DS_Store

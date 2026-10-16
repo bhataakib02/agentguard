@@ -1052,9 +1052,9 @@ class SimulationRunner:
             # Create transient mock Decision objects for analyzers
             mock_d = type("MockDecision", (), {
                 "id": f"sim_dec_{idx}",
-                "action_requested": h["action"],
-                "resource_target": h["resource"],
-                "decision": h["decision"],
+                "action_requested": h.get("action", ""),
+                "resource_target": h.get("resource", ""),
+                "decision": h.get("decision", "ALLOW"),
                 "amount": float(h.get("amount", 0.0)),
                 "timestamp": now - datetime.timedelta(seconds=(idx + 1) * 30)
             })()
