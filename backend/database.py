@@ -5,6 +5,8 @@ from config import settings
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+else:
+    connect_args = {"options": "-c search_path=public,extensions"}
 
 engine_kwargs = {
     "connect_args": connect_args,

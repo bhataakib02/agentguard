@@ -83,6 +83,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import logging
+    logging.getLogger("agentguard.error").error(f"[Unhandled Error on {request.method} {request.url.path}] {type(exc).__name__}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"error_type": type(exc).__name__, "error_detail": str(exc)}
+    )
+
 # Mount all domain routers with both /api and /api/v1
 DOMAIN_ROUTERS = [
     auth.router, profile.router, platform.router, organization.router,

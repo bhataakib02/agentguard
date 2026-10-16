@@ -2,6 +2,14 @@ import datetime
 from datetime import timedelta
 from typing import Optional, List
 from jose import jwt
+import bcrypt
+
+# Ensure passlib compatibility across all bcrypt releases
+if not hasattr(bcrypt, "__about__"):
+    class _BcryptAbout:
+        __version__ = getattr(bcrypt, "__version__", "4.0.1")
+    bcrypt.__about__ = _BcryptAbout()
+
 from passlib.context import CryptContext
 from config import settings
 
