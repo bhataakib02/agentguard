@@ -137,7 +137,7 @@ def health_liveness():
         "status": "ALIVE",
         "process": "RUNNING",
         "commit_sha": getattr(settings, "COMMIT_SHA", "unknown"),
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
 
 @app.get("/health/ready")
@@ -155,7 +155,7 @@ def health_readiness(response: Response, db: Session = Depends(get_db)):
             "status": "READY",
             "database": "CONNECTED",
             "commit_sha": getattr(settings, "COMMIT_SHA", "unknown"),
-            "timestamp": datetime.datetime.utcnow().isoformat()
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
     except Exception as e:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -164,7 +164,7 @@ def health_readiness(response: Response, db: Session = Depends(get_db)):
             "database": "DISCONNECTED",
             "commit_sha": getattr(settings, "COMMIT_SHA", "unknown"),
             "error": str(e),
-            "timestamp": datetime.datetime.utcnow().isoformat()
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
 
 @app.websocket("/ws")

@@ -8,7 +8,7 @@ import bcrypt
 if not hasattr(bcrypt, "__about__"):
     class _BcryptAbout:
         __version__ = getattr(bcrypt, "__version__", "4.0.1")
-    bcrypt.__about__ = _BcryptAbout()
+    setattr(bcrypt, "__about__", _BcryptAbout())
 
 from passlib.context import CryptContext
 from config import settings
@@ -38,7 +38,7 @@ def create_access_token(
     else:
         expire = utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode = {"sub": str(user_id), "exp": expire}
+    to_encode = {"sub": user_id, "exp": expire}
     if email:
         to_encode["email"] = email
     if role:
