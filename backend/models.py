@@ -24,6 +24,15 @@ class GUID(TypeDecorator):
 def gen_uuid():
     return str(uuid.uuid4())
 
+def is_valid_uuid(val) -> bool:
+    if not val:
+        return False
+    try:
+        uuid.UUID(str(val).strip())
+        return True
+    except (ValueError, AttributeError):
+        return False
+
 class Organization(Base):
     __tablename__ = "organizations"
 

@@ -32,9 +32,13 @@ async def evaluate_decision(
     # 1. Fetch Agent (by ID or agent_code if provided, else use first agent in user's org)
     agent = None
     if req.agent_id:
-        agent = db.query(models.Agent).filter(
-            (models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id)
-        ).first()
+        req_id = req.agent_id.strip()
+        if models.is_valid_uuid(req_id):
+            agent = db.query(models.Agent).filter(
+                (models.Agent.id == req_id) | (models.Agent.agent_code == req_id)
+            ).first()
+        else:
+            agent = db.query(models.Agent).filter(models.Agent.agent_code == req_id).first()
         if not agent:
             raise HTTPException(
                 status_code=404,

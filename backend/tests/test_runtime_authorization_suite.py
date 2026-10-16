@@ -532,6 +532,8 @@ class TestRuntimeAuthorizationSuite:
     def test_14_capability_token_consumed_on_allow_prevents_replay(self):
         """Valid capability token is consumed on ALLOW; replay attempt is refused."""
         db = TestSession()
+        # Clean up residual refusal decisions from earlier negative capability tests to isolate token lifecycle
+        db.query(models.Decision).filter(models.Decision.agent_id == self.agent1_id).delete()
         token = models.CapabilityToken(
             token_code=f"cap_test_replay_{uuid.uuid4().hex[:8]}",
             agent_id=self.agent1_id,

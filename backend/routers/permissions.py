@@ -20,7 +20,11 @@ def list_permissions(
         query = query.filter(models.Agent.org_id == current_user.org_id)
 
     if agent_id:
-        query = query.filter((models.Agent.id == agent_id) | (models.Agent.agent_code == agent_id))
+        a_id = agent_id.strip()
+        if models.is_valid_uuid(a_id):
+            query = query.filter((models.Agent.id == a_id) | (models.Agent.agent_code == a_id))
+        else:
+            query = query.filter(models.Agent.agent_code == a_id)
 
     return query.all()
 
@@ -43,9 +47,13 @@ def create_permission(
     if not req.agent_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="agent_id is required")
 
-    agent = db.query(models.Agent).filter(
-        (models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id)
-    ).first()
+    req_agent_id = req.agent_id.strip()
+    if models.is_valid_uuid(req_agent_id):
+        agent = db.query(models.Agent).filter(
+            (models.Agent.id == req_agent_id) | (models.Agent.agent_code == req_agent_id)
+        ).first()
+    else:
+        agent = db.query(models.Agent).filter(models.Agent.agent_code == req_agent_id).first()
 
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")

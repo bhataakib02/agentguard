@@ -46,6 +46,11 @@ class ActionSequenceAnalyzer:
         now = datetime.datetime.utcnow()
         cutoff_time = now - datetime.timedelta(seconds=window_seconds)
 
+        # Respect operator circuit-breaker resets: do not treat pre-restoration events as active refusal cascade
+        cb = db.query(models.CircuitBreaker).filter(models.CircuitBreaker.agent_id == agent_id).first()
+        if cb and cb.restored_at and cb.restored_at > cutoff_time:
+            cutoff_time = cb.restored_at
+
         # Query recent decisions for this agent, strictly scoped to agent_id and tenant org
         recent_decisions = db.query(models.Decision).join(
             models.Agent, models.Decision.agent_id == models.Agent.id
@@ -758,10 +763,16 @@ class PredictiveActionControlEngine:
                         org_id=str(caller_entity.org_id) if caller_entity.org_id else "UNKNOWN"
                     )
 
-                agent = db.query(models.Agent).filter(
-                    (models.Agent.id == target_agent_identifier.strip()) |
-                    (models.Agent.agent_code == target_agent_identifier.strip())
-                ).first()
+                ident = target_agent_identifier.strip()
+                if models.is_valid_uuid(ident):
+                    agent = db.query(models.Agent).filter(
+                        (models.Agent.id == ident) |
+                        (models.Agent.agent_code == ident)
+                    ).first()
+                else:
+                    agent = db.query(models.Agent).filter(
+                        models.Agent.agent_code == ident
+                    ).first()
 
                 if not agent:
                     return self._build_fail_response(
