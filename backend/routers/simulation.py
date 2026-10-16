@@ -36,20 +36,41 @@ def list_scenarios(
 @router.post("/runs", response_model=schemas.SimulationRunResponse, status_code=status.HTTP_201_CREATED)
 def start_simulation_run(
     request: schemas.SimulationRunRequest,
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Start a bounded, reproducible simulation run comparing Baseline Policy vs PACE.
-    Enforces server-side tenant scoping and caller identification.
+    Supports predefined scenario libraries and persisted evaluation datasets.
+    Enforces server-side tenant scoping and 5-role enterprise IAM.
     Never dispatches actions to external tools.
     """
-    tenant_org_id = current_user.org_id or "default_org"
+    if current_user.role == "AGENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AGENT represents an AI machine identity and cannot launch simulations"
+        )
+
+    if current_user.role == "AUDITOR":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AUDITOR role has read-only access and cannot launch simulations"
+        )
+
+    if current_user.role not in ENTERPRISE_EVAL_IMPORT_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Insufficient privileges to launch simulations. Role '{current_user.role}' is not authorized."
+        )
+
+    tenant_org_id = str(current_user.org_id) if current_user.org_id else "default_org"
     caller_user_id = str(current_user.id)
 
     run_response = simulation_runner.execute_simulation_run(
         request=request,
         tenant_org_id=tenant_org_id,
-        caller_user_id=caller_user_id
+        caller_user_id=caller_user_id,
+        db=db
     )
     return run_response
 
@@ -61,13 +82,35 @@ def get_simulation_run(
 ):
     """
     Retrieve current status, action-by-action timeline, and comparative outcomes of a simulation run.
+    Enforces server-side tenant isolation and 5-role enterprise IAM.
     """
+    if current_user.role == "AGENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AGENT represents an AI machine identity and cannot access simulation runs"
+        )
+
+    if current_user.role not in ENTERPRISE_EVAL_READ_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Role '{current_user.role}' is not authorized to access simulation runs."
+        )
+
     run_record = simulation_runner.get_run(run_id)
     if not run_record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Simulation run '{run_id}' not found in active simulation registry."
         )
+
+    run_org = simulation_runner.get_run_org(run_id)
+    caller_org = str(current_user.org_id) if current_user.org_id else "default_org"
+    if run_org and caller_org and run_org != caller_org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation run '{run_id}' not found."
+        )
+
     return run_record
 
 
@@ -78,13 +121,35 @@ def get_simulation_metrics(
 ):
     """
     Retrieve comparative confusion matrices, lead-time stats, and detection metrics for a completed run.
+    Enforces server-side tenant isolation and 5-role enterprise IAM.
     """
+    if current_user.role == "AGENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AGENT represents an AI machine identity and cannot access simulation runs"
+        )
+
+    if current_user.role not in ENTERPRISE_EVAL_READ_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Role '{current_user.role}' is not authorized to access simulation runs."
+        )
+
     run_record = simulation_runner.get_run(run_id)
     if not run_record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Simulation run '{run_id}' not found."
         )
+
+    run_org = simulation_runner.get_run_org(run_id)
+    caller_org = str(current_user.org_id) if current_user.org_id else "default_org"
+    if run_org and caller_org and run_org != caller_org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation run '{run_id}' not found."
+        )
+
     if not run_record.metrics:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -100,15 +165,37 @@ def cancel_simulation_run(
 ):
     """
     Cancel a running simulation safely.
+    Enforces server-side tenant isolation and 5-role enterprise IAM.
     """
+    if current_user.role == "AGENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AGENT represents an AI machine identity and cannot cancel simulations"
+        )
+
+    if current_user.role not in ENTERPRISE_EVAL_IMPORT_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Insufficient privileges to cancel simulations. Role '{current_user.role}' is not authorized."
+        )
+
+    run_record = simulation_runner.get_run(run_id)
+    if not run_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation run '{run_id}' not found."
+        )
+
+    run_org = simulation_runner.get_run_org(run_id)
+    caller_org = str(current_user.org_id) if current_user.org_id else "default_org"
+    if run_org and caller_org and run_org != caller_org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation run '{run_id}' not found."
+        )
+
     success = simulation_runner.cancel_run(run_id)
     if not success:
-        run_record = simulation_runner.get_run(run_id)
-        if not run_record:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Simulation run '{run_id}' not found."
-            )
         return {"status": run_record.status, "message": f"Run is already in state '{run_record.status}'."}
 
     return {"status": "CANCELLED", "message": f"Simulation run '{run_id}' was cancelled."}

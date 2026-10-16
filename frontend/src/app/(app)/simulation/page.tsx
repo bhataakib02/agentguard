@@ -31,7 +31,8 @@ import {
   Search,
   FileJson,
   AlertCircle,
-  Check
+  Check,
+  ShieldCheck
 } from "lucide-react";
 
 interface ScenarioAgentProfile {
@@ -117,6 +118,7 @@ interface ConfusionMatrixMetrics {
   false_positive_rate: number;
   false_negative_rate: number;
   f1_score: number;
+  sample_size?: number;
 }
 
 interface SimulationMetricsSummary {
@@ -133,6 +135,13 @@ interface SimulationMetricsSummary {
   runtime_ms: number;
   provenance: string;
   evaluation_limitations: string;
+  dataset_name?: string;
+  dataset_identity?: string;
+  evaluation_method?: string;
+  records_submitted?: number;
+  records_completed?: number;
+  records_failed?: number;
+  records_excluded?: number;
 }
 
 interface SimulationRunResponse {
@@ -146,6 +155,16 @@ interface SimulationRunResponse {
   results: ScenarioRunResult[];
   metrics?: SimulationMetricsSummary;
   error?: string;
+  dataset_name?: string;
+  dataset_provenance?: string;
+  records_total?: number;
+  records_evaluated?: number;
+  records_failed?: number;
+  records_excluded?: number;
+  validation_report?: {
+    status: string;
+    unsupported_records: Array<{ record_id: string; error: string }>;
+  };
 }
 
 // Evaluation Dataset Interfaces (Phase 5.1/5.2)
@@ -263,6 +282,12 @@ export default function SimulationLabPage() {
   const [importApiError, setImportApiError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Dataset Comparative Evaluation State (Phase 6)
+  const [showDatasetRunModal, setShowDatasetRunModal] = useState(false);
+  const [isDatasetRunning, setIsDatasetRunning] = useState(false);
+  const [datasetRunResponse, setDatasetRunResponse] = useState<SimulationRunResponse | null>(null);
+  const [datasetRunError, setDatasetRunError] = useState<string | null>(null);
+
   // --------------------------------------------------------------------------
   // Scenario Loading
   // --------------------------------------------------------------------------
@@ -334,10 +359,33 @@ export default function SimulationLabPage() {
   useEffect(() => {
     if (selectedDatasetName) {
       loadDatasetDetail(selectedDatasetName);
+      setDatasetRunResponse(null);
+      setDatasetRunError(null);
     } else {
       setDatasetDetail(null);
     }
   }, [selectedDatasetName]);
+
+  const handleStartDatasetSimulation = async () => {
+    if (!datasetDetail) return;
+    try {
+      setIsDatasetRunning(true);
+      setDatasetRunError(null);
+      const res: SimulationRunResponse = await fetchApi("/simulation/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          dataset_name: datasetDetail.dataset_name,
+          mode: "BASELINE_VS_PACE"
+        })
+      });
+      setDatasetRunResponse(res);
+      setShowDatasetRunModal(false);
+    } catch (err: any) {
+      setDatasetRunError(err?.message || "Failed to execute dataset comparative simulation.");
+    } finally {
+      setIsDatasetRunning(false);
+    }
+  };
 
   // --------------------------------------------------------------------------
   // File Upload & JSON Benchmark Parsing
@@ -1092,29 +1140,331 @@ export default function SimulationLabPage() {
                     )}
                   </div>
 
-                  {/* Comparative Simulation Callout Banner */}
-                  <div className="bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] p-4 text-[12px] space-y-2">
-                    <div className="flex items-center justify-between gap-2">
+                  {/* Error Alert Banner */}
+                  {datasetRunError && (
+                    <div className="bg-[#FDE8E8] border border-[#E05656]/30 rounded-[10px] p-4 text-[12px] text-[#9C1C1C] flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <BarChart2 className="w-4 h-4 text-[#2E9D50]" />
-                        <span className="font-bold text-[#1F1F1F]">Dataset-Driven Comparative Simulation</span>
+                        <AlertCircle className="w-4 h-4 shrink-0 text-[#E05656]" />
+                        <span>{datasetRunError}</span>
                       </div>
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-[#FFF4E5] text-[#C45E00] border border-[#F59A23]/30 rounded">
-                        PHASE 6 ROADMAP
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#666666]">
-                      Direct dynamic execution of custom imported evaluation datasets through the PACE simulation adapter is scheduled for Phase 6. Standard synthetic benchmark suites (Categories 1-10) are currently evaluated deterministically on the Scenario Benchmarks tab.
-                    </p>
-                    <div className="pt-1">
                       <button
-                        disabled
-                        className="px-3 py-1.5 text-[11px] font-bold text-[#94A3B8] bg-[#F1F1EF] border border-[#E8E8E4] rounded-[6px] cursor-not-allowed"
+                        onClick={() => setDatasetRunError(null)}
+                        className="text-[11px] font-bold underline hover:no-underline cursor-pointer"
                       >
-                        Run Comparative Simulation (Available in Phase 6)
+                        Dismiss
                       </button>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Running State Banner */}
+                  {isDatasetRunning && (
+                    <div className="bg-[#EAF7EE] border border-[#2E9D50]/30 rounded-[10px] p-6 text-center space-y-2">
+                      <RefreshCw className="w-6 h-6 animate-spin text-[#2E9D50] mx-auto" />
+                      <h4 className="text-[13px] font-bold text-[#1F1F1F]">
+                        Running Baseline vs. PACE Comparative Simulation...
+                      </h4>
+                      <p className="text-[11px] text-[#666666] max-w-lg mx-auto">
+                        Evaluating {datasetDetail.records.length} persisted records from &quot;{datasetDetail.dataset_name}&quot; through isolated in-memory baseline and PACE decision engines. Zero external tools are called.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Completed Dataset Simulation Results View (Phase 6) */}
+                  {datasetRunResponse && datasetRunResponse.metrics && !isDatasetRunning && (
+                    <div className="bg-[#FFFFFF] border-2 border-[#2E9D50]/40 rounded-[12px] p-5 space-y-4 shadow-sm">
+                      {/* Results Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E8E8E4] pb-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-[14px] text-[#1F1F1F]">
+                              Comparative Simulation Results: {datasetRunResponse.dataset_name}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-[#EAF7EE] text-[#237A3C] rounded">
+                              {datasetRunResponse.dataset_provenance || "AUTHORIZED_LABELED_DATA"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#666666]">
+                            Run ID: <span className="font-mono text-[#1F1F1F]">{datasetRunResponse.run_id}</span> &bull; Status: <span className="font-bold text-[#2E9D50]">{datasetRunResponse.status}</span> &bull; Runtime: {datasetRunResponse.metrics.runtime_ms}ms &bull; Method: {datasetRunResponse.metrics.evaluation_method}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowDatasetRunModal(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#FFFFFF] bg-[#2E9D50] hover:bg-[#237A3C] rounded-[6px] cursor-pointer shadow-sm"
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                            Run Again
+                          </button>
+                          <button
+                            onClick={() => setDatasetRunResponse(null)}
+                            className="px-3 py-1.5 text-[11px] font-bold text-[#666666] bg-[#FCFCFA] border border-[#E8E8E4] hover:bg-[#F1F1EF] rounded-[6px] cursor-pointer"
+                          >
+                            Close Results
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Excluded Records Alert Banner (If partial validation) */}
+                      {datasetRunResponse.records_excluded !== undefined && datasetRunResponse.records_excluded > 0 && (
+                        <div className="bg-[#FFF4E5] border border-[#F59A23]/30 rounded-[8px] p-3 text-[11px] text-[#C45E00] space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <AlertTriangle className="w-4 h-4 text-[#F59A23]" />
+                            <span>Excluded Records Notice: {datasetRunResponse.records_excluded} record(s) omitted due to validation constraints</span>
+                          </div>
+                          {datasetRunResponse.validation_report?.unsupported_records && (
+                            <ul className="list-disc pl-5 text-[10px] space-y-0.5">
+                              {datasetRunResponse.validation_report.unsupported_records.map((r, i) => (
+                                <li key={i}>
+                                  <span className="font-mono font-bold">{r.record_id}</span>: {r.error}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Metric Comparison Cards Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                        <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px]">
+                          <span className="text-[10px] font-bold text-[#666666] uppercase block">Records Evaluated</span>
+                          <span className="text-[18px] font-mono font-bold text-[#1F1F1F]">
+                            {datasetRunResponse.records_evaluated} / {datasetRunResponse.records_total}
+                          </span>
+                        </div>
+                        <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px]">
+                          <span className="text-[10px] font-bold text-[#666666] uppercase block">Accuracy (Base / PACE)</span>
+                          <div className="flex items-baseline gap-1 text-[16px] font-mono font-bold">
+                            <span className="text-[#666666]">
+                              {((datasetRunResponse.metrics.baseline_metrics.accuracy || 0) * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[#CCCCCC]">&rarr;</span>
+                            <span className="text-[#2E9D50]">
+                              {((datasetRunResponse.metrics.pace_metrics.accuracy || 0) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px]">
+                          <span className="text-[10px] font-bold text-[#666666] uppercase block">Precision (Base / PACE)</span>
+                          <div className="flex items-baseline gap-1 text-[16px] font-mono font-bold">
+                            <span className="text-[#666666]">
+                              {((datasetRunResponse.metrics.baseline_metrics.precision || 0) * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[#CCCCCC]">&rarr;</span>
+                            <span className="text-[#2E9D50]">
+                              {((datasetRunResponse.metrics.pace_metrics.precision || 0) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px]">
+                          <span className="text-[10px] font-bold text-[#666666] uppercase block">Recall (Base / PACE)</span>
+                          <div className="flex items-baseline gap-1 text-[16px] font-mono font-bold">
+                            <span className="text-[#666666]">
+                              {((datasetRunResponse.metrics.baseline_metrics.recall || 0) * 100).toFixed(0)}%
+                            </span>
+                            <span className="text-[#CCCCCC]">&rarr;</span>
+                            <span className="text-[#2E9D50]">
+                              {((datasetRunResponse.metrics.pace_metrics.recall || 0) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px]">
+                          <span className="text-[10px] font-bold text-[#666666] uppercase block">F1 Score (Base / PACE)</span>
+                          <div className="flex items-baseline gap-1 text-[16px] font-mono font-bold">
+                            <span className="text-[#666666]">
+                              {(datasetRunResponse.metrics.baseline_metrics.f1_score || 0).toFixed(2)}
+                            </span>
+                            <span className="text-[#CCCCCC]">&rarr;</span>
+                            <span className="text-[#2E9D50]">
+                              {(datasetRunResponse.metrics.pace_metrics.f1_score || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px]">
+                          <span className="text-[10px] font-bold text-[#666666] uppercase block">Avg Lead Time</span>
+                          <span className="text-[18px] font-mono font-bold text-[#2E9D50]">
+                            {datasetRunResponse.metrics.avg_detection_lead_steps.toFixed(1)} <span className="text-[11px] font-normal text-[#666666]">steps</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Side-by-Side Confusion Matrix */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-[#1F1F1F] uppercase font-mono">
+                              Baseline Policy Confusion Matrix
+                            </span>
+                            <span className="text-[10px] text-[#666666]">
+                              N = {datasetRunResponse.metrics.baseline_metrics.sample_size || datasetRunResponse.records_evaluated}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
+                            <div className="p-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded">
+                              <span className="text-[9px] uppercase text-[#666666] block">True Positives</span>
+                              <span className="text-[15px] font-bold text-[#2E9D50]">
+                                {datasetRunResponse.metrics.baseline_metrics.true_positives}
+                              </span>
+                            </div>
+                            <div className="p-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded">
+                              <span className="text-[9px] uppercase text-[#666666] block">False Positives</span>
+                              <span className="text-[15px] font-bold text-[#E05656]">
+                                {datasetRunResponse.metrics.baseline_metrics.false_positives}
+                              </span>
+                            </div>
+                            <div className="p-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded">
+                              <span className="text-[9px] uppercase text-[#666666] block">False Negatives</span>
+                              <span className="text-[15px] font-bold text-[#E05656]">
+                                {datasetRunResponse.metrics.baseline_metrics.false_negatives}
+                              </span>
+                            </div>
+                            <div className="p-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded">
+                              <span className="text-[9px] uppercase text-[#666666] block">True Negatives</span>
+                              <span className="text-[15px] font-bold text-[#2E9D50]">
+                                {datasetRunResponse.metrics.baseline_metrics.true_negatives}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-[#2E9D50] uppercase font-mono">
+                              PACE Engine Confusion Matrix
+                            </span>
+                            <span className="text-[10px] text-[#666666]">
+                              N = {datasetRunResponse.metrics.pace_metrics.sample_size || datasetRunResponse.records_evaluated}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
+                            <div className="p-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded">
+                              <span className="text-[9px] uppercase text-[#666666] block">True Positives</span>
+                              <span className="text-[15px] font-bold text-[#2E9D50]">
+                                {datasetRunResponse.metrics.pace_metrics.true_positives}
+                              </span>
+                            </div>
+                            <div className="p-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded">
+                              <span className="text-[9px] uppercase text-[#666666] block">False Positives</span>
+                              <span className="text-[15px] font-bold text-[#E05656]">
+                                {datasetRunResponse.metrics.pace_metrics.false_positives}
+                              </span>
+                            </div>
+                            <div className="p-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded">
+                              <span className="text-[9px] uppercase text-[#666666] block">False Negatives</span>
+                              <span className="text-[15px] font-bold text-[#E05656]">
+                                {datasetRunResponse.metrics.pace_metrics.false_negatives}
+                              </span>
+                            </div>
+                            <div className="p-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded">
+                              <span className="text-[9px] uppercase text-[#666666] block">True Negatives</span>
+                              <span className="text-[15px] font-bold text-[#2E9D50]">
+                                {datasetRunResponse.metrics.pace_metrics.true_negatives}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Per-Record Decision Comparison Table */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold text-[#1F1F1F] uppercase font-mono block">
+                          Record-Level Decision Outcomes ({datasetRunResponse.results.length})
+                        </span>
+                        <div className="border border-[#E8E8E4] rounded-[8px] overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-[11px]">
+                            <thead>
+                              <tr className="bg-[#FCFCFA] border-b border-[#E8E8E4] text-[#666666] font-mono text-[10px] uppercase">
+                                <th className="p-2">Record ID</th>
+                                <th className="p-2">Ground Truth</th>
+                                <th className="p-2">Baseline Decision</th>
+                                <th className="p-2">PACE Decision</th>
+                                <th className="p-2">PACE Intervention</th>
+                                <th className="p-2">Lead Steps</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#E8E8E4]">
+                              {datasetRunResponse.results.map((res) => (
+                                <tr key={res.scenario_id} className="hover:bg-[#FCFCFA]">
+                                  <td className="p-2 font-mono font-bold text-[#1F1F1F]">
+                                    {res.scenario_id.includes(":") ? res.scenario_id.split(":")[1] : res.scenario_id}
+                                  </td>
+                                  <td className="p-2">
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                      res.ground_truth_label === "RISKY" ? "bg-[#FDE8E8] text-[#9C1C1C]" : "bg-[#EAF7EE] text-[#237A3C]"
+                                    }`}>
+                                      {res.ground_truth_label}
+                                    </span>
+                                  </td>
+                                  <td className="p-2">
+                                    <span className="font-mono">{res.baseline_final_decision}</span>
+                                    {res.baseline_matches_ground_truth ? (
+                                      <span className="text-[#2E9D50] ml-1 font-bold">&check;</span>
+                                    ) : (
+                                      <span className="text-[#E05656] ml-1 font-bold">&cross;</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2">
+                                    <span className="font-mono">{res.pace_final_decision}</span>
+                                    {res.pace_matches_ground_truth ? (
+                                      <span className="text-[#2E9D50] ml-1 font-bold">&check;</span>
+                                    ) : (
+                                      <span className="text-[#E05656] ml-1 font-bold">&cross;</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2 font-mono text-[10px]">
+                                    {res.pace_selected_intervention}
+                                  </td>
+                                  <td className="p-2 font-mono text-[11px]">
+                                    {res.early_detection_lead_steps > 0 ? (
+                                      <span className="font-bold text-[#2E9D50]">+{res.early_detection_lead_steps} steps</span>
+                                    ) : (
+                                      <span className="text-[#666666]">0</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Evaluation Limitations Disclosure */}
+                      <div className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] text-[10px] text-[#666666] flex items-start gap-2">
+                        <Info className="w-4 h-4 text-[#94A3B8] shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold text-[#1F1F1F] block">Evaluation Disclaimer & Integrity Boundary:</span>
+                          <p>{datasetRunResponse.metrics.evaluation_limitations}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Comparative Simulation Callout Banner (Phase 6 Live Action) */}
+                  {!datasetRunResponse && !isDatasetRunning && (
+                    <div className="bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] p-4 text-[12px] space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <BarChart2 className="w-4 h-4 text-[#2E9D50]" />
+                          <span className="font-bold text-[#1F1F1F]">Dataset-Driven Comparative Simulation</span>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-[#EAF7EE] text-[#237A3C] border border-[#2E9D50]/30 rounded">
+                          ACTIVE &bull; PHASE 6
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#666666]">
+                        Execute a deterministic baseline static policy evaluation alongside the Predictive Action Control Engine (PACE) over all {datasetDetail.records.length} persisted records in this dataset. Execution occurs strictly within an in-memory simulation sandbox without real tool calls or production state changes.
+                      </p>
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowDatasetRunModal(true)}
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-bold text-[#FFFFFF] bg-[#2E9D50] hover:bg-[#237A3C] rounded-[6px] shadow-sm cursor-pointer transition-colors"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          Run Comparative Simulation ({datasetDetail.records.length} Records)
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Records Inspection Filter Toolbar */}
                   <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#E8E8E4]">
@@ -1405,6 +1755,95 @@ export default function SimulationLabPage() {
                   <>
                     <UploadCloud className="w-4 h-4" />
                     Submit Import
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* CONFIRMATION MODAL: Comparative Dataset Simulation (Phase 6)         */}
+      {/* ==================================================================== */}
+      {showDatasetRunModal && datasetDetail && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[14px] shadow-xl max-w-lg w-full p-6 space-y-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#E8E8E4] pb-3">
+              <div className="flex items-center gap-2">
+                <Play className="w-5 h-5 text-[#2E9D50]" />
+                <h3 className="text-[15px] font-bold text-[#1F1F1F]">Confirm Comparative Simulation</h3>
+              </div>
+              <button
+                onClick={() => setShowDatasetRunModal(false)}
+                className="text-[#666666] hover:text-[#1F1F1F] p-1 rounded hover:bg-[#FCFCFA] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-[12px] text-[#666666]">
+              You are about to launch a side-by-side comparative simulation evaluating a static baseline policy against the Predictive Action Control Engine (PACE).
+            </p>
+
+            {/* Target Dataset Summary */}
+            <div className="bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] p-3 text-[11px] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[#666666]">Target Dataset:</span>
+                <span className="font-mono font-bold text-[#1F1F1F]">{datasetDetail.dataset_name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#666666]">Provenance:</span>
+                <span className="font-mono text-[#237A3C] bg-[#EAF7EE] px-1.5 py-0.5 rounded text-[10px] font-bold">
+                  {datasetDetail.provenance}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#666666]">Record Count:</span>
+                <span className="font-mono font-bold text-[#2E9D50]">{datasetDetail.records.length} records</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#666666]">Evaluation Mode:</span>
+                <span className="font-mono text-[#1F1F1F] font-bold">BASELINE_VS_PACE</span>
+              </div>
+            </div>
+
+            {/* In-Memory Isolation Safety Guarantee */}
+            <div className="bg-[#EAF7EE] border border-[#2E9D50]/30 rounded-[8px] p-3 text-[11px] text-[#237A3C] flex items-start gap-2">
+              <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#2E9D50]" />
+              <div>
+                <span className="font-bold block">Simulation Safety Guarantee:</span>
+                <p className="text-[10px] text-[#2E9D50]/90">
+                  Runs strictly within transient in-memory simulation adapters. No real tool executions, external API calls, or production AuditLog/Decision writes will occur.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E8E8E4]">
+              <button
+                type="button"
+                onClick={() => setShowDatasetRunModal(false)}
+                className="px-3.5 py-2 text-[12px] font-bold text-[#666666] bg-[#FFFFFF] border border-[#E8E8E4] hover:bg-[#FCFCFA] rounded-[8px] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStartDatasetSimulation}
+                disabled={isDatasetRunning}
+                className="flex items-center gap-1.5 px-4 py-2 text-[12px] font-bold text-[#FFFFFF] bg-[#2E9D50] hover:bg-[#237A3C] rounded-[8px] shadow-sm cursor-pointer transition-colors disabled:opacity-50"
+              >
+                {isDatasetRunning ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    Launch Simulation
                   </>
                 )}
               </button>

@@ -1026,10 +1026,11 @@ class ConfusionMatrixMetrics(BaseModel):
     false_positive_rate: float = 0.0
     false_negative_rate: float = 0.0
     f1_score: float = 0.0
+    sample_size: int = 0
 
 
 class SimulationMetricsSummary(BaseModel):
-    unit_of_measurement: str = "scenario"
+    unit_of_measurement: str = "scenario"  # scenario or dataset_record
     total_scenarios_evaluated: int = 0
     total_actions_evaluated: int = 0
     baseline_metrics: ConfusionMatrixMetrics
@@ -1042,12 +1043,20 @@ class SimulationMetricsSummary(BaseModel):
     runtime_ms: int = 0
     provenance: str = "SYNTHETIC_BENCHMARK_SUITE"
     evaluation_limitations: str
+    dataset_name: Optional[str] = None
+    dataset_identity: Optional[str] = None
+    evaluation_method: Optional[str] = "PACE_V1_COMPARATIVE_ENGINE"
+    records_submitted: Optional[int] = None
+    records_completed: Optional[int] = None
+    records_failed: Optional[int] = None
+    records_excluded: Optional[int] = None
 
 
 class SimulationRunRequest(BaseModel):
     scenario_ids: Optional[List[str]] = None
     categories: Optional[List[str]] = None
-    mode: str = "COMPARISON"  # COMPARISON, PACE, BASELINE
+    dataset_name: Optional[str] = None  # Phase 6: Run simulation on persisted evaluation dataset
+    mode: str = "COMPARISON"  # COMPARISON, PACE, BASELINE, BASELINE_VS_PACE
     seed: Optional[int] = 42
 
 
@@ -1062,6 +1071,14 @@ class SimulationRunResponse(BaseModel):
     results: List[ScenarioRunResult] = []
     metrics: Optional[SimulationMetricsSummary] = None
     error: Optional[str] = None
+    # Phase 6: Dataset-driven evaluation attributes
+    dataset_name: Optional[str] = None
+    dataset_provenance: Optional[str] = None
+    records_total: Optional[int] = None
+    records_evaluated: Optional[int] = None
+    records_failed: Optional[int] = None
+    records_excluded: Optional[int] = None
+    validation_report: Optional[Dict[str, Any]] = None
 
 
 # ============================================================================

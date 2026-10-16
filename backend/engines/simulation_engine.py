@@ -16,7 +16,8 @@ import time
 import datetime
 import re
 import logging
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from database import SessionLocal
 import models
@@ -36,6 +37,7 @@ SECRET_PATTERNS = [
     re.compile(r"bearer\s+[a-zA-Z0-9_\-\.]{20,}", re.IGNORECASE),
     re.compile(r"sk-[a-zA-Z0-9]{20,}", re.IGNORECASE),
     re.compile(r"ag_live_[a-zA-Z0-9]{20,}", re.IGNORECASE),
+    re.compile(r"AKIA[0-9A-Z]{16}", re.IGNORECASE),
     re.compile(r"(?:password|secret_key|api_key|access_token|private_key)\s*[:=]\s*['\"][^'\"]{8,}['\"]", re.IGNORECASE),
 ]
 
@@ -501,8 +503,146 @@ VERSIONED_SIMULATION_SCENARIOS: List[schemas.SimulationScenario] = [
 
 
 # ============================================================================
-# SAFE BOUNDED SIMULATION RUNNER
+# PHASE 6: DYNAMIC DATASET SCENARIO ADAPTER & SIMULATION RUNNER
 # ============================================================================
+
+def eval_record_to_simulation_scenario(
+    record: Any,
+    dataset_name: str = "CUSTOM_DATASET"
+) -> Tuple[Optional[schemas.SimulationScenario], Optional[str]]:
+    """
+    Translates a persisted EvaluationDatasetRecord (DB model, schema, or dict)
+    into a transient, isolated SimulationScenario for baseline vs. PACE execution.
+    Validates required fields, action sequences, agent profiles, and ground-truth labels.
+    Rejects malformed or unsupported records with explicit validation messages.
+    Never executes imported action sequences against real external tools.
+    """
+    if record is None:
+        return None, "Record is None."
+
+    if isinstance(record, dict):
+        record_id = record.get("record_id")
+        provenance = record.get("provenance", "AUTHORIZED_LABELED_DATA")
+        agent_profile_data = record.get("agent_profile")
+        initial_history = record.get("initial_history") or []
+        action_sequence_data = record.get("action_sequence") or []
+        ground_truth_label = record.get("ground_truth_label")
+        ground_truth_notes = record.get("ground_truth_notes") or ""
+        tags = record.get("tags") or []
+        rec_dict = record
+    else:
+        record_id = getattr(record, "record_id", None)
+        provenance = getattr(record, "provenance", "AUTHORIZED_LABELED_DATA")
+        agent_profile_data = getattr(record, "agent_profile", None)
+        initial_history = getattr(record, "initial_history", None) or []
+        action_sequence_data = getattr(record, "action_sequence", None) or []
+        ground_truth_label = getattr(record, "ground_truth_label", None)
+        ground_truth_notes = getattr(record, "ground_truth_notes", None) or ""
+        tags = getattr(record, "tags", None) or []
+        rec_dict = record.model_dump() if hasattr(record, "model_dump") else (
+            record.dict() if hasattr(record, "dict") else (
+                record if isinstance(record, dict) else vars(record)
+            )
+        )
+
+    # 1. Validate Record ID
+    if not record_id or not str(record_id).strip():
+        return None, "Missing or empty record_id."
+    record_id_str = str(record_id).strip()
+
+    # 2. Validate Ground Truth Label
+    if ground_truth_label not in ("SAFE", "RISKY"):
+        return None, f"Record '{record_id_str}': ground_truth_label must be 'SAFE' or 'RISKY' (got '{ground_truth_label}')."
+
+    # 3. Validate Agent Profile
+    if hasattr(agent_profile_data, "model_dump"):
+        ap_dict = agent_profile_data.model_dump()
+    elif hasattr(agent_profile_data, "dict"):
+        ap_dict = agent_profile_data.dict()
+    elif isinstance(agent_profile_data, dict):
+        ap_dict = agent_profile_data
+    else:
+        return None, f"Record '{record_id_str}': agent_profile is missing or malformed."
+
+    if not ap_dict.get("agent_code") or not str(ap_dict.get("agent_code")).strip():
+        return None, f"Record '{record_id_str}': agent_profile missing required agent_code."
+    if not ap_dict.get("name") or not str(ap_dict.get("name")).strip():
+        return None, f"Record '{record_id_str}': agent_profile missing required name."
+
+    autonomy = str(ap_dict.get("autonomy_level") or "MEDIUM").upper()
+    if autonomy not in ("LOW", "MEDIUM", "HIGH", "FULL", "RESTRICTED"):
+        autonomy = "MEDIUM"
+
+    agent_profile = schemas.ScenarioAgentProfile(
+        agent_code=str(ap_dict["agent_code"]).strip(),
+        name=str(ap_dict["name"]).strip(),
+        autonomy_level=autonomy,
+        department=str(ap_dict.get("department") or "General").strip(),
+        granted_permissions=ap_dict.get("granted_permissions") or [],
+        daily_budget=float(ap_dict.get("daily_budget", 10000.0))
+    )
+
+    # 4. Validate Action Sequence
+    if not action_sequence_data:
+        return None, f"Record '{record_id_str}': action_sequence cannot be empty."
+    if len(action_sequence_data) > SimulationRunner.MAX_SEQUENCE_STEPS_PER_RECORD:
+        return None, f"Record '{record_id_str}': action_sequence exceeds maximum limit of {SimulationRunner.MAX_SEQUENCE_STEPS_PER_RECORD} steps."
+
+    action_steps: List[schemas.ScenarioActionStep] = []
+    total_steps = len(action_sequence_data)
+    for idx, s in enumerate(action_sequence_data):
+        s_dict = s.model_dump() if hasattr(s, "model_dump") else (
+            s.dict() if hasattr(s, "dict") else (s if isinstance(s, dict) else vars(s))
+        )
+        step_num = s_dict.get("step_number") or s_dict.get("step_index") or (idx + 1)
+        act = s_dict.get("action")
+        res = s_dict.get("resource")
+        if not act or not str(act).strip():
+            return None, f"Record '{record_id_str}' step #{idx}: action is empty."
+        if not res or not str(res).strip():
+            return None, f"Record '{record_id_str}' step #{idx}: resource is empty."
+
+        is_term = bool(s_dict.get("is_terminal_step", idx == total_steps - 1))
+        step_obj = schemas.ScenarioActionStep(
+            step_number=int(step_num),
+            action=str(act).strip(),
+            resource=str(res).strip(),
+            operation=s_dict.get("operation"),
+            amount=float(s_dict.get("amount", 0.0)),
+            parameters=s_dict.get("parameters"),
+            prompt=s_dict.get("prompt"),
+            is_terminal_step=is_term
+        )
+        action_steps.append(step_obj)
+
+    # 5. Sensitive Secret Check
+    if contains_sensitive_secrets(rec_dict):
+        return None, f"Record '{record_id_str}': Contains potential sensitive credentials or secret tokens."
+
+    # 6. Derive expected outcomes from ground truth label
+    expected_policy = "REFUSE" if ground_truth_label == "RISKY" else "ALLOW"
+    expected_intervention = "REQUIRE_APPROVAL" if ground_truth_label == "RISKY" else "ALLOW_WITHOUT_INTERVENTION"
+
+    cat = tags[0] if (tags and len(tags) > 0 and str(tags[0]).strip()) else "DATASET_EVALUATION"
+
+    scenario = schemas.SimulationScenario(
+        scenario_id=f"{dataset_name}:{record_id_str}",
+        version="1.0.0",
+        category=cat,
+        title=f"Record {record_id_str} ({dataset_name})",
+        description=str(ground_truth_notes or f"Imported action sequence from dataset '{dataset_name}'"),
+        provenance=str(provenance or "AUTHORIZED_LABELED_DATA"),
+        agent_profile=agent_profile,
+        initial_history=initial_history or [],
+        action_sequence=action_steps,
+        expected_policy_outcome=expected_policy,
+        expected_intervention=expected_intervention,
+        ground_truth_label=ground_truth_label,
+        ground_truth_limitations=str(ground_truth_notes or "Evaluated from persisted dataset records."),
+        why_relevant=f"Persisted evaluation record '{record_id_str}' from dataset '{dataset_name}'."
+    )
+    return scenario, None
+
 
 class SimulationRunner:
     """
@@ -519,6 +659,7 @@ class SimulationRunner:
 
     def __init__(self):
         self._runs: Dict[str, schemas.SimulationRunResponse] = {}
+        self._runs_org: Dict[str, str] = {}
         self._cancel_flags: Set[str] = set()
 
     def get_scenarios(self, category: Optional[str] = None) -> List[schemas.SimulationScenario]:
@@ -528,6 +669,9 @@ class SimulationRunner:
 
     def get_run(self, run_id: str) -> Optional[schemas.SimulationRunResponse]:
         return self._runs.get(run_id)
+
+    def get_run_org(self, run_id: str) -> Optional[str]:
+        return self._runs_org.get(run_id)
 
     def cancel_run(self, run_id: str) -> bool:
         if run_id in self._runs and self._runs[run_id].status == "RUNNING":
@@ -540,32 +684,117 @@ class SimulationRunner:
         self,
         request: schemas.SimulationRunRequest,
         tenant_org_id: str,
-        caller_user_id: str
+        caller_user_id: str,
+        db: Optional[Session] = None
     ) -> schemas.SimulationRunResponse:
         run_id = f"sim_run_{uuid.uuid4().hex[:12]}"
         now = datetime.datetime.now(datetime.timezone.utc)
         start_time = time.monotonic()
 
-        # Filter target scenarios
-        target_scenarios = list(VERSIONED_SIMULATION_SCENARIOS)
-        if request.scenario_ids:
-            target_scenarios = [s for s in target_scenarios if s.scenario_id in request.scenario_ids]
-        if request.categories:
-            target_scenarios = [s for s in target_scenarios if s.category in request.categories]
+        # Phase 6: Dataset-driven simulation branch vs. predefined scenario branch
+        if request.dataset_name:
+            close_db = False
+            if db is None:
+                db = SessionLocal()
+                close_db = True
 
-        # Bound maximum scenarios
-        target_scenarios = target_scenarios[:self.MAX_SCENARIOS]
+            try:
+                ds = db.query(models.EvaluationDataset).filter(
+                    models.EvaluationDataset.name == request.dataset_name.strip(),
+                    models.EvaluationDataset.org_id == tenant_org_id
+                ).first()
 
-        run_record = schemas.SimulationRunResponse(
-            run_id=run_id,
-            status="RUNNING",
-            mode=request.mode,
-            created_at=now,
-            scenarios_total=len(target_scenarios),
-            scenarios_completed=0,
-            results=[]
-        )
-        self._runs[run_id] = run_record
+                if not ds:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Evaluation dataset '{request.dataset_name}' not found for this organization."
+                    )
+
+                db_records = db.query(models.EvaluationDatasetRecord).filter(
+                    models.EvaluationDatasetRecord.dataset_id == ds.id,
+                    models.EvaluationDatasetRecord.org_id == tenant_org_id
+                ).order_by(models.EvaluationDatasetRecord.created_at.asc()).all()
+
+                if not db_records:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Evaluation dataset '{request.dataset_name}' contains no records."
+                    )
+
+                target_scenarios: List[schemas.SimulationScenario] = []
+                unsupported_records: List[Dict[str, Any]] = []
+
+                for r in db_records:
+                    scenario, err = eval_record_to_simulation_scenario(r, dataset_name=ds.name)
+                    if err:
+                        unsupported_records.append({
+                            "record_id": getattr(r, "record_id", "UNKNOWN"),
+                            "error": err
+                        })
+                    else:
+                        target_scenarios.append(scenario)
+
+                if not target_scenarios:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Dataset '{request.dataset_name}' contains no valid records for simulation. Validation errors: {unsupported_records}"
+                    )
+
+                target_scenarios = target_scenarios[:self.MAX_DATASET_RECORDS]
+
+                run_record = schemas.SimulationRunResponse(
+                    run_id=run_id,
+                    status="RUNNING",
+                    mode=request.mode,
+                    created_at=now,
+                    scenarios_total=len(target_scenarios),
+                    scenarios_completed=0,
+                    results=[],
+                    dataset_name=ds.name,
+                    dataset_provenance=ds.provenance,
+                    records_total=len(db_records),
+                    records_evaluated=0,
+                    records_failed=0,
+                    records_excluded=len(unsupported_records),
+                    validation_report={"status": "PARTIAL_VALIDATION", "unsupported_records": unsupported_records} if unsupported_records else None
+                )
+                self._runs[run_id] = run_record
+                self._runs_org[run_id] = tenant_org_id
+                ds_provenance = ds.provenance
+                ds_name = ds.name
+                ds_id_str = str(ds.id)
+                submitted_count = len(db_records)
+                excluded_count = len(unsupported_records)
+            finally:
+                if close_db:
+                    db.close()
+        else:
+            # Predefined scenario branch
+            target_scenarios = list(VERSIONED_SIMULATION_SCENARIOS)
+            if request.scenario_ids:
+                target_scenarios = [s for s in target_scenarios if s.scenario_id in request.scenario_ids]
+            if request.categories:
+                target_scenarios = [s for s in target_scenarios if s.category in request.categories]
+
+            target_scenarios = target_scenarios[:self.MAX_SCENARIOS]
+
+            run_record = schemas.SimulationRunResponse(
+                run_id=run_id,
+                status="RUNNING",
+                mode=request.mode,
+                created_at=now,
+                scenarios_total=len(target_scenarios),
+                scenarios_completed=0,
+                results=[],
+                dataset_provenance="SYNTHETIC_BENCHMARK_PROVENANCE"
+            )
+            self._runs[run_id] = run_record
+            self._runs_org[run_id] = tenant_org_id
+            ds_provenance = "SYNTHETIC_BENCHMARK_SUITE"
+            ds_name = None
+            ds_id_str = None
+            submitted_count = len(target_scenarios)
+            excluded_count = 0
 
         # Isolated component instances for simulation
         seq_analyzer = ActionSequenceAnalyzer()
@@ -592,7 +821,7 @@ class SimulationRunner:
                 early_lead_steps = 0
                 detected_before_terminal = False
 
-                for step in sc.action_sequence[:self.MAX_SEQUENCE_STEPS]:
+                for step in sc.action_sequence[:self.MAX_SEQUENCE_STEPS_PER_RECORD]:
                     # 1. EVALUATE BASELINE (Deterministic Policy without Predictive Extension)
                     baseline_outcome = self._evaluate_baseline_step(
                         agent_profile=sc.agent_profile,
@@ -697,13 +926,28 @@ class SimulationRunner:
 
             # Compute comparative metrics
             runtime_ms = int((time.monotonic() - start_time) * 1000)
-            metrics_summary = self._calculate_metrics(results, runtime_ms)
+            uom = "dataset_record" if request.dataset_name else "scenario"
+            metrics_summary = self._calculate_metrics(
+                results=results,
+                runtime_ms=runtime_ms,
+                provenance=ds_provenance,
+                dataset_name=ds_name,
+                dataset_identity=ds_id_str,
+                unit_of_measurement=uom,
+                records_submitted=submitted_count,
+                records_completed=len(results),
+                records_failed=0,
+                records_excluded=excluded_count
+            )
 
             run_record.status = "COMPLETED" if run_record.status != "CANCELLED" else "CANCELLED"
             run_record.completed_at = datetime.datetime.now(datetime.timezone.utc)
             run_record.results = results
             run_record.metrics = metrics_summary
+            run_record.records_evaluated = len(results)
 
+        except HTTPException:
+            raise
         except Exception as e:
             run_record.status = "FAILED"
             run_record.error = str(e)
@@ -956,7 +1200,15 @@ class SimulationRunner:
     def _calculate_metrics(
         self,
         results: List[schemas.ScenarioRunResult],
-        runtime_ms: int
+        runtime_ms: int,
+        provenance: str = "SYNTHETIC_BENCHMARK_SUITE",
+        dataset_name: Optional[str] = None,
+        dataset_identity: Optional[str] = None,
+        unit_of_measurement: str = "scenario",
+        records_submitted: Optional[int] = None,
+        records_completed: Optional[int] = None,
+        records_failed: Optional[int] = None,
+        records_excluded: Optional[int] = None
     ) -> schemas.SimulationMetricsSummary:
         total_scenarios = len(results)
         total_actions = sum(len(r.steps) for r in results)
@@ -1007,8 +1259,21 @@ class SimulationRunner:
             if r.pace_matches_ground_truth:
                 cat_breakdown[cat]["pace_correct"] += 1
 
+        if dataset_name:
+            limitations = (
+                f"Evaluated over {len(results)} persisted records from dataset '{dataset_name}' (Provenance: {provenance}). "
+                "Class balance and outcome metrics reflect labeled benchmark data. "
+                "These evaluation metrics must not be interpreted as empirical proof of general production accuracy."
+            )
+        else:
+            limitations = (
+                "Evaluation evaluated over versioned synthetic scenarios (N=10). "
+                "Class balance is structured (7 Risky, 3 Safe) to probe adversarial edge cases. "
+                "Synthetic metrics must not be conflated with long-run production telemetry."
+            )
+
         return schemas.SimulationMetricsSummary(
-            unit_of_measurement="scenario",
+            unit_of_measurement=unit_of_measurement,
             total_scenarios_evaluated=total_scenarios,
             total_actions_evaluated=total_actions,
             baseline_metrics=baseline_cm,
@@ -1019,12 +1284,15 @@ class SimulationRunner:
             insufficient_data_count=insufficient_data_count,
             category_breakdown=cat_breakdown,
             runtime_ms=runtime_ms,
-            provenance="SYNTHETIC_BENCHMARK_SUITE",
-            evaluation_limitations=(
-                "Evaluation evaluated over versioned synthetic scenarios (N=10). "
-                "Class balance is structured (7 Risky, 3 Safe) to probe adversarial edge cases. "
-                "Synthetic metrics must not be conflated with long-run production telemetry."
-            )
+            provenance=provenance,
+            evaluation_limitations=limitations,
+            dataset_name=dataset_name,
+            dataset_identity=dataset_identity,
+            evaluation_method="PACE_V1_COMPARATIVE_ENGINE",
+            records_submitted=records_submitted if records_submitted is not None else total_scenarios,
+            records_completed=records_completed if records_completed is not None else total_scenarios,
+            records_failed=records_failed or 0,
+            records_excluded=records_excluded or 0
         )
 
     def _calc_cm_ratios(self, tp: int, fp: int, tn: int, fn: int, total: int) -> schemas.ConfusionMatrixMetrics:
@@ -1045,7 +1313,8 @@ class SimulationRunner:
             recall=recall,
             false_positive_rate=fpr,
             false_negative_rate=fnr,
-            f1_score=f1
+            f1_score=f1,
+            sample_size=total
         )
 
     def import_evaluation_dataset(
