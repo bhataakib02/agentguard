@@ -18,6 +18,12 @@ class TestPlatformSuperAdminLicenseSuite(unittest.TestCase):
     def setUpClass(cls):
         cls.db = SessionLocal()
 
+        # Clean prior test users for acme.com / techcorp.com / sec-iso.com
+        cls.db.query(models.User).filter(models.User.email.like("%@acme.com")).delete(synchronize_session=False)
+        cls.db.query(models.User).filter(models.User.email.like("%@techcorp.com")).delete(synchronize_session=False)
+        cls.db.query(models.User).filter(models.User.email.like("%@sec-iso.com")).delete(synchronize_session=False)
+        cls.db.commit()
+
         # Provision SUPER_ADMIN
         cls.super_admin_email = "super_admin_lic@agentguard.com"
         cls.super_admin = cls.db.query(models.User).filter(models.User.email == cls.super_admin_email).first()
@@ -40,6 +46,8 @@ class TestPlatformSuperAdminLicenseSuite(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        cls.db.query(models.User).filter(models.User.email.like("%@sec-iso.com")).delete(synchronize_session=False)
+        cls.db.commit()
         cls.db.close()
 
     def get_auth_headers(self, user_obj):
@@ -188,6 +196,72 @@ class TestPlatformSuperAdminLicenseSuite(unittest.TestCase):
         event_types = [a.event_type for a in audits]
         self.assertIn("ORGANIZATION_CREATED", event_types)
         print("  [PASS] Test 20: Real audit log records generated & persisted in database")
+
+    def test_06_platform_security_authorization_and_isolation(self):
+        """TEST 21: /api/platform/security strictly rejects unauthenticated callers, organization roles (USER, AUDITOR, SECURITY_OFFICER, ADMIN), forged role headers, and authorizes only authentic database SUPER_ADMIN."""
+        # 1. Unauthenticated request -> 401 Unauthorized
+        resp_unauth = client.get("/api/platform/security")
+        self.assertEqual(resp_unauth.status_code, 401)
+
+        # Retrieve Org A admin
+        admin_a = self.get_user_by_email("admin@acme.com")
+        self.assertIsNotNone(admin_a)
+        headers_admin = self.get_auth_headers(admin_a)
+
+        # 2. Org Admin -> 403 Forbidden
+        resp_admin = client.get("/api/platform/security", headers=headers_admin)
+        self.assertEqual(resp_admin.status_code, 403)
+        self.assertIn("Only SUPER_ADMIN can perform this action", resp_admin.json().get("detail", ""))
+
+        # 3. Provision/Get dedicated Org (sec-iso.com) with User, Auditor, Security Officer, and Admin
+        sec_org = self.db.query(models.Organization).filter(models.Organization.domain == "sec-iso.com").first()
+        if not sec_org:
+            sec_org = models.Organization(name="Security Isolation Org", domain="sec-iso.com", status="ACTIVE")
+            self.db.add(sec_org)
+            self.db.commit()
+            self.db.refresh(sec_org)
+
+        roles_to_test = ["USER", "AUDITOR", "SECURITY_OFFICER", "ADMIN"]
+        for role_name in roles_to_test:
+            user_email = f"test_{role_name.lower()}@sec-iso.com"
+            test_user = self.get_user_by_email(user_email)
+            if not test_user:
+                test_user = models.User(
+                    org_id=sec_org.id,
+                    email=user_email,
+                    full_name=f"SecIso {role_name}",
+                    role=role_name,
+                    status="ACTIVE"
+                )
+                self.db.add(test_user)
+                self.db.commit()
+                self.db.refresh(test_user)
+
+            user_headers = self.get_auth_headers(test_user)
+            resp_role = client.get("/api/platform/security", headers=user_headers)
+            self.assertEqual(resp_role.status_code, 403, f"Role {role_name} should be rejected with 403")
+            self.assertIn("Only SUPER_ADMIN can perform this action", resp_role.json().get("detail", ""))
+
+        # 4. Forged header (spoofed role in request by an Org Admin) -> 403 Forbidden
+        admin_iso = self.get_user_by_email("test_admin@sec-iso.com")
+        headers_iso_admin = self.get_auth_headers(admin_iso)
+        spoofed_headers = dict(headers_iso_admin)
+        spoofed_headers["X-Role"] = "SUPER_ADMIN"
+        spoofed_headers["X-User-Role"] = "SUPER_ADMIN"
+        resp_spoof = client.get("/api/platform/security", headers=spoofed_headers)
+        self.assertEqual(resp_spoof.status_code, 403)
+
+        # 5. Legitimate SUPER_ADMIN -> 200 OK with truthful metrics
+        sa_headers = self.get_auth_headers(self.super_admin)
+        resp_sa = client.get("/api/platform/security", headers=sa_headers)
+        self.assertEqual(resp_sa.status_code, 200)
+        data = resp_sa.json()
+        self.assertIn("critical_risks_count", data)
+        self.assertIn("security_incidents_count", data)
+        self.assertIn("blocked_actions_count", data)
+        self.assertIn("security_status", data)
+        self.assertEqual(data["security_status"], "STRICT_ENFORCEMENT")
+        print("  [PASS] Test 21: /api/platform/security strictly rejects 401 unauthenticated, 403 organization roles (USER, AUDITOR, SECURITY_OFFICER, ADMIN), rejects forged headers, and authorizes real database SUPER_ADMIN (200)")
 
 if __name__ == "__main__":
     unittest.main()

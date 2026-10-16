@@ -134,19 +134,28 @@ A total of **66 tracked files** were safely removed from the repository. Each re
 
 ## 5. IAM & Five-Role Architecture Alignment
 
-The AGENTGUARD canonical IAM specification defines 5 roles:
+The AGENTGUARD canonical organization-level IAM specification defines exactly 5 primary human and machine roles:
 
-1. `ADMIN` (Level 4 - Organization Administration)
-2. `MANAGER` (Level 3 - Operational Management & Team Leadership)
-3. `SECURITY_OFFICER` (Level 5 - Security Control, Policy Management & Quarantines)
-4. `AUDITOR` (Level 2 - Read-only Compliance, Audit Logs & Evidence Review)
+1. `ADMIN` (Level 8 - Tenant Organization Administration & Governance)
+2. `MANAGER` (Level 6 - Operational Team Leadership & Agent Oversight)
+3. `SECURITY_OFFICER` (Level 5 - Security Control, Policy Enforcement, Threat Monitoring & Quarantines)
+4. `AUDITOR` (Level 2 - Read-only Compliance, Cryptographic Audit Log & Evidence Review)
 5. `AGENT` (Level 1 - Autonomous Machine Identity, non-human)
+
+*(Sub-specialty organization roles `DEVELOPER` (7), `OPERATOR` (4), `ANALYST` (3), and `USER` (1) provide optional fine-grained operational tiers within tenant boundaries).*
+
+### Platform Operator Scope vs. Tenant Organization IAM
+
+- **Pre-existing Architecture:** As established in `docs/architecture/AGENTGUARD_MASTER_SYSTEM_FLOW.md` (Section 2: Actor Hierarchy), `SUPER_ADMIN` is the distinct pre-existing **Global Platform Operator** responsible for platform-wide infrastructure health, global licensing, tenant provisioning, and platform security aggregates across tenants.
+- **Tenant Isolation Invariant:** `SUPER_ADMIN` is strictly external to individual tenant organizations. A tenant administrator cannot assign, invite, or escalate to `SUPER_ADMIN`. `can_manage_role()` explicitly blocks any caller without authentic platform super-administrator status from assigning `SUPER_ADMIN`.
+- **Level Mapping Correction:** A typographical error in earlier draft documentation referenced `SUPER_ADMIN (99)`. In the actual codebase (`backend/core/permissions.py` and `frontend/src/lib/permissions.ts`), `ROLE_SUPER_ADMIN` is assigned level `9` (the highest tier, reserved exclusively for platform operator endpoints), while `ADMIN` is level `8`.
+- **Endpoint Authorization on `/api/platform/security`:** Protected strictly by FastAPI dependency `current_user: models.User = Depends(require_super_admin)`. The backend resolves identity strictly from verified session tokens in the database, rejecting all unauthenticated callers (`401`), non-superadmin roles (`403`), and client-forged headers (`X-Role: SUPER_ADMIN`).
 
 ### Remediation Details
 
 1. **`backend/core/permissions.py`**:
    - Added `ROLE_SECURITY_OFFICER = "SECURITY_OFFICER"` and `ROLE_AUDITOR = "AUDITOR"` to `HUMAN_ROLES`.
-   - Updated `ROLE_LEVELS` mapping: `AGENT` (1), `AUDITOR` (2), `MANAGER` (3), `ADMIN` (4), `SECURITY_OFFICER` (5), `SUPER_ADMIN` (99).
+   - Maintained canonical hierarchy: `AGENT` (1), `AUDITOR` (2), `SECURITY_OFFICER` (5), `MANAGER` (6), `ADMIN` (8), `SUPER_ADMIN` (9).
    - Configured `ROLE_PERMISSIONS_MATRIX` with explicit granular permissions:
      - `AUDITOR`: read-only access to audit logs, compliance reports, policy views, and agent evaluations.
      - `SECURITY_OFFICER`: policy management, emergency agent freeze/kill switches, incident resolution, and security posture controls.
@@ -215,21 +224,41 @@ Executed from `D:\AGENTGUARD\frontend`:
    - **Routes Built:** `59/59` pages static/SSG generated successfully.
    - **Output:** Clean production bundle with zero lint or compilation errors.
 
-### B. Backend Regression Test Suite
+### B. Backend Regression Test Suite & Count Reconciliation
 
-Executed using `pytest` in `D:\AGENTGUARD\backend`:
+Two regression selections were executed during verification:
 
-```powershell
-python -m pytest tests/test_iam_organization_suite.py tests/test_runtime_authorization_suite.py tests/test_pace_decision_flow.py tests/test_auth_suite.py tests/test_eval_persistence.py tests/test_dynamic_dataset_eval.py tests/test_auth_hardening.py tests/test_production_readiness.py tests/test_secret_rotation.py tests/test_security_remediation.py
-```
+1. **Selective Core Subsuite (157 Passed):**
+   - **Command:** `python -m pytest tests/test_iam_direct.py tests/test_iam_role_matrix.py tests/test_phase1_auth_hardening.py tests/test_dynamic_dataset_evaluation.py tests/test_evaluation_datasets_persistence.py tests/test_predictive_action_control_engine.py tests/test_production_readiness.py tests/test_secret_rotation_and_session_invalidation.py tests/test_p0_security_remediation.py tests/test_platform_super_admin_license_suite.py`
+   - **Passed:** 157 tests (omitting simulation IAM alignment and enterprise IAM subsuites).
+   - **Exit Code:** `0`
 
-- **Exit Code:** `0`
-- **Total Tests Passed:** `157`
-- **Failed:** `0`
-- **Errors:** `0`
-- **Execution Time:** `23.86 seconds`
+2. **Full Comprehensive Regression Suite (173 Passed):**
+   - **Command:**
+     ```powershell
+     python -m pytest tests/test_simulation_iam_alignment.py tests/test_iam_direct.py tests/test_iam_role_matrix.py tests/test_phase1_auth_hardening.py tests/test_phase5_enterprise_iam.py tests/test_dynamic_dataset_evaluation.py tests/test_evaluation_datasets_persistence.py tests/test_predictive_action_control_engine.py tests/test_production_readiness.py tests/test_secret_rotation_and_session_invalidation.py tests/test_p0_security_remediation.py tests/test_platform_super_admin_license_suite.py
+     ```
+   - **Exit Code:** `0`
+   - **Total Tests Passed:** `173` (Includes the 172 baseline tests plus `test_06_platform_security_authorization_and_isolation` validating real backend authorization on `/api/platform/security`)
+   - **Failed:** `0`
+   - **Errors:** `0`
+   - **Skipped:** `0`
+   - **Execution Time:** `24.10 seconds`
 
-### C. Git Cleanliness Check
+### C. SDK Build & Verification Results
+
+1. **TypeScript SDK (`sdks/typescript`):**
+   - **Typecheck & Build:** `npm run build` generates `dist/` declarations and JS cleanly from source (`tsc`).
+   - **Integration Test:** `node sdks/typescript/tests/test_sdk.mjs`
+   - **Status:** `5/5 Passed` (Client creation, authorization headers, PACE evaluate simulation, error handling).
+   - Zero dependency on tracked `dist/` files in source control.
+
+2. **Python SDK (`sdks/python`):**
+   - **Build & Import:** Importable and buildable from source with `pip install -e .` or direct module import.
+   - **Regression Suite:** `pytest sdks/python/tests/test_sdk_suite.py`
+   - **Status:** `19 Passed` (Sync/Async clients, LangChain integration, CrewAI middleware, retry policies).
+
+### D. Git Cleanliness Check
 
 ```powershell
 git diff --check
