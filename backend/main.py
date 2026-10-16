@@ -12,7 +12,11 @@ from routers import (
     provenance, audit, red_team, digital_twin, economics, impact,
     optimization, analytics, assistant, developers, integrations, system,
     settings as settings_router, notifications, platform, organization, reports, webhooks,
+<<<<<<< HEAD
     telemetry, tools, billing, simulation
+=======
+    telemetry, tools, billing
+>>>>>>> ee74fb570e5883e2551016f01ec75f0a956c1eff
 )
 
 from bootstrap import bootstrap_database, ensure_canonical_plans
@@ -93,7 +97,11 @@ DOMAIN_ROUTERS = [
     economics.router, impact.router, optimization.router, analytics.router,
     assistant.router, developers.router, integrations.router, system.router,
     settings_router.router, notifications.router, webhooks.router,
+<<<<<<< HEAD
     telemetry.router, tools.router, billing.router, simulation.router
+=======
+    telemetry.router, tools.router, billing.router
+>>>>>>> ee74fb570e5883e2551016f01ec75f0a956c1eff
 ]
 
 for r in DOMAIN_ROUTERS:

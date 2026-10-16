@@ -67,6 +67,7 @@ async def act_on_approval(
         if new_status == "APPROVED":
             dec.decision = "ALLOW"
             dec.execution_status = "EXECUTED"
+<<<<<<< HEAD
             if not dec.execution_gate_token:
                 import uuid
                 dec.execution_gate_token = f"gate_{uuid.uuid4().hex[:16]}"
@@ -92,6 +93,10 @@ async def act_on_approval(
             }
         )
         db.add(audit)
+=======
+        else:
+            dec.execution_status = "BLOCKED"
+>>>>>>> ee74fb570e5883e2551016f01ec75f0a956c1eff
 
     db.commit()
 
