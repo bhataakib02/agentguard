@@ -16,6 +16,8 @@ client = TestClient(app)
 class TestPhase1AuthHardening(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from database import Base, engine
+        Base.metadata.create_all(bind=engine)
         cls.db = SessionLocal()
 
         # 1. Ensure a platform organization exists

@@ -71,7 +71,7 @@ def get_platform_overview(
     total_agents = db.query(models.Agent).count()
     active_licenses = db.query(models.License).filter(models.License.status == "ACTIVE").count()
     
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     expiring_licenses = db.query(models.License).filter(
         models.License.expiry_date != None,
         models.License.expiry_date <= now + datetime.timedelta(days=30),
@@ -122,7 +122,9 @@ def get_platform_overview(
         o = db.query(models.Organization).filter(models.Organization.id == l.org_id).first()
         days_rem = (l.expiry_date - now).days if l.expiry_date else 365
         org_user_cnt = db.query(models.User).filter(models.User.org_id == l.org_id).count()
-        calc_usage_pct = round((org_user_cnt / l.max_users) * 100, 1) if l.max_users and l.max_users > 0 else 0.0
+        u_val = getattr(l, "max_users", 0)
+        max_u_val = float(u_val) if u_val else 0.0
+        calc_usage_pct = round((float(org_user_cnt) / max_u_val) * 100.0, 1) if max_u_val > 0.0 else 0.0
         expiring_list.append({
             "id": str(l.id),
             "org_id": str(l.org_id),
@@ -162,7 +164,7 @@ def get_platform_overview(
         },
         "recent_audits": audit_list,
         "expiring_licenses_list": expiring_list,
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
 
 @router.get("/plans")
@@ -210,7 +212,7 @@ def list_organizations(
         res.append({
             "id": str(o.id),
             "name": o.name,
-            "slug": o.slug or slugify(o.name),
+            "slug": o.slug or slugify(str(o.name)),
             "domain": o.domain or "",
             "status": o.status or "ACTIVE",
             "admin_email": o.admin_email or "admin@enterprise.ai",
@@ -291,7 +293,7 @@ def update_organization_status(
         raise HTTPException(status_code=404, detail="Organization not found")
 
     old_status = org.status
-    org.status = new_status
+    setattr(org, "status", new_status)
     db.commit()
     db.refresh(org)
 
@@ -328,7 +330,7 @@ def update_platform_user_status(
         raise HTTPException(status_code=403, detail="Forbidden: Cannot suspend or deactivate your own account")
 
     old_status = user.status
-    user.status = new_status
+    setattr(user, "status", new_status)
     if new_status in ["SUSPENDED", "INACTIVE", "DEACTIVATED"]:
         db.query(models.Session).filter(models.Session.user_id == user.id).update({"revoked": True})
     db.commit()
@@ -389,8 +391,8 @@ def create_organization(
             db.refresh(admin_user)
         else:
             if admin_user.org_id != existing_org.id or admin_user.role != "ADMIN":
-                admin_user.org_id = existing_org.id
-                admin_user.role = "ADMIN"
+                setattr(admin_user, "org_id", existing_org.id)
+                setattr(admin_user, "role", "ADMIN")
                 db.commit()
                 db.refresh(admin_user)
 
@@ -494,8 +496,8 @@ def create_organization(
             db.flush()
             admin_user_id = str(admin_user.id)
         else:
-            existing_admin.org_id = org.id
-            existing_admin.role = "ADMIN"
+            setattr(existing_admin, "org_id", org.id)
+            setattr(existing_admin, "role", "ADMIN")
             db.flush()
             admin_user_id = str(existing_admin.id)
 
@@ -603,7 +605,7 @@ def list_platform_licenses(
 ):
     licenses = db.query(models.License).all()
     res = []
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     for l in licenses:
         org = db.query(models.Organization).filter(models.Organization.id == l.org_id).first()
@@ -618,7 +620,8 @@ def list_platform_licenses(
         is_expired = False
 
         if l.expiry_date:
-            diff = (l.expiry_date - now).days
+            exp_dt = l.expiry_date if l.expiry_date.tzinfo else l.expiry_date.replace(tzinfo=datetime.timezone.utc)
+            diff = (exp_dt - now).days
             days_remaining = diff
             if diff <= 30 and diff > 0:
                 expiring_soon = True
@@ -653,16 +656,17 @@ def extend_organization_license(
     if not lic:
         raise HTTPException(status_code=404, detail="Organization license not found")
 
-    old_expiry = lic.expiry_date or datetime.datetime.utcnow()
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    old_expiry = lic.expiry_date or now_utc
     if payload.custom_expiry_date:
         new_expiry = datetime.datetime.fromisoformat(payload.custom_expiry_date)
     else:
         add_days = payload.days or 30
         new_expiry = old_expiry + datetime.timedelta(days=add_days)
 
-    lic.expiry_date = new_expiry
-    if lic.status == "EXPIRED":
-        lic.status = "ACTIVE"
+    setattr(lic, "expiry_date", new_expiry)
+    if str(lic.status) == "EXPIRED":
+        setattr(lic, "status", "ACTIVE")
     db.commit()
 
     audit = models.AuditLog(
@@ -689,9 +693,9 @@ def renew_organization_license(
     if not lic:
         raise HTTPException(status_code=404, detail="Organization license not found")
 
-    new_expiry = datetime.datetime.utcnow() + datetime.timedelta(days=365)
-    lic.expiry_date = new_expiry
-    lic.status = "ACTIVE"
+    new_expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365)
+    setattr(lic, "expiry_date", new_expiry)
+    setattr(lic, "status", "ACTIVE")
     db.commit()
 
     audit = models.AuditLog(
@@ -718,7 +722,7 @@ def revoke_organization_license(
     if not lic:
         raise HTTPException(status_code=404, detail="Organization license not found")
 
-    lic.status = "CANCELLED"
+    setattr(lic, "status", "CANCELLED")
     db.commit()
 
     audit = models.AuditLog(
@@ -740,37 +744,73 @@ def get_platform_security(
     current_user: models.User = Depends(require_super_admin),
     db: Session = Depends(get_db)
 ):
-    try:
-        incidents = db.query(models.SecurityIncident).order_by(models.SecurityIncident.created_at.desc()).all()
-    except Exception:
-        db.rollback()
-        incidents = []
+    critical_risks = db.query(models.SecurityIncident).filter(models.SecurityIncident.severity == "CRITICAL").count()
+    security_incidents = db.query(models.SecurityIncident).count()
+    blocked_actions = db.query(models.Decision).filter(models.Decision.decision == "REFUSE").count()
+    suspended_agents = db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").count()
+    suspended_users = db.query(models.User).filter(models.User.status == "SUSPENDED").count()
 
-    inc_list = []
-    for i in incidents:
-        org = db.query(models.Organization).filter(models.Organization.id == i.org_id).first()
-        inc_list.append({
-            "id": str(i.id),
-            "title": i.title,
-            "severity": i.severity,
-            "status": i.status,
-            "org_name": org.name if org else "Unknown",
-            "timestamp": i.created_at.isoformat() if i.created_at else None
+    decisions = db.query(models.Decision).all()
+    scores: list[float] = [float(getattr(d, "risk_score", 0.0)) for d in decisions if getattr(d, "risk_score", None) is not None]
+    avg_score: float = round(sum(scores) / len(scores), 1) if scores else 0.0
+
+    incidents_query = db.query(models.SecurityIncident).order_by(models.SecurityIncident.created_at.desc()).limit(10).all()
+    incidents_list = []
+    for inc in incidents_query:
+        org = db.query(models.Organization).filter(models.Organization.id == inc.org_id).first()
+        incidents_list.append({
+            "id": str(inc.id),
+            "title": str(inc.title),
+            "org_name": str(org.name) if org else "Platform",
+            "severity": str(inc.severity),
+            "status": str(inc.status),
+            "timestamp": inc.created_at.isoformat() if inc.created_at else None
         })
 
+    blocked_query = db.query(models.Decision).filter(models.Decision.decision == "REFUSE").order_by(models.Decision.timestamp.desc()).limit(5).all()
+    blocked_list = []
+    for b in blocked_query:
+        agent = db.query(models.Agent).filter(models.Agent.id == b.agent_id).first() if b.agent_id else None
+        agent_name = str(agent.name) if agent else "Agent"
+        blocked_list.append({
+            "id": str(b.id),
+            "reason": str(b.intent_summary or "POLICY_VIOLATION"),
+            "details": f"Agent '{agent_name}' attempted '{b.action_requested}' on '{b.resource_target}'. {b.explanation}",
+            "status": "REFUSED"
+        })
 
-    suspended_agents = db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").all()
-    suspended_users = db.query(models.User).filter(models.User.status == "SUSPENDED").all()
+    suspended_id_list = []
+    for a in db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").limit(5).all():
+        org = db.query(models.Organization).filter(models.Organization.id == a.org_id).first()
+        suspended_id_list.append({
+            "id": str(a.id),
+            "name": str(a.name),
+            "org_name": str(org.name) if org else "Tenant",
+            "status": "QUARANTINED",
+            "reason": f"Agent '{a.agent_code or a.name}' suspended"
+        })
+    for u in db.query(models.User).filter(models.User.status == "SUSPENDED").limit(5).all():
+        org = db.query(models.Organization).filter(models.Organization.id == u.org_id).first()
+        suspended_id_list.append({
+            "id": str(u.id),
+            "name": str(u.email),
+            "org_name": str(org.name) if org else "Tenant",
+            "status": "SUSPENDED",
+            "reason": "Account suspended by administrator"
+        })
 
     return {
-        "security_incidents_count": len(incidents),
-        "critical_risks_count": len([i for i in incidents if i.severity == "CRITICAL"]) + 5,
-        "blocked_actions_count": 23,
-        "suspended_agents_count": len(suspended_agents),
-        "suspended_users_count": len(suspended_users),
-        "incidents": inc_list,
-        "suspended_agents": [{"id": str(a.id), "name": a.name, "code": a.agent_code} for a in suspended_agents],
-        "suspended_users": [{"id": str(u.id), "name": u.full_name, "email": u.email} for u in suspended_users]
+        "critical_risks_count": critical_risks,
+        "security_incidents_count": security_incidents,
+        "blocked_actions_count": blocked_actions,
+        "suspended_agents_count": suspended_agents,
+        "suspended_users_count": suspended_users,
+        "risk_score": f"{avg_score} / 100",
+        "active_threats": critical_risks,
+        "incidents": incidents_list,
+        "blocked_actions": blocked_list,
+        "suspended_identities": suspended_id_list,
+        "security_status": "STRICT_ENFORCEMENT"
     }
 
 
@@ -814,11 +854,11 @@ def get_system_health(
     db: Session = Depends(get_db)
 ):
     db_status = "Operational"
-    start_time = datetime.datetime.utcnow()
+    start_time = datetime.datetime.now(datetime.timezone.utc)
     latency_ms = 1
     try:
         db.execute(text("SELECT 1;"))
-        latency_ms = max(1, int((datetime.datetime.utcnow() - start_time).total_seconds() * 1000))
+        latency_ms = max(1, int((datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds() * 1000))
     except Exception:
         db_status = "Degraded"
 
@@ -830,7 +870,7 @@ def get_system_health(
             {"name": "API Gateway Services", "status": "Operational", "telemetry": "Active", "latency_ms": latency_ms + 2},
             {"name": "Audit & Security Log Engine", "status": "Operational", "telemetry": "Active", "latency_ms": latency_ms + 1}
         ],
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
 
 @router.get("/search")
@@ -963,8 +1003,8 @@ def get_platform_api_integrations(
     successful_deliveries = db.query(models.WebhookDelivery).filter(models.WebhookDelivery.status == "DELIVERED").count()
     delivery_rate = f"{round((successful_deliveries / total_deliveries) * 100, 1)}%" if total_deliveries > 0 else "No data available"
 
-    now = datetime.datetime.utcnow()
-    h24_ago = now - datetime.timedelta(hours=24)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    h24_ago = now.replace(tzinfo=None) - datetime.timedelta(hours=24)
     decisions_24h = db.query(models.Decision).filter(models.Decision.timestamp >= h24_ago).count()
     audits_24h = db.query(models.AuditLog).filter(models.AuditLog.timestamp >= h24_ago).count()
     requests_24h = f"{decisions_24h + audits_24h:,}"
@@ -1002,94 +1042,21 @@ def get_platform_api_integrations(
         "recent_api_activity": recent_activity
     }
 
-@router.get("/security")
-def get_platform_security(
-    current_user: models.User = Depends(require_super_admin),
-    db: Session = Depends(get_db)
-):
-    critical_risks = db.query(models.SecurityIncident).filter(models.SecurityIncident.severity == "CRITICAL").count()
-    security_incidents = db.query(models.SecurityIncident).count()
-    blocked_actions = db.query(models.Decision).filter(models.Decision.decision == "REFUSE").count()
-    suspended_agents = db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").count()
-    suspended_users = db.query(models.User).filter(models.User.status == "SUSPENDED").count()
-
-    decisions = db.query(models.Decision).all()
-    avg_score = round(sum(d.risk_score for d in decisions if d.risk_score is not None) / len(decisions), 1) if decisions else 0.0
-
-    incidents_query = db.query(models.SecurityIncident).order_by(models.SecurityIncident.created_at.desc()).limit(10).all()
-    incidents_list = []
-    for inc in incidents_query:
-        org = db.query(models.Organization).filter(models.Organization.id == inc.org_id).first()
-        incidents_list.append({
-            "id": str(inc.id),
-            "title": inc.title,
-            "org_name": org.name if org else "Platform",
-            "severity": inc.severity,
-            "status": inc.status,
-            "timestamp": inc.created_at.isoformat() if inc.created_at else None
-        })
-
-    blocked_query = db.query(models.Decision).filter(models.Decision.decision == "REFUSE").order_by(models.Decision.timestamp.desc()).limit(5).all()
-    blocked_list = []
-    for b in blocked_query:
-        agent = db.query(models.Agent).filter(models.Agent.id == b.agent_id).first() if b.agent_id else None
-        agent_name = agent.name if agent else "Agent"
-        blocked_list.append({
-            "id": str(b.id),
-            "reason": b.intent_summary or "POLICY_VIOLATION",
-            "details": f"Agent '{agent_name}' attempted '{b.action_requested}' on '{b.resource_target}'. {b.explanation}",
-            "status": "REFUSED"
-        })
-
-    suspended_id_list = []
-    for a in db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").limit(5).all():
-        org = db.query(models.Organization).filter(models.Organization.id == a.org_id).first()
-        suspended_id_list.append({
-            "id": str(a.id),
-            "name": a.name,
-            "org_name": org.name if org else "Tenant",
-            "status": "QUARANTINED",
-            "reason": f"Agent '{a.agent_code or a.name}' suspended"
-        })
-    for u in db.query(models.User).filter(models.User.status == "SUSPENDED").limit(5).all():
-        org = db.query(models.Organization).filter(models.Organization.id == u.org_id).first()
-        suspended_id_list.append({
-            "id": str(u.id),
-            "name": u.email,
-            "org_name": org.name if org else "Tenant",
-            "status": "SUSPENDED",
-            "reason": "Account suspended by administrator"
-        })
-
-    return {
-        "critical_risks_count": critical_risks,
-        "security_incidents_count": security_incidents,
-        "blocked_actions_count": blocked_actions,
-        "suspended_agents_count": suspended_agents,
-        "suspended_users_count": suspended_users,
-        "risk_score": f"{avg_score} / 100",
-        "active_threats": critical_risks,
-        "incidents": incidents_list,
-        "blocked_actions": blocked_list,
-        "suspended_identities": suspended_id_list,
-        "security_status": "STRICT_ENFORCEMENT"
-    }
-
 @router.get("/health")
 def get_detailed_system_health(
     current_user: models.User = Depends(require_super_admin),
     db: Session = Depends(get_db)
 ):
     db_status = "Operational"
-    start_time = datetime.datetime.utcnow()
+    start_time = datetime.datetime.now(datetime.timezone.utc)
     latency_ms = 1
     try:
         db.execute(text("SELECT 1;"))
-        latency_ms = max(1, int((datetime.datetime.utcnow() - start_time).total_seconds() * 1000))
+        latency_ms = max(1, int((datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds() * 1000))
     except Exception:
         db_status = "Degraded"
 
-    now_iso = datetime.datetime.utcnow().isoformat()
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     recent_audits = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).limit(3).all()
     recent_events = []
     for a in recent_audits:

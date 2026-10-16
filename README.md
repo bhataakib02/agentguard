@@ -71,6 +71,11 @@ AGENTGUARD/
 ├── supabase/
 │   └── migrations/       # PostgreSQL schema & RLS policies
 │
+├── docs/                 # Platform documentation & audit records
+│   ├── architecture/     # Master system flow & architectural blueprints
+│   ├── runbooks/         # Deployment runbook & development workflow
+│   └── reports/          # Verification, UAT, and consistency audit reports
+│
 ├── logo.png
 ├── README.md
 └── .gitignore
@@ -106,3 +111,16 @@ npm run dev
 - **Database**: Supabase PostgreSQL (via `DATABASE_URL` in `backend/.env`).
 - **Auth**: Supabase Auth (`supabase.auth.signUp()`, `signInWithPassword()`, `signInWithOtp()`, `verifyOtp()`).
 - **Data Source**: 100% database-driven. Zero hardcoded/mock demo records.
+
+---
+
+## 📚 Documentation & Runbooks
+
+- **Architecture**:
+  - [AGENTGUARD Master System Flow](docs/architecture/AGENTGUARD_MASTER_SYSTEM_FLOW.md)
+- **Operations & Runbooks**:
+  - [Deployment Runbook](docs/runbooks/DEPLOYMENT_RUNBOOK.md)
+  - [Development Workflow](docs/runbooks/DEVELOPMENT_WORKFLOW.md)
+- **Audit & Phase Reports**:
+  - [Cleanup and Production Consistency Report](docs/reports/CLEANUP_AND_PRODUCTION_CONSISTENCY_REPORT.md)
+  - [Dynamic Dataset Evaluation & Persistent Simulation Reports](docs/reports/)

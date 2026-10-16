@@ -97,7 +97,7 @@ def get_current_user_permissions(
     current_user: models.User = Depends(get_current_user)
 ):
     """Returns the authenticated user's authoritative permissions and role hierarchy."""
-    perms = get_user_permissions(current_user.role)
+    perms = get_user_permissions(str(current_user.role))
     return {
         "user_id": str(current_user.id),
         "email": current_user.email,
@@ -157,14 +157,14 @@ def create_api_key(
 
     expires_at = None
     if req.expires_in_days and req.expires_in_days > 0:
-        expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=req.expires_in_days)
+        expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=req.expires_in_days)
 
     scopes_str = "read,write"
     if req.scopes:
         if isinstance(req.scopes, list):
             scopes_str = ",".join(req.scopes)
         else:
-            scopes_str = str(req.scopes)
+            scopes_str = req.scopes
 
     api_key = models.ApiKey(
         org_id=current_user.org_id,
@@ -229,9 +229,9 @@ def revoke_api_key(
     if current_user.role != "SUPER_ADMIN" and key.org_id != current_user.org_id:
         raise HTTPException(status_code=403, detail="Forbidden: Cannot revoke API key of another organization")
 
-    key.is_revoked = True
-    key.revoked_at = datetime.datetime.utcnow()
-    key.revoked_by_id = current_user.id
+    setattr(key, "is_revoked", True)
+    setattr(key, "revoked_at", datetime.datetime.now(datetime.timezone.utc))
+    setattr(key, "revoked_by_id", current_user.id)
     db.commit()
 
     audit = models.AuditLog(
@@ -272,7 +272,8 @@ def list_invitations(
     res = []
     for inv in invs:
         # Check expired
-        is_expired = inv.expires_at < datetime.datetime.utcnow() and inv.status == "PENDING"
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        is_expired = inv.expires_at < now_utc and inv.status == "PENDING"
         res.append({
             "id": str(inv.id),
             "org_id": str(inv.org_id),
@@ -304,7 +305,7 @@ def create_invitation(
         )
 
     # Privilege escalation protection
-    if not can_manage_role(current_user.role, target_role):
+    if not can_manage_role(str(current_user.role), target_role):
         raise HTTPException(
             status_code=403,
             detail=f"Forbidden: You do not have permission to invite users with role '{target_role}'"
@@ -326,7 +327,7 @@ def create_invitation(
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
     expires_days = req.expires_in_days if (req.expires_in_days and req.expires_in_days > 0) else 7
-    expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=expires_days)
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=expires_days)
 
     inv = models.UserInvitation(
         org_id=current_user.org_id,
@@ -385,7 +386,7 @@ def revoke_invitation(
     if current_user.role != "SUPER_ADMIN" and inv.org_id != current_user.org_id:
         raise HTTPException(status_code=403, detail="Forbidden: Cannot revoke invitation for another organization")
 
-    inv.status = "REVOKED"
+    setattr(inv, "status", "REVOKED")
     db.commit()
 
     audit = models.AuditLog(
@@ -422,7 +423,8 @@ def list_sessions(
     res = []
     for s in sessions:
         u = s.user
-        masked_token = f"sess_****{s.token[-6:]}" if s.token and len(s.token) > 6 else "sess_****"
+        s_tok = str(s.token) if s.token is not None else ""
+        masked_token = f"sess_****{s_tok[-6:]}" if len(s_tok) > 6 else "sess_****"
         res.append({
             "id": str(s.id),
             "user_id": str(s.user_id),
@@ -454,7 +456,7 @@ def revoke_session(
     if current_user.role != "SUPER_ADMIN" and u and u.org_id != current_user.org_id:
         raise HTTPException(status_code=403, detail="Forbidden: Cannot revoke session for another organization")
 
-    s.revoked = True
+    setattr(s, "revoked", True)
     db.commit()
 
     audit = models.AuditLog(

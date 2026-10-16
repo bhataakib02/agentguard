@@ -1065,3 +1065,10 @@ class TestDynamicDatasetEvaluationSuite:
         assert b["precision"] == 0.0
         assert b["recall"] == 0.0
         assert b["f1_score"] == 0.0
+
+    @classmethod
+    def teardown_class(cls):
+        from main import app
+        from database import get_db, Base, engine
+        app.dependency_overrides.pop(get_db, None)
+        Base.metadata.create_all(bind=engine)

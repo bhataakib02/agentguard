@@ -18,6 +18,8 @@ client = TestClient(app)
 class TestProductionReadiness(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from database import Base, engine
+        Base.metadata.create_all(bind=engine)
         cls.db = SessionLocal()
 
         # Ensure demo organizations are seeded in isolated test environment only
