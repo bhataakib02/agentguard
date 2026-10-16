@@ -12,9 +12,11 @@ ROLE_SUPER_ADMIN = "SUPER_ADMIN"
 ROLE_ADMIN = "ADMIN"
 ROLE_DEVELOPER = "DEVELOPER"
 ROLE_MANAGER = "MANAGER"
+ROLE_SECURITY_OFFICER = "SECURITY_OFFICER"
 ROLE_SECURITY_ANALYST = "SECURITY_ANALYST"
 ROLE_OPERATOR = "OPERATOR"
 ROLE_ANALYST = "ANALYST"
+ROLE_AUDITOR = "AUDITOR"
 ROLE_VIEWER = "VIEWER"
 ROLE_USER = "USER"
 
@@ -26,9 +28,11 @@ MACHINE_ROLES = [
 
 HUMAN_ROLES = [
     ROLE_USER,
+    ROLE_AUDITOR,
     ROLE_VIEWER,
     ROLE_ANALYST,
     ROLE_OPERATOR,
+    ROLE_SECURITY_OFFICER,
     ROLE_SECURITY_ANALYST,
     ROLE_MANAGER,
     ROLE_DEVELOPER,
@@ -41,9 +45,11 @@ ROLE_LEVELS: Dict[str, int] = {
     ROLE_ADMIN: 8,
     ROLE_DEVELOPER: 7,
     ROLE_MANAGER: 6,
+    ROLE_SECURITY_OFFICER: 5,
     ROLE_SECURITY_ANALYST: 5,
     ROLE_OPERATOR: 4,
     ROLE_ANALYST: 3,
+    ROLE_AUDITOR: 2,
     ROLE_VIEWER: 2,
     ROLE_USER: 1,
 }
@@ -198,6 +204,56 @@ ROLE_PERMISSIONS_MATRIX: Dict[str, Set[str]] = {
         "capabilities:read",
         "capabilities:execute",
         "runtime:read",
+    },
+    ROLE_AUDITOR: {
+        PERM_ORGANIZATION_VIEW,
+        PERM_USER_VIEW,
+        PERM_AGENT_VIEW,
+        PERM_POLICY_VIEW,
+        PERM_DECISION_VIEW,
+        PERM_AUDIT_VIEW,
+        PERM_AUDIT_EXPORT,
+        PERM_REPORT_VIEW,
+        PERM_REPORT_DOWNLOAD,
+        PERM_TELEMETRY_VIEW,
+        PERM_SECURITY_VIEW,
+        "dashboard:read",
+        "profile:read",
+        "agents:read",
+        "decisions:read",
+        "risk:read",
+        "audit:read",
+        "provenance:read",
+        "analytics:read",
+        "reports:read",
+    },
+    ROLE_SECURITY_OFFICER: {
+        PERM_ORGANIZATION_VIEW,
+        PERM_USER_VIEW,
+        PERM_AGENT_VIEW,
+        PERM_AGENT_SUSPEND,
+        PERM_AGENT_RESUME,
+        PERM_POLICY_VIEW,
+        PERM_DECISION_VIEW,
+        PERM_AUDIT_VIEW,
+        PERM_AUDIT_EXPORT,
+        PERM_SECURITY_VIEW,
+        PERM_SECURITY_INCIDENT_CREATE,
+        PERM_SECURITY_INCIDENT_UPDATE,
+        PERM_SECURITY_INCIDENT_RESOLVE,
+        PERM_REPORT_VIEW,
+        PERM_REPORT_GENERATE,
+        PERM_REPORT_DOWNLOAD,
+        PERM_TELEMETRY_VIEW,
+        PERM_TELEMETRY_EXPORT,
+        "dashboard:read",
+        "profile:read",
+        "agents:read",
+        "security:read",
+        "security:write",
+        "circuit_breaker:manage",
+        "red_team:execute",
+        "incidents:manage",
     },
     ROLE_SECURITY_ANALYST: {
         PERM_ORGANIZATION_VIEW,

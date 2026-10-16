@@ -721,46 +721,32 @@ export default function PlatformDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1E2638]">
-                <tr className="hover:bg-[#161C2A]">
-                  <td className="py-2 px-2 font-mono text-[10px] text-[#64748B]">2m ago</td>
-                  <td className="py-2 px-2 font-bold text-white">SUPER_ADMIN</td>
-                  <td className="py-2 px-2 text-[#94A3B8]">License extended</td>
-                  <td className="py-2 px-2">
-                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/30 font-mono">
-                      SUCCESS
-                    </span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-[#161C2A]">
-                  <td className="py-2 px-2 font-mono text-[10px] text-[#64748B]">15m ago</td>
-                  <td className="py-2 px-2 font-bold text-white">MedCore-Admin</td>
-                  <td className="py-2 px-2 text-[#94A3B8]">Agent created</td>
-                  <td className="py-2 px-2">
-                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/30 font-mono">
-                      SUCCESS
-                    </span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-[#161C2A]">
-                  <td className="py-2 px-2 font-mono text-[10px] text-[#64748B]">32m ago</td>
-                  <td className="py-2 px-2 font-bold text-white">Nexa-Admin</td>
-                  <td className="py-2 px-2 text-[#94A3B8]">Role updated</td>
-                  <td className="py-2 px-2">
-                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/30 font-mono">
-                      SUCCESS
-                    </span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-[#161C2A]">
-                  <td className="py-2 px-2 font-mono text-[10px] text-[#64748B]">1h ago</td>
-                  <td className="py-2 px-2 font-bold text-[#94A3B8]">UrbanGrid-Admin</td>
-                  <td className="py-2 px-2 text-[#94A3B8]">Policy updated</td>
-                  <td className="py-2 px-2">
-                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/30 font-mono">
-                      SUCCESS
-                    </span>
-                  </td>
-                </tr>
+                {(overview?.recent_audits || []).length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-center text-[#64748B] text-[11px]">
+                      No audit records found.
+                    </td>
+                  </tr>
+                ) : (
+                  (overview?.recent_audits || []).map((audit: any) => (
+                    <tr key={audit.id} className="hover:bg-[#161C2A]">
+                      <td className="py-2 px-2 font-mono text-[10px] text-[#64748B]">
+                        {audit.time ? new Date(audit.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"}
+                      </td>
+                      <td className="py-2 px-2 font-bold text-white truncate max-w-[100px]">{audit.actor}</td>
+                      <td className="py-2 px-2 text-[#94A3B8] truncate max-w-[120px]">{audit.action}</td>
+                      <td className="py-2 px-2">
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase font-mono border ${
+                          audit.result === "SUCCESS"
+                            ? "bg-[#173B25] text-[#2E9D50] border-[#2E9D50]/30"
+                            : "bg-[#3B1516] text-[#E53935] border-[#E53935]/30"
+                        }`}>
+                          {audit.result}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

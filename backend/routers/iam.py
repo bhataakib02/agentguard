@@ -62,10 +62,12 @@ def list_roles(
     db: Session = Depends(get_db)
 ):
     roles_def = [
-        ("USER", "Default role for newly registered human users"),
+        ("USER", "Default baseline role for registered human accounts"),
+        ("AUDITOR", "Independent compliance auditor with read-only provenance & audit authority"),
         ("VIEWER", "Read-only access to general platform information"),
         ("ANALYST", "Analysis and investigation across agents, decisions & risk"),
         ("OPERATOR", "AI agent operational management and monitoring"),
+        ("SECURITY_OFFICER", "Enterprise security officer with policy, incident & runtime guardrail authority"),
         ("SECURITY_ANALYST", "Security center, SOC incidents, red-team testing & anomaly response"),
         ("MANAGER", "Operational and governance management with approval authority"),
         ("DEVELOPER", "Developer platform, REST APIs, integrations & API configuration"),

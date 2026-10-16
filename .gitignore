@@ -6,6 +6,10 @@ node_modules/
 .next/
 out/
 build/
+*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+sdks/typescript/dist/
+sdks/typescript/node_modules/
 
 # Environment files & Secrets
 *.env
@@ -17,6 +21,9 @@ build/
 frontend/.env.local
 frontend/.env*.local
 backend/.env
+!*.env.example
+!*.env.*.example
+!.env.example
 
 # Database files & Backups
 *.db
@@ -39,6 +46,9 @@ backend/*.pyc
 backend/*.db
 backend/venv/
 backend/.venv/
+sdks/python/**/__pycache__/
+sdks/python/**/*.pyc
+sdks/python/*.egg-info/
 .pytest_cache/
 .coverage
 htmlcov/

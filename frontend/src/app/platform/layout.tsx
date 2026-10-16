@@ -428,9 +428,11 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                   className="w-9 h-9 rounded-[8px] bg-[#161C2A] border border-[#232F48] flex items-center justify-center hover:bg-[#1E2638] transition-colors relative"
                 >
                   <Bell className="w-4 h-4 text-[#94A3B8]" />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E53935] text-white text-[9px] font-bold flex items-center justify-center border border-[#0F131D]">
-                    12
-                  </span>
+                  {notifications.length > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#E53935] text-white text-[9px] font-bold flex items-center justify-center border border-[#0F131D]">
+                      {notifications.length > 99 ? "99+" : notifications.length}
+                    </span>
+                  )}
                 </button>
 
                 {showNotifDropdown && (
@@ -440,14 +442,18 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                       <span className="text-[10px] text-[#2E9D50] font-mono uppercase">Global Scope</span>
                     </div>
                     <div className="space-y-2 max-h-60 overflow-y-auto">
-                      <div className="p-2 bg-[#1A2234] rounded-[6px] border border-[#232F48] space-y-0.5">
-                        <span className="font-bold text-white block">License Expiring Soon</span>
-                        <p className="text-[11px] text-[#94A3B8]">UrbanGrid Logistics license expires in 24 days.</p>
-                      </div>
-                      <div className="p-2 bg-[#1A2234] rounded-[6px] border border-[#232F48] space-y-0.5">
-                        <span className="font-bold text-white block">Security Incident Alert</span>
-                        <p className="text-[11px] text-[#94A3B8]">Critical risk flag evaluated for MedCore Health Systems.</p>
-                      </div>
+                      {notifications.length === 0 ? (
+                        <div className="p-3 text-center text-[#64748B] text-[11px]">
+                          No pending platform alerts.
+                        </div>
+                      ) : (
+                        notifications.map((n: any, idx: number) => (
+                          <div key={n.id || idx} className="p-2 bg-[#1A2234] rounded-[6px] border border-[#232F48] space-y-0.5">
+                            <span className="font-bold text-white block">{n.title || n.type || "Alert"}</span>
+                            <p className="text-[11px] text-[#94A3B8]">{n.message || n.description || n.content}</p>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}

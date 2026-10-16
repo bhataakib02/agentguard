@@ -26,6 +26,9 @@ backend/*/*/__pycache__/
 htmlcov/
 test_fixtures_uat/
 scratch/
+cleanup_reports/
+sdks/
+documents/
 
 # Local databases & logs
 *.db

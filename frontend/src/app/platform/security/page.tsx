@@ -38,13 +38,13 @@ export default function PlatformSecurityPage() {
     loadSecurity();
   }, []);
 
-  const criticalRisks = secData?.critical_risks_count ?? 7;
-  const securityIncidents = secData?.security_incidents_count ?? 3;
-  const blockedActions = secData?.blocked_actions_count ?? 23;
-  const suspendedAgents = secData?.suspended_agents_count ?? 2;
-  const suspendedUsers = secData?.suspended_users_count ?? 1;
-  const riskScore = "38.4 / 100";
-  const activeThreats = 2;
+  const criticalRisks = secData?.critical_risks_count ?? 0;
+  const securityIncidents = secData?.security_incidents_count ?? 0;
+  const blockedActions = secData?.blocked_actions_count ?? 0;
+  const suspendedAgents = secData?.suspended_agents_count ?? 0;
+  const suspendedUsers = secData?.suspended_users_count ?? 0;
+  const riskScore = secData?.risk_score ?? "0.0 / 100";
+  const activeThreats = secData?.active_threats ?? 0;
 
   return (
     <div className="space-y-6 text-[#E1E7F0]">
@@ -150,48 +150,24 @@ export default function PlatformSecurityPage() {
                 </thead>
                 <tbody className="divide-y divide-[#1E2638]">
                   {(secData?.incidents || []).length === 0 ? (
-                    <>
-                      <tr className="hover:bg-[#161C2A] transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-white">Unauthorized Budget Override Attempt</td>
-                        <td className="py-3.5 px-4 text-[#94A3B8]">ACME Technologies</td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#3B1516] text-[#E53935] border border-[#E53935]/40 font-mono">
-                            CRITICAL
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-[#2E9D50] font-bold">BLOCKED</td>
-                        <td className="py-3.5 px-4 font-mono text-[#64748B]">12m ago</td>
-                      </tr>
-                      <tr className="hover:bg-[#161C2A] transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-white">Abnormal API Token Spike Detected</td>
-                        <td className="py-3.5 px-4 text-[#94A3B8]">MedCore Health Systems</td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40 font-mono">
-                            HIGH
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-[#F59A23] font-bold">INVESTIGATING</td>
-                        <td className="py-3.5 px-4 font-mono text-[#64748B]">45m ago</td>
-                      </tr>
-                      <tr className="hover:bg-[#161C2A] transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-white">Suspicious Prompt Injection Keyword</td>
-                        <td className="py-3.5 px-4 text-[#94A3B8]">Nexa Financial Services</td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40 font-mono">
-                            MEDIUM
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-[#2E9D50] font-bold">CONTAINED</td>
-                        <td className="py-3.5 px-4 font-mono text-[#64748B]">2h ago</td>
-                      </tr>
-                    </>
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-[#64748B] text-[12px]">
+                        No active security incidents recorded across tenant workspaces.
+                      </td>
+                    </tr>
                   ) : (
                     (secData?.incidents || []).map((inc: any) => (
                       <tr key={inc.id} className="hover:bg-[#161C2A] transition-colors">
                         <td className="py-3.5 px-4 font-bold text-white">{inc.title}</td>
                         <td className="py-3.5 px-4 text-[#94A3B8]">{inc.org_name}</td>
                         <td className="py-3.5 px-4">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#3B1516] text-[#E53935] border border-[#E53935]/40 font-mono">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono border ${
+                            inc.severity === "CRITICAL"
+                              ? "bg-[#3B1516] text-[#E53935] border-[#E53935]/40"
+                              : inc.severity === "HIGH"
+                              ? "bg-[#3D2910] text-[#F59A23] border-[#F59A23]/40"
+                              : "bg-[#173B25] text-[#2E9D50] border-[#2E9D50]/40"
+                          }`}>
                             {inc.severity}
                           </span>
                         </td>
@@ -215,20 +191,23 @@ export default function PlatformSecurityPage() {
             </h3>
 
             <div className="space-y-2 text-[12px]">
-              <div className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-white block">FINANCIAL_LIMIT_EXCEEDED</span>
-                  <span className="text-[11px] text-[#94A3B8]">Agent AGENT-ACC-09 requested transfer of ₹450,000 against max budget ₹100,000</span>
+              {(secData?.blocked_actions || []).length === 0 ? (
+                <div className="p-4 text-center text-[#64748B] text-[11px] bg-[#161C2A] rounded-[8px]">
+                  No blocked actions recorded in the current period.
                 </div>
-                <span className="px-2 py-1 bg-[#3B1516] text-[#E53935] rounded font-mono text-[10px] font-bold">REFUSED</span>
-              </div>
-              <div className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-white block">UNAUTHORIZED_DB_SCHEMA_ACCESS</span>
-                  <span className="text-[11px] text-[#94A3B8]">Agent AGENT-MED-04 attempted raw table DROP in MedCore database</span>
-                </div>
-                <span className="px-2 py-1 bg-[#3B1516] text-[#E53935] rounded font-mono text-[10px] font-bold">REFUSED</span>
-              </div>
+              ) : (
+                (secData?.blocked_actions || []).map((b: any) => (
+                  <div key={b.id} className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-white block">{b.reason}</span>
+                      <span className="text-[11px] text-[#94A3B8]">{b.details}</span>
+                    </div>
+                    <span className="px-2 py-1 bg-[#3B1516] text-[#E53935] rounded font-mono text-[10px] font-bold">
+                      {b.status || "REFUSED"}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -243,21 +222,23 @@ export default function PlatformSecurityPage() {
             </h3>
 
             <div className="space-y-2 text-[12px]">
-              <div className="p-2.5 bg-[#161C2A] rounded-[8px] border border-[#232F48] space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">AGENT-FIN-009</span>
-                  <span className="text-[9px] font-bold uppercase bg-[#3B1516] text-[#E53935] px-1.5 py-0.5 rounded font-mono">QUARANTINED</span>
+              {(secData?.suspended_identities || []).length === 0 ? (
+                <div className="p-4 text-center text-[#64748B] text-[11px] bg-[#161C2A] rounded-[8px]">
+                  All agent and user identities active. No quarantined accounts.
                 </div>
-                <p className="text-[11px] text-[#64748B]">Nexa Financial • Excessive failure rate</p>
-              </div>
-
-              <div className="p-2.5 bg-[#161C2A] rounded-[8px] border border-[#232F48] space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">dev-test-user@urbangrid.com</span>
-                  <span className="text-[9px] font-bold uppercase bg-[#3B1516] text-[#E53935] px-1.5 py-0.5 rounded font-mono">RESTRICTED</span>
-                </div>
-                <p className="text-[11px] text-[#64748B]">UrbanGrid • Suspicious token rotation</p>
-              </div>
+              ) : (
+                (secData?.suspended_identities || []).map((ident: any) => (
+                  <div key={ident.id} className="p-2.5 bg-[#161C2A] rounded-[8px] border border-[#232F48] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white">{ident.name}</span>
+                      <span className="text-[9px] font-bold uppercase bg-[#3B1516] text-[#E53935] px-1.5 py-0.5 rounded font-mono">
+                        {ident.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#64748B]">{ident.org_name} • {ident.reason}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

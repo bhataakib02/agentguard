@@ -14,7 +14,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 import pytest
 from database import Base, engine
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 def setup_test_database():
+    from database import Base, engine
     Base.metadata.create_all(bind=engine)
     yield

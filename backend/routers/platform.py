@@ -1002,6 +1002,79 @@ def get_platform_api_integrations(
         "recent_api_activity": recent_activity
     }
 
+@router.get("/security")
+def get_platform_security(
+    current_user: models.User = Depends(require_super_admin),
+    db: Session = Depends(get_db)
+):
+    critical_risks = db.query(models.SecurityIncident).filter(models.SecurityIncident.severity == "CRITICAL").count()
+    security_incidents = db.query(models.SecurityIncident).count()
+    blocked_actions = db.query(models.Decision).filter(models.Decision.decision == "REFUSE").count()
+    suspended_agents = db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").count()
+    suspended_users = db.query(models.User).filter(models.User.status == "SUSPENDED").count()
+
+    decisions = db.query(models.Decision).all()
+    avg_score = round(sum(d.risk_score for d in decisions if d.risk_score is not None) / len(decisions), 1) if decisions else 0.0
+
+    incidents_query = db.query(models.SecurityIncident).order_by(models.SecurityIncident.created_at.desc()).limit(10).all()
+    incidents_list = []
+    for inc in incidents_query:
+        org = db.query(models.Organization).filter(models.Organization.id == inc.org_id).first()
+        incidents_list.append({
+            "id": str(inc.id),
+            "title": inc.title,
+            "org_name": org.name if org else "Platform",
+            "severity": inc.severity,
+            "status": inc.status,
+            "timestamp": inc.created_at.isoformat() if inc.created_at else None
+        })
+
+    blocked_query = db.query(models.Decision).filter(models.Decision.decision == "REFUSE").order_by(models.Decision.timestamp.desc()).limit(5).all()
+    blocked_list = []
+    for b in blocked_query:
+        agent = db.query(models.Agent).filter(models.Agent.id == b.agent_id).first() if b.agent_id else None
+        agent_name = agent.name if agent else "Agent"
+        blocked_list.append({
+            "id": str(b.id),
+            "reason": b.intent_summary or "POLICY_VIOLATION",
+            "details": f"Agent '{agent_name}' attempted '{b.action_requested}' on '{b.resource_target}'. {b.explanation}",
+            "status": "REFUSED"
+        })
+
+    suspended_id_list = []
+    for a in db.query(models.Agent).filter(models.Agent.status == "SUSPENDED").limit(5).all():
+        org = db.query(models.Organization).filter(models.Organization.id == a.org_id).first()
+        suspended_id_list.append({
+            "id": str(a.id),
+            "name": a.name,
+            "org_name": org.name if org else "Tenant",
+            "status": "QUARANTINED",
+            "reason": f"Agent '{a.agent_code or a.name}' suspended"
+        })
+    for u in db.query(models.User).filter(models.User.status == "SUSPENDED").limit(5).all():
+        org = db.query(models.Organization).filter(models.Organization.id == u.org_id).first()
+        suspended_id_list.append({
+            "id": str(u.id),
+            "name": u.email,
+            "org_name": org.name if org else "Tenant",
+            "status": "SUSPENDED",
+            "reason": "Account suspended by administrator"
+        })
+
+    return {
+        "critical_risks_count": critical_risks,
+        "security_incidents_count": security_incidents,
+        "blocked_actions_count": blocked_actions,
+        "suspended_agents_count": suspended_agents,
+        "suspended_users_count": suspended_users,
+        "risk_score": f"{avg_score} / 100",
+        "active_threats": critical_risks,
+        "incidents": incidents_list,
+        "blocked_actions": blocked_list,
+        "suspended_identities": suspended_id_list,
+        "security_status": "STRICT_ENFORCEMENT"
+    }
+
 @router.get("/health")
 def get_detailed_system_health(
     current_user: models.User = Depends(require_super_admin),

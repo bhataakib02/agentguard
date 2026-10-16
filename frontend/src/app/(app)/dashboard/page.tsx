@@ -88,8 +88,11 @@ export default function DashboardPage() {
         return { title: "Platform Administration Dashboard", desc: "Global Multi-Tenant Control Plane, System Health & Platform Governance" };
       case "ADMIN":
         return { title: "Organization Admin Control Plane", desc: "Enterprise Identity, User Scoping, Security Policies & Workspace Governance" };
+      case "SECURITY_OFFICER":
       case "SECURITY_ANALYST":
-        return { title: "Security Operations (SOC) Center", desc: "Real-time Threat Monitoring, Anomaly Response & Circuit Breaker Control" };
+        return { title: "Security Operations (SOC) Center", desc: "Real-time Threat Monitoring, Anomaly Response, Guardrails & Circuit Breaker Control" };
+      case "AUDITOR":
+        return { title: "Compliance & Governance Audit Center", desc: "Independent Audit Verification, Causal Provenance Trees & Policy Inspection" };
       case "OPERATOR":
         return { title: "AI Operational Command Center", desc: "Agent Autonomy Controls, Capability Token Execution & Runtime Monitoring" };
       case "ANALYST":
