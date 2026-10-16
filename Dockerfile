@@ -18,5 +18,5 @@ COPY backend/ .
 # Expose HTTP & WebSocket port
 EXPOSE 8000
 
-# Run Uvicorn ASGI server with production WebSocket ping settings
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--ws-ping-interval", "20", "--ws-ping-timeout", "20"]
+# Run Uvicorn ASGI server with production WebSocket ping settings (binds to $PORT if set by Render/cloud provider, defaults to 8000)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --ws-ping-interval 20 --ws-ping-timeout 20"]

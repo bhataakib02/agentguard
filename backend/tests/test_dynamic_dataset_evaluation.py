@@ -159,7 +159,7 @@ class TestDynamicDatasetEvaluationSuite:
                 agent_profile={
                     "agent_code": "FIN-PROC",
                     "name": "Procurement Assistant",
-                    "autonomy_level": "RESTRICTED",
+                    "autonomy_level": "MEDIUM",
                     "daily_budget": 50000
                 },
                 initial_history=[
@@ -180,7 +180,7 @@ class TestDynamicDatasetEvaluationSuite:
                 agent_profile={
                     "agent_code": "FIN-PROC",
                     "name": "Procurement Assistant",
-                    "autonomy_level": "RESTRICTED",
+                    "autonomy_level": "MEDIUM",
                     "daily_budget": 50000
                 },
                 initial_history=[],
@@ -198,7 +198,7 @@ class TestDynamicDatasetEvaluationSuite:
                 agent_profile={
                     "agent_code": "FIN-PROC",
                     "name": "Procurement Assistant",
-                    "autonomy_level": "RESTRICTED",
+                    "autonomy_level": "MEDIUM",
                     "daily_budget": 50000
                 },
                 initial_history=[],
@@ -217,7 +217,7 @@ class TestDynamicDatasetEvaluationSuite:
                 agent_profile={
                     "agent_code": "FIN-PROC",
                     "name": "Procurement Assistant",
-                    "autonomy_level": "RESTRICTED",
+                    "autonomy_level": "MEDIUM",
                     "daily_budget": 50000
                 },
                 initial_history=[],
@@ -301,7 +301,7 @@ class TestDynamicDatasetEvaluationSuite:
                 record_id="SAFE-001",
                 provenance="AUTHORIZED_LABELED_DATA",
                 ground_truth_label="SAFE",
-                agent_profile={"agent_code": "READ-ONLY", "name": "Reader", "autonomy_level": "RESTRICTED"},
+                agent_profile={"agent_code": "READ-ONLY", "name": "Reader", "autonomy_level": "LOW"},
                 initial_history=[],
                 action_sequence=[{"step_number": 1, "action": "READ", "resource": "DOCS", "parameters": {}}]
             ),
@@ -311,7 +311,7 @@ class TestDynamicDatasetEvaluationSuite:
                 record_id="SAFE-002",
                 provenance="AUTHORIZED_LABELED_DATA",
                 ground_truth_label="SAFE",
-                agent_profile={"agent_code": "READ-ONLY", "name": "Reader", "autonomy_level": "RESTRICTED"},
+                agent_profile={"agent_code": "READ-ONLY", "name": "Reader", "autonomy_level": "LOW"},
                 initial_history=[],
                 action_sequence=[{"step_number": 1, "action": "LIST", "resource": "DOCS", "parameters": {}}]
             )
@@ -340,7 +340,7 @@ class TestDynamicDatasetEvaluationSuite:
             agent_profile={
                 "agent_code": "AGENT-007",
                 "name": "Infiltration Bot",
-                "autonomy_level": "RESTRICTED",
+                "autonomy_level": "LOW",
                 "department": "Security Ops",
                 "granted_permissions": [{"action": "READ", "resource_type": "USER", "resource_name": "*"}],
                 "daily_budget": 10000
@@ -360,11 +360,24 @@ class TestDynamicDatasetEvaluationSuite:
         assert scenario.scenario_id == "unit-test-dataset:REC-TEST-01"
         assert scenario.ground_truth_label == "RISKY"
         assert scenario.agent_profile.agent_code == "AGENT-007"
-        assert scenario.agent_profile.autonomy_level == "RESTRICTED"
+        assert scenario.agent_profile.autonomy_level == "LOW"
         assert len(scenario.initial_history) == 1
         assert len(scenario.action_sequence) == 2
         assert scenario.action_sequence[1].action == "GRANT_ADMIN"
         assert scenario.action_sequence[1].is_terminal_step is True
+
+    def test_eval_record_non_canonical_autonomy_normalized(self):
+        """Non-canonical autonomy levels (e.g. RESTRICTED) gracefully normalize to MEDIUM per production schema."""
+        record = models.EvaluationDatasetRecord(
+            record_id="REC-TEST-NORM",
+            provenance="AUTHORIZED_LABELED_DATA",
+            ground_truth_label="SAFE",
+            agent_profile={"agent_code": "AG-NORM", "name": "Agent", "autonomy_level": "RESTRICTED"},
+            action_sequence=[{"step_number": 1, "action": "PING", "resource": "SYS"}]
+        )
+        scenario, err = eval_record_to_simulation_scenario(record)
+        assert err is None
+        assert scenario.agent_profile.autonomy_level == "MEDIUM"
 
     # =========================================================================
     # 2. Malformed Record Rejection & Secret Scanner
@@ -761,7 +774,7 @@ class TestDynamicDatasetEvaluationSuite:
                     "agent_profile": {
                         "agent_code": "REG-AG",
                         "name": "Reg Agent",
-                        "autonomy_level": "RESTRICTED",
+                        "autonomy_level": "LOW",
                         "department": "Operations"
                     },
                     "action_sequence": [{"step_number": 1, "action": "PING", "resource": "SYSTEM", "parameters": {}}]

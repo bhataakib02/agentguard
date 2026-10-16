@@ -570,7 +570,7 @@ def eval_record_to_simulation_scenario(
         return None, f"Record '{record_id_str}': agent_profile missing required name."
 
     autonomy = str(ap_dict.get("autonomy_level") or "MEDIUM").upper()
-    if autonomy not in ("LOW", "MEDIUM", "HIGH", "FULL", "RESTRICTED"):
+    if autonomy not in ("LOW", "MEDIUM", "HIGH", "FULL"):
         autonomy = "MEDIUM"
 
     agent_profile = schemas.ScenarioAgentProfile(
