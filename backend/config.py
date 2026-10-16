@@ -20,12 +20,21 @@ class Settings:
         # Environment configuration
         self.ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
 
+        # Git Commit Identification (Injected by Render as RENDER_GIT_COMMIT, or fallback)
+        self.COMMIT_SHA = (
+            os.getenv("RENDER_GIT_COMMIT", "").strip()
+            or os.getenv("GIT_COMMIT_SHA", "").strip()
+            or "ae95d84"
+        )
+
         raw_secret = os.getenv("SECRET_KEY", "").strip()
         insecure_placeholders = {
             "",
             "change-this-to-a-secure-random-32-byte-hex-key",
             "agentguard-super-secret-production-key-2026",
             "agentguard-default-signing-key",
+            "agentguard-dev-stable-signing-key-2026-secure",
+            "agentguard-default-key-for-dev",
         }
 
         if self.ENVIRONMENT == "production":

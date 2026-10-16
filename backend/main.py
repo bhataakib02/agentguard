@@ -111,7 +111,8 @@ def root():
         "tagline": settings.TAGLINE,
         "status": "RUNNING",
         "docs": "/docs",
-        "api_v1": settings.API_V1_STR
+        "api_v1": settings.API_V1_STR,
+        "commit_sha": getattr(settings, "COMMIT_SHA", "unknown")
     }
 
 @app.get("/health/live")
@@ -124,6 +125,7 @@ def health_liveness():
     return {
         "status": "ALIVE",
         "process": "RUNNING",
+        "commit_sha": getattr(settings, "COMMIT_SHA", "unknown"),
         "timestamp": datetime.datetime.utcnow().isoformat()
     }
 
@@ -141,6 +143,7 @@ def health_readiness(response: Response, db: Session = Depends(get_db)):
         return {
             "status": "READY",
             "database": "CONNECTED",
+            "commit_sha": getattr(settings, "COMMIT_SHA", "unknown"),
             "timestamp": datetime.datetime.utcnow().isoformat()
         }
     except Exception as e:
@@ -148,6 +151,7 @@ def health_readiness(response: Response, db: Session = Depends(get_db)):
         return {
             "status": "NOT_READY",
             "database": "DISCONNECTED",
+            "commit_sha": getattr(settings, "COMMIT_SHA", "unknown"),
             "error": str(e),
             "timestamp": datetime.datetime.utcnow().isoformat()
         }
