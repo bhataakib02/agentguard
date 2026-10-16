@@ -3,8 +3,10 @@ Name: agentguard
 Version: 1.0.0
 Summary: Official Python SDK and Runtime Governance Guardrails for AgentGuard
 Author-email: AgentGuard Core Security Team <security@agentguard.dev>
+License: Apache-2.0
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
 Classifier: Topic :: Security
 Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
 Classifier: Programming Language :: Python :: 3

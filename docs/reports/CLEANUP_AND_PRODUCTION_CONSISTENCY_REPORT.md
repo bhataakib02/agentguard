@@ -255,7 +255,7 @@ Two regression selections were executed during verification:
 
 2. **Python SDK (`sdks/python`):**
    - **Build & Import:** Importable and buildable from source with `pip install -e .` or direct module import.
-   - **Regression Suite:** `pytest sdks/python/tests/test_sdk_suite.py`
+   - **Regression Suite:** `pytest backend/tests/test_sdk_suite.py`
    - **Status:** `19 Passed` (Sync/Async clients, LangChain integration, CrewAI middleware, retry policies).
 
 ### D. Git Cleanliness Check

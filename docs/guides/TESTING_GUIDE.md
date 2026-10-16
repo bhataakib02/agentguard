@@ -109,12 +109,11 @@ node tests/test_sdk.mjs
 
 ### 4.2 Python SDK Verification
 
-From `sdks/python`:
+From the repository root:
 
 ```bash
-cd sdks/python
-pip install -e .
-pytest tests/test_sdk_suite.py -v
+pip install -e sdks/python
+python -m pytest backend/tests/test_sdk_suite.py -v
 ```
 
 **Expected Result:** `19 passed` (Synchronous/Asynchronous clients, LangChain integration, CrewAI middleware, retry policies).

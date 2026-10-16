@@ -127,9 +127,8 @@ If your change touches SDK code under `sdks/`:
    ```
 2. **Python SDK:**
    ```bash
-   cd sdks/python
-   pip install -e .
-   pytest tests/test_sdk_suite.py
+   pip install -e sdks/python
+   python -m pytest backend/tests/test_sdk_suite.py
    ```
 
 ### 4.4 Git Cleanliness

@@ -8,12 +8,14 @@ version = "1.0.0"
 description = "Official Python SDK and Runtime Governance Guardrails for AgentGuard"
 readme = "README.md"
 requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
 authors = [
     { name = "AgentGuard Core Security Team", email = "security@agentguard.dev" }
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
     "Topic :: Security",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Programming Language :: Python :: 3",
