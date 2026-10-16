@@ -307,7 +307,6 @@ class RuntimeAuthorizationService:
         behavior_deviation = behavior_eval.get("deviation_score", 0.0)
 
         # --------------------------------------------------------------------
-<<<<<<< HEAD
         # STAGE 8.7: BOUNDED ACTION-SEQUENCE RISK EVALUATION
         # --------------------------------------------------------------------
         from engines.predictive_action_control_engine import predictive_action_control_engine
@@ -322,8 +321,6 @@ class RuntimeAuthorizationService:
         sequence_risk_delta = sequence_indicators.sequence_risk_delta
 
         # --------------------------------------------------------------------
-=======
->>>>>>> ee74fb570e5883e2551016f01ec75f0a956c1eff
         # STAGE 9: POLICY ENGINE EVALUATION
         # --------------------------------------------------------------------
         risk_res = risk_engine.calculate_risk(
@@ -331,12 +328,8 @@ class RuntimeAuthorizationService:
             action=action,
             amount=requested_amount,
             daily_budget=agent.daily_budget,
-<<<<<<< HEAD
             behavior_deviation=behavior_deviation,
             sequence_risk_delta=sequence_risk_delta
-=======
-            behavior_deviation=behavior_deviation
->>>>>>> ee74fb570e5883e2551016f01ec75f0a956c1eff
         )
         calculated_risk_score = risk_res.get("overall_score", 15)
 

@@ -148,6 +148,18 @@ def ensure_schema_compatibility(db_engine=engine):
                 conn.execute(text("ALTER TABLE organizations ADD COLUMN kms_config_json JSON DEFAULT '{}'::json;"))
             conn.commit()
 
+    # Check evaluation_datasets and evaluation_dataset_records table columns
+    if "evaluation_datasets" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("evaluation_datasets")}
+        with db_engine.connect() as conn:
+            if "description" not in cols:
+                conn.execute(text("ALTER TABLE evaluation_datasets ADD COLUMN description TEXT;"))
+            if "tags" not in cols:
+                conn.execute(text("ALTER TABLE evaluation_datasets ADD COLUMN tags JSON;"))
+            if "metadata_json" not in cols:
+                conn.execute(text("ALTER TABLE evaluation_datasets ADD COLUMN metadata_json JSON;"))
+            conn.commit()
+
 
 def bootstrap_database():
     """

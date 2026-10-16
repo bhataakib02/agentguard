@@ -115,41 +115,103 @@ def cancel_simulation_run(
 
 
 # ============================================================================
-# PHASE 4: AUTHORIZED EVALUATION-DATA SUPPORT ENDPOINTS
+# PHASE 4 & PHASE 5.1/5.2: AUTHORIZED EVALUATION-DATA SUPPORT ENDPOINTS
+# Enterprise IAM 5-Role Alignment: ADMIN, MANAGER, SECURITY_OFFICER, AUDITOR, AGENT
 # ============================================================================
+
+ENTERPRISE_EVAL_IMPORT_ROLES = {"ADMIN", "SECURITY_OFFICER", "MANAGER"}
+ENTERPRISE_EVAL_READ_ROLES = {"ADMIN", "SECURITY_OFFICER", "MANAGER", "AUDITOR"}
 
 @router.post("/eval-data/import", response_model=schemas.EvaluationDataImportResponse, status_code=status.HTTP_201_CREATED)
 def import_evaluation_dataset(
     request: schemas.EvaluationDataImportRequest,
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Import authorized, labeled action-sequence evaluation data.
-    Validates schema and rejects malformed records.
-    Explicitly segregates evaluation data from production telemetry and models.
+    Validates schema, provenance, and payload limits, rejecting malformed records.
+    Persists evaluation datasets and records into tenant-isolated database storage.
+    Enforces enterprise five-role IAM:
+      - ADMIN, SECURITY_OFFICER, MANAGER: Authorized to import.
+      - AUDITOR: Read-only access; cannot import.
+      - AGENT: Machine identity; blocked from human UI management.
     """
-    return simulation_runner.import_evaluation_dataset(request)
+    if current_user.role == "AGENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AGENT represents an AI machine identity and cannot manage evaluation datasets"
+        )
+
+    if current_user.role == "AUDITOR":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AUDITOR role has read-only access and cannot import evaluation datasets"
+        )
+
+    if current_user.role not in ENTERPRISE_EVAL_IMPORT_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Insufficient privileges to import evaluation datasets. Role '{current_user.role}' is not authorized."
+        )
+
+    org_id = str(current_user.org_id) if current_user.org_id else None
+    return simulation_runner.import_evaluation_dataset(request, db=db, org_id=org_id)
 
 
 @router.get("/eval-data", response_model=List[schemas.EvaluationDatasetSummary])
 def list_evaluation_datasets(
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     List imported authorized evaluation datasets with record counts and provenance disclosures.
+    Enforces server-side tenant scoping from authenticated identity.
+    Accessible to authorized human roles (ADMIN, SECURITY_OFFICER, MANAGER, AUDITOR).
+    Machine identities (AGENT) are blocked.
     """
-    return simulation_runner.list_evaluation_datasets()
+    if current_user.role == "AGENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AGENT represents an AI machine identity and cannot manage evaluation datasets"
+        )
+
+    if current_user.role not in ENTERPRISE_EVAL_READ_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Role '{current_user.role}' is not authorized to access evaluation datasets."
+        )
+
+    org_id = str(current_user.org_id) if current_user.org_id else None
+    return simulation_runner.list_evaluation_datasets(db=db, org_id=org_id)
 
 
 @router.get("/eval-data/{dataset_name}")
 def get_evaluation_dataset(
     dataset_name: str,
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Inspect records and metadata of an authorized evaluation dataset.
+    Enforces server-side tenant scoping from authenticated identity.
+    Accessible to authorized human roles (ADMIN, SECURITY_OFFICER, MANAGER, AUDITOR).
+    Machine identities (AGENT) are blocked.
     """
-    dataset = simulation_runner.get_evaluation_dataset(dataset_name)
+    if current_user.role == "AGENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: AGENT represents an AI machine identity and cannot manage evaluation datasets"
+        )
+
+    if current_user.role not in ENTERPRISE_EVAL_READ_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Role '{current_user.role}' is not authorized to access evaluation datasets."
+        )
+
+    org_id = str(current_user.org_id) if current_user.org_id else None
+    dataset = simulation_runner.get_evaluation_dataset(dataset_name, db=db, org_id=org_id)
     if not dataset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

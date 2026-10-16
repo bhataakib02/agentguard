@@ -50,3 +50,24 @@ CREATE POLICY tenant_isolation_audit_logs ON audit_logs
         actor_id IN (SELECT id::text FROM users WHERE org_id::text = current_setting('app.current_org_id', true))
         OR current_setting('app.current_user_role', true) = 'SUPER_ADMIN'
     );
+
+-- 6. Evaluation Datasets Table RLS
+ALTER TABLE evaluation_datasets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation_evaluation_datasets ON evaluation_datasets
+    FOR ALL
+    USING (
+        org_id::text = current_setting('app.current_org_id', true)
+        OR current_setting('app.current_user_role', true) = 'SUPER_ADMIN'
+    );
+
+-- 7. Evaluation Dataset Records Table RLS
+ALTER TABLE evaluation_dataset_records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation_evaluation_dataset_records ON evaluation_dataset_records
+    FOR ALL
+    USING (
+        org_id::text = current_setting('app.current_org_id', true)
+        OR current_setting('app.current_user_role', true) = 'SUPER_ADMIN'
+    );
+

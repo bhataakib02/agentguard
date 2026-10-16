@@ -14,8 +14,12 @@ Safety Invariants:
 import uuid
 import time
 import datetime
+import re
+import logging
 from typing import List, Dict, Any, Optional, Set
-
+from sqlalchemy.orm import Session
+from database import SessionLocal
+import models
 import schemas
 from engines.risk_engine import risk_engine
 from engines.policy_engine import policy_engine
@@ -25,6 +29,41 @@ from engines.predictive_action_control_engine import (
     ActionChainReachabilityAnalyzer,
     MinimalInterventionPlanner
 )
+
+logger = logging.getLogger("agentguard.simulation_engine")
+
+SECRET_PATTERNS = [
+    re.compile(r"bearer\s+[a-zA-Z0-9_\-\.]{20,}", re.IGNORECASE),
+    re.compile(r"sk-[a-zA-Z0-9]{20,}", re.IGNORECASE),
+    re.compile(r"ag_live_[a-zA-Z0-9]{20,}", re.IGNORECASE),
+    re.compile(r"(?:password|secret_key|api_key|access_token|private_key)\s*[:=]\s*['\"][^'\"]{8,}['\"]", re.IGNORECASE),
+]
+
+def contains_sensitive_secrets(val: Any) -> bool:
+    """Detects potential sensitive tokens, API keys, and credentials."""
+    if not val:
+        return False
+    if isinstance(val, str):
+        for pattern in SECRET_PATTERNS:
+            if pattern.search(val):
+                return True
+        return False
+    if isinstance(val, dict):
+        for k, v in val.items():
+            k_lower = str(k).lower()
+            if any(s in k_lower for s in ("password", "secret", "private_key", "access_token", "api_key")):
+                if v and str(v).strip():
+                    return True
+            if contains_sensitive_secrets(v):
+                return True
+        return False
+    if isinstance(val, (list, tuple)):
+        for item in val:
+            if contains_sensitive_secrets(item):
+                return True
+        return False
+    return False
+
 
 
 # ============================================================================
@@ -475,11 +514,12 @@ class SimulationRunner:
     MAX_SCENARIOS = 25
     MAX_SEQUENCE_STEPS = 10
     MAX_RUN_TIME_SECONDS = 30
+    MAX_DATASET_RECORDS = 500
+    MAX_SEQUENCE_STEPS_PER_RECORD = 50
 
     def __init__(self):
         self._runs: Dict[str, schemas.SimulationRunResponse] = {}
         self._cancel_flags: Set[str] = set()
-        self._evaluation_datasets: Dict[str, Dict[str, Any]] = {}
 
     def get_scenarios(self, category: Optional[str] = None) -> List[schemas.SimulationScenario]:
         if category and category != "ALL":
@@ -1010,27 +1050,75 @@ class SimulationRunner:
 
     def import_evaluation_dataset(
         self,
-        request: schemas.EvaluationDataImportRequest
+        request: schemas.EvaluationDataImportRequest,
+        db: Optional[Session] = None,
+        org_id: Optional[str] = None
     ) -> schemas.EvaluationDataImportResponse:
+        """
+        Imports and durably persists authorized, labeled evaluation datasets into database storage.
+        Enforces tenant isolation, provenance boundaries, payload bounds, and immutability.
+        Transactional: any failure during record creation rolls back without leaving incomplete datasets.
+        """
         errors = []
-        valid_records = []
         allowed_provenances = {"AUTHORIZED_LABELED_DATA", "BENCHMARK_EVAL_FIXTURE", "SYNTHETIC_EVAL_DATA"}
 
+        # 1. Validate Dataset Name
         if not request.dataset_name or not request.dataset_name.strip():
             errors.append("Dataset name cannot be empty.")
+        elif len(request.dataset_name.strip()) > 255:
+            errors.append("Dataset name exceeds maximum length of 255 characters.")
 
+        # 2. Validate Provenance
         if request.provenance not in allowed_provenances:
-            errors.append(f"Invalid provenance '{request.provenance}'. Must be one of {allowed_provenances}. Direct production telemetry cannot be imported as evaluation data.")
+            errors.append(
+                f"Invalid provenance '{request.provenance}'. Must be one of {allowed_provenances}. "
+                "Direct production telemetry cannot be imported as evaluation data."
+            )
 
-        for idx, rec in enumerate(request.records):
-            if not rec.record_id:
+        # 3. Validate Records Collection
+        if not request.records:
+            errors.append("Dataset must contain at least one evaluation record.")
+        elif len(request.records) > self.MAX_DATASET_RECORDS:
+            errors.append(f"Record count ({len(request.records)}) exceeds maximum allowed limit of {self.MAX_DATASET_RECORDS}.")
+
+        seen_record_ids = set()
+        valid_records = []
+
+        # 4. Validate Each Record
+        for idx, rec in enumerate(request.records or []):
+            rec_id = (rec.record_id or "").strip()
+            if not rec_id:
                 errors.append(f"Record #{idx}: missing record_id.")
+            elif rec_id in seen_record_ids:
+                errors.append(f"Record #{idx} ({rec_id}): duplicate record_id within the import payload.")
+            else:
+                seen_record_ids.add(rec_id)
+
             if rec.ground_truth_label not in ("SAFE", "RISKY"):
-                errors.append(f"Record #{idx} ({rec.record_id}): ground_truth_label must be 'SAFE' or 'RISKY'.")
+                errors.append(f"Record #{idx} ({rec_id}): ground_truth_label must be 'SAFE' or 'RISKY'.")
+
             if not rec.action_sequence:
-                errors.append(f"Record #{idx} ({rec.record_id}): action_sequence cannot be empty.")
+                errors.append(f"Record #{idx} ({rec_id}): action_sequence cannot be empty.")
+            elif len(rec.action_sequence) > self.MAX_SEQUENCE_STEPS_PER_RECORD:
+                errors.append(f"Record #{idx} ({rec_id}): action_sequence exceeds maximum limit of {self.MAX_SEQUENCE_STEPS_PER_RECORD} steps.")
+            else:
+                for step_idx, step in enumerate(rec.action_sequence):
+                    if not getattr(step, "action", None) or not str(step.action).strip():
+                        errors.append(f"Record #{idx} ({rec_id}) step #{step_idx}: action cannot be empty.")
+                    if not getattr(step, "resource", None) or not str(step.resource).strip():
+                        errors.append(f"Record #{idx} ({rec_id}) step #{step_idx}: resource cannot be empty.")
+
+            # Secret / Token Detection Check
+            rec_dict = rec.model_dump() if hasattr(rec, "model_dump") else (rec.dict() if hasattr(rec, "dict") else vars(rec))
+            if contains_sensitive_secrets(rec_dict):
+                errors.append(
+                    f"Record #{idx} ({rec_id}): Contains potential sensitive credentials or secret tokens. "
+                    "Evaluation records must not store credentials or sensitive tokens."
+                )
+
             valid_records.append(rec)
 
+        # Early rejection on syntax / schema / security violations
         if errors:
             return schemas.EvaluationDataImportResponse(
                 status="REJECTED",
@@ -1040,38 +1128,191 @@ class SimulationRunner:
                 validation_errors=errors
             )
 
-        self._evaluation_datasets[request.dataset_name] = {
-            "dataset_name": request.dataset_name,
-            "description": request.description or "",
-            "provenance": request.provenance,
-            "records": valid_records,
-            "created_at": datetime.datetime.now(datetime.timezone.utc),
-            "tags": list(set([t for r in valid_records for t in r.tags]))
-        }
+        # 5. Database Session Resolution & Persistence
+        close_db = False
+        if db is None:
+            db = SessionLocal()
+            close_db = True
 
-        return schemas.EvaluationDataImportResponse(
-            status="SUCCESS",
-            dataset_name=request.dataset_name,
-            provenance=request.provenance,
-            imported_records_count=len(valid_records),
-            validation_errors=[]
-        )
+        try:
+            target_org_id = org_id
+            if not target_org_id:
+                first_org = db.query(models.Organization).first()
+                target_org_id = str(first_org.id) if first_org else "00000000-0000-0000-0000-000000000000"
 
-    def list_evaluation_datasets(self) -> List[schemas.EvaluationDatasetSummary]:
-        summaries = []
-        for ds in self._evaluation_datasets.values():
-            summaries.append(schemas.EvaluationDatasetSummary(
-                dataset_name=ds["dataset_name"],
-                description=ds["description"],
-                provenance=ds["provenance"],
-                records_count=len(ds["records"]),
-                created_at=ds["created_at"],
-                tags=ds["tags"]
-            ))
-        return summaries
+            # Check for duplicate dataset name within the same organization
+            existing = db.query(models.EvaluationDataset).filter(
+                models.EvaluationDataset.org_id == target_org_id,
+                models.EvaluationDataset.name == request.dataset_name.strip()
+            ).first()
 
-    def get_evaluation_dataset(self, dataset_name: str) -> Optional[Dict[str, Any]]:
-        return self._evaluation_datasets.get(dataset_name)
+            if existing:
+                return schemas.EvaluationDataImportResponse(
+                    status="REJECTED",
+                    dataset_name=request.dataset_name,
+                    provenance=request.provenance,
+                    imported_records_count=0,
+                    validation_errors=[
+                        f"Dataset '{request.dataset_name.strip()}' already exists in this organization. "
+                        "Duplicate imports are rejected to prevent unintentional overwrites. Use a distinct dataset name or version."
+                    ]
+                )
+
+            # Persist Dataset and Records atomically
+            aggregated_tags = sorted(list(set([t for r in valid_records for t in (r.tags or [])])))
+            ds_model = models.EvaluationDataset(
+                org_id=target_org_id,
+                name=request.dataset_name.strip(),
+                description=request.description or "",
+                provenance=request.provenance,
+                records_count=len(valid_records),
+                tags=aggregated_tags,
+                metadata_json={
+                    "imported_by_org_id": str(target_org_id),
+                    "import_format": "PACE_EVALUATION_V1"
+                }
+            )
+            db.add(ds_model)
+            db.flush()
+
+            for r in valid_records:
+                agent_prof = r.agent_profile.model_dump() if hasattr(r.agent_profile, "model_dump") else r.agent_profile.dict()
+                seq = [s.model_dump() if hasattr(s, "model_dump") else s.dict() for s in r.action_sequence]
+                rec_model = models.EvaluationDatasetRecord(
+                    dataset_id=ds_model.id,
+                    org_id=target_org_id,
+                    record_id=r.record_id.strip(),
+                    provenance=r.provenance or request.provenance,
+                    agent_profile=agent_prof,
+                    initial_history=r.initial_history or [],
+                    action_sequence=seq,
+                    ground_truth_label=r.ground_truth_label,
+                    ground_truth_notes=r.ground_truth_notes or "",
+                    tags=r.tags or []
+                )
+                db.add(rec_model)
+
+            db.commit()
+
+            return schemas.EvaluationDataImportResponse(
+                status="SUCCESS",
+                dataset_name=ds_model.name,
+                provenance=ds_model.provenance,
+                imported_records_count=len(valid_records),
+                validation_errors=[]
+            )
+        except Exception as e:
+            db.rollback()
+            logger.error(f"[SimulationEngine] Database persistence failed: {e}")
+            return schemas.EvaluationDataImportResponse(
+                status="REJECTED",
+                dataset_name=request.dataset_name,
+                provenance=request.provenance,
+                imported_records_count=0,
+                validation_errors=[f"Database transaction failure during import: {str(e)}"]
+            )
+        finally:
+            if close_db:
+                db.close()
+
+    def list_evaluation_datasets(
+        self,
+        db: Optional[Session] = None,
+        org_id: Optional[str] = None
+    ) -> List[schemas.EvaluationDatasetSummary]:
+        """
+        Lists imported evaluation datasets from durable database storage.
+        Filters by organization scope if org_id is provided.
+        """
+        close_db = False
+        if db is None:
+            db = SessionLocal()
+            close_db = True
+
+        try:
+            query = db.query(models.EvaluationDataset)
+            if org_id:
+                query = query.filter(models.EvaluationDataset.org_id == org_id)
+
+            datasets = query.order_by(models.EvaluationDataset.created_at.desc()).all()
+            summaries = []
+            for ds in datasets:
+                summaries.append(schemas.EvaluationDatasetSummary(
+                    dataset_name=ds.name,
+                    description=ds.description,
+                    provenance=ds.provenance,
+                    records_count=ds.records_count,
+                    created_at=ds.created_at,
+                    tags=ds.tags or []
+                ))
+            return summaries
+        finally:
+            if close_db:
+                db.close()
+
+    def get_evaluation_dataset(
+        self,
+        dataset_name: str,
+        db: Optional[Session] = None,
+        org_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieves an evaluation dataset with all its records from durable database storage.
+        Enforces tenant isolation using org_id scope.
+        """
+        close_db = False
+        if db is None:
+            db = SessionLocal()
+            close_db = True
+
+        try:
+            query = db.query(models.EvaluationDataset).filter(
+                models.EvaluationDataset.name == dataset_name.strip()
+            )
+            if org_id:
+                query = query.filter(models.EvaluationDataset.org_id == org_id)
+
+            ds = query.first()
+            if not ds:
+                # Fallback to ID match if parameter is a valid UUID
+                if models.is_valid_uuid(dataset_name.strip()):
+                    query_id = db.query(models.EvaluationDataset).filter(
+                        models.EvaluationDataset.id == dataset_name.strip()
+                    )
+                    if org_id:
+                        query_id = query_id.filter(models.EvaluationDataset.org_id == org_id)
+                    ds = query_id.first()
+
+            if not ds:
+                return None
+
+            records = [
+                {
+                    "dataset_id": ds.name,
+                    "record_id": r.record_id,
+                    "provenance": r.provenance,
+                    "agent_profile": r.agent_profile,
+                    "initial_history": r.initial_history or [],
+                    "action_sequence": r.action_sequence or [],
+                    "ground_truth_label": r.ground_truth_label,
+                    "ground_truth_notes": r.ground_truth_notes or "",
+                    "tags": r.tags or []
+                }
+                for r in ds.records
+            ]
+
+            return {
+                "dataset_name": ds.name,
+                "description": ds.description or "",
+                "provenance": ds.provenance,
+                "records": records,
+                "created_at": ds.created_at,
+                "updated_at": ds.updated_at,
+                "tags": ds.tags or []
+            }
+        finally:
+            if close_db:
+                db.close()
 
 
 simulation_runner = SimulationRunner()

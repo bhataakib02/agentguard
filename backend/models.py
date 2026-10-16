@@ -1,7 +1,7 @@
 import datetime
 import uuid
 from sqlalchemy import (
-    Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON, Index
+    Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON, Index, UniqueConstraint
 )
 from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects.postgresql import UUID
@@ -60,6 +60,7 @@ class Organization(Base):
     license = relationship("License", back_populates="organization", uselist=False)
     license_usage = relationship("LicenseUsage", back_populates="organization", uselist=False)
     sandbox_jobs = relationship("SandboxExecutionJob", back_populates="organization", cascade="all, delete-orphan")
+    evaluation_datasets = relationship("EvaluationDataset", back_populates="organization", cascade="all, delete-orphan")
 
     @property
     def plan_id(self):
@@ -939,6 +940,76 @@ class SandboxExecutionJob(Base):
         Index("ix_sandbox_jobs_status_created", "status", "created_at"),
         Index("ix_sandbox_jobs_agent_created", "agent_id", "created_at"),
     )
+
+
+# ============================================================================
+# PHASE 5.1: Persistent Simulation Evaluation Datasets & Records
+# ============================================================================
+
+class EvaluationDataset(Base):
+    """
+    Durable storage for authorized, labeled action-sequence evaluation datasets.
+    Tenant-isolated by organization, storing dataset metadata, aggregated tags,
+    provenance disclosures, and record counts. Survives backend restarts.
+    """
+    __tablename__ = "evaluation_datasets"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    provenance = Column(String(100), nullable=False, default="AUTHORIZED_LABELED_DATA")
+    records_count = Column(Integer, default=0, nullable=False)
+    tags = Column(JSON, default=list)
+    metadata_json = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    organization = relationship("Organization", back_populates="evaluation_datasets")
+    records = relationship(
+        "EvaluationDatasetRecord",
+        back_populates="dataset",
+        cascade="all, delete-orphan",
+        order_by="EvaluationDatasetRecord.created_at.asc()"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("org_id", "name", name="uq_evaluation_datasets_org_name"),
+        Index("ix_evaluation_datasets_org_name", "org_id", "name"),
+        Index("ix_evaluation_datasets_org_created", "org_id", "created_at"),
+    )
+
+
+class EvaluationDatasetRecord(Base):
+    """
+    Individual evaluation records within a persistent evaluation dataset.
+    Stores agent profiles, initial history, action sequences, ground truth labels,
+    and evaluation notes. Strictly isolated from production telemetry.
+    """
+    __tablename__ = "evaluation_dataset_records"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    dataset_id = Column(GUID(), ForeignKey("evaluation_datasets.id", ondelete="CASCADE"), nullable=False, index=True)
+    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False, index=True)
+    record_id = Column(String(100), nullable=False)
+    provenance = Column(String(100), nullable=False, default="AUTHORIZED_LABELED_DATA")
+    agent_profile = Column(JSON, nullable=False)
+    initial_history = Column(JSON, default=list)
+    action_sequence = Column(JSON, nullable=False)
+    ground_truth_label = Column(String(50), nullable=False)  # SAFE, RISKY
+    ground_truth_notes = Column(Text, nullable=True)
+    tags = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+    dataset = relationship("EvaluationDataset", back_populates="records")
+    organization = relationship("Organization")
+
+    __table_args__ = (
+        UniqueConstraint("dataset_id", "record_id", name="uq_eval_record_dataset_record_id"),
+        Index("ix_eval_records_dataset_record", "dataset_id", "record_id"),
+        Index("ix_eval_records_org_label", "org_id", "ground_truth_label"),
+    )
+
 
 
 
