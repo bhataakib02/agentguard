@@ -288,11 +288,17 @@ async def runtime_authorize_action(
         if not agent:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target agent not found")
 
-        if entity.role != "SUPER_ADMIN" and agent.org_id != entity.org_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: Cross-tenant agent authorization denied"
-            )
+        if entity.role != "SUPER_ADMIN":
+            if agent.org_id != entity.org_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Cross-tenant agent authorization denied"
+                )
+            if agent.owner_id != entity.id and entity.role not in ("ADMIN", "MANAGER", "OPERATOR"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Insufficient privileges to authorize actions for this agent"
+                )
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
@@ -392,17 +398,31 @@ async def runtime_execute_action(
     agent = None
     if isinstance(entity, AuthenticatedAgent):
         agent = entity.agent
+        decision = db.query(models.Decision).filter(
+            models.Decision.execution_gate_token == req.execution_gate_token
+        ).first()
+        if decision and str(decision.agent_id) != str(agent.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Forbidden: Execution gate token agent mismatch: issued to agent {decision.agent_id}, not {agent.id}."
+            )
     elif isinstance(entity, models.User):
         decision = db.query(models.Decision).filter(
             models.Decision.execution_gate_token == req.execution_gate_token
         ).first()
         if decision:
             agent = db.query(models.Agent).filter(models.Agent.id == decision.agent_id).first()
-            if agent and entity.role != "SUPER_ADMIN" and agent.org_id != entity.org_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Forbidden: Cannot execute gate token for an agent in another organization."
-                )
+            if agent and entity.role != "SUPER_ADMIN":
+                if agent.org_id != entity.org_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Forbidden: Cannot execute gate token for an agent in another organization."
+                    )
+                if agent.owner_id != entity.id and str(decision.user_id) != str(entity.id) and entity.role not in ("ADMIN", "MANAGER", "OPERATOR"):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Forbidden: Insufficient privileges to execute this gate token."
+                    )
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
@@ -456,17 +476,31 @@ async def runtime_sandbox_execute(
     agent = None
     if isinstance(entity, AuthenticatedAgent):
         agent = entity.agent
+        decision = db.query(models.Decision).filter(
+            models.Decision.execution_gate_token == req.execution_gate_token
+        ).first()
+        if decision and str(decision.agent_id) != str(agent.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Forbidden: Execution gate token agent mismatch: issued to agent {decision.agent_id}, not {agent.id}."
+            )
     elif isinstance(entity, models.User):
         decision = db.query(models.Decision).filter(
             models.Decision.execution_gate_token == req.execution_gate_token
         ).first()
         if decision:
             agent = db.query(models.Agent).filter(models.Agent.id == decision.agent_id).first()
-            if agent and entity.role != "SUPER_ADMIN" and agent.org_id != entity.org_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Forbidden: Cannot execute gate token for an agent in another organization."
-                )
+            if agent and entity.role != "SUPER_ADMIN":
+                if agent.org_id != entity.org_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Forbidden: Cannot execute gate token for an agent in another organization."
+                    )
+                if agent.owner_id != entity.id and str(decision.user_id) != str(entity.id) and entity.role not in ("ADMIN", "MANAGER", "OPERATOR"):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Forbidden: Insufficient privileges to execute this gate token."
+                    )
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
@@ -621,8 +655,14 @@ async def runtime_invoke_action(
         ).first()
         if not agent:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
-        if entity.role != "SUPER_ADMIN" and agent.org_id != entity.org_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant invocation forbidden.")
+        if entity.role != "SUPER_ADMIN":
+            if agent.org_id != entity.org_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant invocation forbidden.")
+            if agent.owner_id != entity.id and entity.role not in ("ADMIN", "MANAGER", "OPERATOR"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Insufficient privileges to invoke this agent"
+                )
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 

@@ -67,7 +67,7 @@ def db_session():
 
 
 @pytest.fixture
-def test_context(db_session):
+def test_context(request, db_session):
     """Sets up an organization, human operator, policy, and two machine agents with passports."""
     suffix = uuid.uuid4().hex[:6]
     org = models.Organization(
@@ -156,6 +156,30 @@ def test_context(db_session):
 
     # Human Bearer Token
     human_token = create_access_token(user_id=str(user.id), email=user.email, role=user.role)
+
+    # Seed refund_tool for org if not testing the registration endpoint directly
+    if request.node.name != "test_tool_registration_and_lookup":
+        refund_tool = models.Tool(
+            org_id=org.id,
+            name="refund_tool",
+            category="PAYMENT",
+            endpoint="https://api.example.com/v1/refunds",
+            description="Processes customer refund transactions",
+            risk_level="HIGH",
+            status="ACTIVE",
+            schema_definition={
+                "type": "object",
+                "required": ["customer_id", "amount", "reason"],
+                "properties": {
+                    "customer_id": {"type": "string", "minLength": 3},
+                    "amount": {"type": "number", "minimum": 1.0, "maximum": 5000.0},
+                    "reason": {"type": "string", "enum": ["DEFECT", "DUPLICATE", "FRAUD"]}
+                }
+            },
+            headers_json={"Authorization": "Bearer mock_downstream_secret"},
+            timeout_seconds=15
+        )
+        db_session.add(refund_tool)
 
     # Grant permission to Agent A for refund tool
     perm = models.Permission(

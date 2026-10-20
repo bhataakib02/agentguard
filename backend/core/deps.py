@@ -246,8 +246,21 @@ def get_current_user(
     # Step 1: Decode local backend JWT signed with settings.SECRET_KEY
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        tok_type = payload.get("token_type") or payload.get("type")
+        if tok_type == "ws_ticket" or payload.get("ticket_id"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="WebSocket tickets cannot be used to authenticate HTTP REST endpoints."
+            )
+        if tok_type == "machine" or payload.get("agent_id") or payload.get("agent_code") or payload.get("credential_id"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Machine agent tokens cannot authenticate human user endpoints."
+            )
         user_id = payload.get("sub")
         email = payload.get("email")
+    except HTTPException:
+        raise
     except JWTError:
         # Step 2: Cryptographically verify Supabase Auth JWT
         verified = verify_supabase_token(token)
@@ -515,10 +528,18 @@ def get_authenticated_entity(
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split("Bearer ", 1)[1].strip()
         try:
-            # Quick check if it's a machine JWT
+            # Quick check if it's a ws_ticket or machine JWT
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"], options={"verify_exp": False})
-            if payload.get("token_type") == "machine":
+            tok_type = payload.get("token_type") or payload.get("type")
+            if tok_type == "ws_ticket" or payload.get("ticket_id"):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="WebSocket tickets cannot be used to authenticate HTTP REST endpoints."
+                )
+            if tok_type == "machine" or payload.get("agent_id") or payload.get("agent_code"):
                 return get_current_machine_agent(authorization=authorization, db=db)
+        except HTTPException:
+            raise
         except Exception:
             pass
 

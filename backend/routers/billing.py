@@ -161,6 +161,19 @@ def create_checkout_session(
     )
 
 
+def _is_event_already_processed(db: Session, org_id: Any, event_id: Optional[str]) -> bool:
+    if not event_id:
+        return False
+    recent_audits = db.query(models.AuditLog).filter(
+        models.AuditLog.org_id == org_id,
+        models.AuditLog.event_type == "LICENSE_PROVISIONED"
+    ).order_by(models.AuditLog.timestamp.desc()).limit(50).all()
+    for a in recent_audits:
+        if a.metadata_json and a.metadata_json.get("event_id") == str(event_id):
+            return True
+    return False
+
+
 @router.post("/webhook/stripe")
 async def stripe_webhook(
     request: Request,
@@ -169,18 +182,23 @@ async def stripe_webhook(
 ):
     """
     Processes inbound Stripe webhook events with HMAC signature verification.
-    Automatically provisions/renews organization license on checkout.session.completed.
+    Fails closed: when secret is configured, missing, empty, or invalid signatures are rejected.
     """
     payload_bytes = await request.body()
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+    is_mandatory = bool(webhook_secret) or os.getenv("BILLING_WEBHOOK_VERIFICATION_MANDATORY", "false").lower() in ("true", "1")
 
-    # If webhook secret is configured, strictly enforce HMAC-SHA256 signature
-    if webhook_secret and stripe_signature:
+    if is_mandatory:
+        if not stripe_signature or not stripe_signature.strip():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing or empty Stripe-Signature header.")
+        if not webhook_secret:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe webhook secret is not configured.")
         try:
-            # Parse Stripe signature header format: t=timestamp,v1=signature
             elements = dict(item.split("=", 1) for item in stripe_signature.split(","))
             timestamp = elements.get("t", "")
             signature = elements.get("v1", "")
+            if not timestamp or not signature:
+                raise ValueError("Missing timestamp (t) or signature (v1) in Stripe-Signature header.")
 
             signed_payload = f"{timestamp}.".encode("utf-8") + payload_bytes
             computed_hmac = hmac.new(
@@ -190,25 +208,58 @@ async def stripe_webhook(
             ).hexdigest()
 
             if not hmac.compare_digest(signature, computed_hmac):
-                raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature.")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe webhook signature.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stripe signature verification failed: {str(e)}")
+    elif stripe_signature and stripe_signature.strip() and webhook_secret:
+        try:
+            elements = dict(item.split("=", 1) for item in stripe_signature.split(","))
+            timestamp = elements.get("t", "")
+            signature = elements.get("v1", "")
+            signed_payload = f"{timestamp}.".encode("utf-8") + payload_bytes
+            computed_hmac = hmac.new(
+                webhook_secret.encode("utf-8"),
+                signed_payload,
+                hashlib.sha256
+            ).hexdigest()
+            if not hmac.compare_digest(signature, computed_hmac):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe webhook signature.")
+        except HTTPException:
+            raise
         except Exception:
-            raise HTTPException(status_code=400, detail="Stripe signature verification failed.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stripe signature verification failed.")
 
     try:
         data = json.loads(payload_bytes.decode("utf-8"))
     except Exception:
-        raise HTTPException(status_code=400, detail="Malformed JSON webhook body.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed JSON webhook body.")
 
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed JSON webhook body.")
+
+    event_id = data.get("id")
     event_type = data.get("type", "")
     if event_type in ("checkout.session.completed", "invoice.payment_succeeded"):
-        session_obj = data.get("data", {}).get("object", {})
+        session_obj = data.get("data", {}).get("object")
+        if not isinstance(session_obj, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe event structure: missing data.object")
         client_ref_id = session_obj.get("client_reference_id")
-        plan_id = session_obj.get("metadata", {}).get("plan_id", "PROFESSIONAL").upper()
+        plan_id = (session_obj.get("metadata") or {}).get("plan_id", "PROFESSIONAL").upper()
 
-        if client_ref_id:
-            org = db.query(models.Organization).filter(models.Organization.id == client_ref_id).first()
-            if org:
-                _provision_license(db, org, plan_id)
+        if not client_ref_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing client_reference_id for tenant organization.")
+
+        org = db.query(models.Organization).filter(models.Organization.id == client_ref_id).first()
+        if not org:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unauthorized tenant: Organization does not exist.")
+
+        # Idempotency check: don't duplicate side effects for replayed event
+        if event_id and _is_event_already_processed(db, org.id, event_id):
+            return {"received": True, "event": event_type, "duplicate": True}
+
+        _provision_license(db, org, plan_id, event_id=event_id)
 
     return {"received": True, "event": event_type}
 
@@ -221,34 +272,69 @@ async def razorpay_webhook(
 ):
     """
     Processes inbound Razorpay webhook events with HMAC signature verification.
+    Fails closed: when secret is configured, missing, empty, or invalid signatures are rejected.
     """
     payload_bytes = await request.body()
-    webhook_secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+    webhook_secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "").strip()
+    is_mandatory = bool(webhook_secret) or os.getenv("BILLING_WEBHOOK_VERIFICATION_MANDATORY", "false").lower() in ("true", "1")
 
-    if webhook_secret and x_razorpay_signature:
+    if is_mandatory:
+        if not x_razorpay_signature or not x_razorpay_signature.strip():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing or empty X-Razorpay-Signature header.")
+        if not webhook_secret:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Razorpay webhook secret is not configured.")
+        try:
+            computed = hmac.new(
+                webhook_secret.encode("utf-8"),
+                payload_bytes,
+                hashlib.sha256
+            ).hexdigest()
+            if not hmac.compare_digest(x_razorpay_signature.strip(), computed):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Razorpay webhook signature.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Razorpay signature verification failed: {str(e)}")
+    elif x_razorpay_signature and x_razorpay_signature.strip() and webhook_secret:
         computed = hmac.new(
             webhook_secret.encode("utf-8"),
             payload_bytes,
             hashlib.sha256
         ).hexdigest()
-        if not hmac.compare_digest(x_razorpay_signature, computed):
-            raise HTTPException(status_code=400, detail="Invalid Razorpay webhook signature.")
+        if not hmac.compare_digest(x_razorpay_signature.strip(), computed):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Razorpay webhook signature.")
 
     try:
         data = json.loads(payload_bytes.decode("utf-8"))
     except Exception:
-        raise HTTPException(status_code=400, detail="Malformed JSON webhook body.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed JSON webhook body.")
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed JSON webhook body.")
 
     event = data.get("event", "")
     if event in ("order.paid", "payment.captured"):
-        notes = data.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {})
+        payload_dict = data.get("payload")
+        if not isinstance(payload_dict, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Razorpay event structure: missing payload.")
+        payment_dict = payload_dict.get("payment", {})
+        entity_dict = payment_dict.get("entity", {}) if isinstance(payment_dict, dict) else {}
+        notes = entity_dict.get("notes") or {}
         org_id = notes.get("org_id")
         plan_id = notes.get("plan_id", "STARTER").upper()
 
-        if org_id:
-            org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
-            if org:
-                _provision_license(db, org, plan_id)
+        if not org_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing org_id in payment notes.")
+
+        org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+        if not org:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unauthorized tenant: Organization does not exist.")
+
+        event_id = data.get("id") or entity_dict.get("id")
+        if event_id and _is_event_already_processed(db, org.id, event_id):
+            return {"received": True, "event": event, "duplicate": True}
+
+        _provision_license(db, org, plan_id, event_id=event_id)
 
     return {"received": True, "event": event}
 
@@ -283,7 +369,7 @@ def simulate_sandbox_payment(
     }
 
 
-def _provision_license(db: Session, org: models.Organization, plan_id: str) -> models.License:
+def _provision_license(db: Session, org: models.Organization, plan_id: str, event_id: Optional[str] = None) -> models.License:
     """Idempotently updates organization plan and extends license validity by 30 days."""
     license_rec = db.query(models.License).filter(models.License.org_id == org.id).first()
     new_expiry = datetime.datetime.utcnow() + datetime.timedelta(days=30)
@@ -312,6 +398,7 @@ def _provision_license(db: Session, org: models.Organization, plan_id: str) -> m
         result="SUCCESS",
         metadata_json={
             "plan_id": plan_id,
+            "event_id": str(event_id) if event_id else None,
             "valid_until": new_expiry.isoformat(),
             "timestamp": datetime.datetime.utcnow().isoformat()
         }

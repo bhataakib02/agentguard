@@ -107,6 +107,16 @@ class ToolProxyService:
                 "gate_token": gate_token or ""
             }
 
+        # Reject caller-controlled override_endpoint unconditionally
+        if override_endpoint and override_endpoint.strip():
+            return {
+                "success": False,
+                "status": "NOT_AUTHORIZED",
+                "error": "Security policy blocked outbound execution: override_endpoint is strictly forbidden.",
+                "gate_token": gate_token,
+                "tool_name": tool_name or ""
+            }
+
         decision = db.query(models.Decision).filter(
             models.Decision.execution_gate_token == gate_token
         ).first()
@@ -134,6 +144,16 @@ class ToolProxyService:
                 "success": False,
                 "status": "AGENT_MISMATCH",
                 "error": f"Execution gate token was issued to agent {decision.agent_id}, not {agent.id}.",
+                "gate_token": gate_token
+            }
+
+        # Check tenant isolation match
+        decision_agent = db.query(models.Agent).filter(models.Agent.id == decision.agent_id).first()
+        if not decision_agent or str(decision_agent.org_id) != str(agent.org_id):
+            return {
+                "success": False,
+                "status": "NOT_AUTHORIZED",
+                "error": "Forbidden: Execution gate token belongs to another organization.",
                 "gate_token": gate_token
             }
 
@@ -167,26 +187,76 @@ class ToolProxyService:
                 }
 
         # --------------------------------------------------------------------
-        # 2. RESOLVE TARGET TOOL & SCHEMA VALIDATION
+        # 2. RESOLVE TARGET TOOL & BINDING VALIDATION (ORGANIZATION SCOPED)
         # --------------------------------------------------------------------
-        resolved_tool_name = tool_name or decision.action_requested
         tool_record = None
-
-        if tool_name:
-            tool_record = db.query(models.Tool).filter(models.Tool.name == tool_name).first()
-        elif decision.tool_id:
-            tool_record = db.query(models.Tool).filter(models.Tool.id == decision.tool_id).first()
-        else:
-            # Attempt lookup by action or resource target
+        if decision.tool_id:
+            tool_record = db.query(models.Tool).filter(
+                models.Tool.id == decision.tool_id,
+                (models.Tool.org_id == agent.org_id) | (models.Tool.org_id == None)
+            ).first()
+        if not tool_record:
             tool_record = db.query(models.Tool).filter(
                 (models.Tool.name == decision.action_requested) |
-                (models.Tool.name == decision.resource_target)
+                (models.Tool.name == decision.resource_target),
+                (models.Tool.org_id == agent.org_id) | (models.Tool.org_id == None)
             ).first()
 
-        effective_params = parameters if parameters is not None else (decision.execution_parameters or {})
+        authorized_tool_name = tool_record.name if tool_record else decision.action_requested
+
+        # If caller specified tool_name, verify it matches the authorized tool
+        if tool_name and tool_name != authorized_tool_name:
+            return {
+                "success": False,
+                "status": "NOT_AUTHORIZED",
+                "error": f"Execution gate token was authorized for tool '{authorized_tool_name}', cannot execute '{tool_name}'.",
+                "gate_token": gate_token,
+                "tool_name": tool_name
+            }
+        resolved_tool_name = authorized_tool_name
+
+        # Ensure tool belongs to calling organization
+        if tool_record and tool_record.org_id and str(tool_record.org_id) != str(agent.org_id):
+            return {
+                "success": False,
+                "status": "NOT_AUTHORIZED",
+                "error": "Forbidden: Tool belongs to another organization.",
+                "gate_token": gate_token,
+                "tool_name": resolved_tool_name
+            }
+
+        # Verify endpoint snapshot binding
+        authorized_ep = getattr(decision, "authorized_endpoint", None)
+        if authorized_ep and tool_record and tool_record.endpoint != authorized_ep:
+            return {
+                "success": False,
+                "status": "NOT_AUTHORIZED",
+                "error": "Security violation: Tool endpoint configuration has changed since authorization was granted.",
+                "gate_token": gate_token,
+                "tool_name": resolved_tool_name
+            }
+
+        # Parameter canonicalization and deterministic binding
+        def _canonical_json(data: Any) -> str:
+            if data is None:
+                return "{}"
+            return json.dumps(data, sort_keys=True, separators=(',', ':'), default=str)
+
+        authorized_params = decision.execution_parameters or {}
+        if parameters is not None:
+            if _canonical_json(parameters) != _canonical_json(authorized_params):
+                return {
+                    "success": False,
+                    "status": "NOT_AUTHORIZED",
+                    "error": "Execution parameters do not match authorized decision parameters.",
+                    "gate_token": gate_token,
+                    "tool_name": resolved_tool_name
+                }
+            effective_params = parameters
+        else:
+            effective_params = authorized_params
 
         if tool_record:
-            resolved_tool_name = tool_record.name
             if tool_record.status != "ACTIVE":
                 return {
                     "success": False,
@@ -209,9 +279,9 @@ class ToolProxyService:
                     }
 
         # --------------------------------------------------------------------
-        # 3. ENDPOINT RESOLUTION & SSRF DEFENSE
+        # 3. ENDPOINT RESOLUTION (NEVER TRUST CALLER OVERRIDE)
         # --------------------------------------------------------------------
-        target_endpoint = override_endpoint or (tool_record.endpoint if tool_record else None)
+        target_endpoint = tool_record.endpoint if tool_record else None
 
         # --------------------------------------------------------------------
         # 4. OUTBOUND DISPATCH / SANDBOX DELEGATION
@@ -221,6 +291,38 @@ class ToolProxyService:
         response_data = None
         error_msg = None
         exec_outcome = "EXECUTED"
+
+        # Check if tool requires isolated sandbox code execution
+        is_sandbox_tool = (
+            (tool_record and tool_record.category in ("SANDBOX", "CODE_EXECUTION")) or
+            (resolved_tool_name and "sandbox" in resolved_tool_name.lower()) or
+            (isinstance(effective_params, dict) and ("code" in effective_params or "script" in effective_params))
+        )
+
+        if not is_sandbox_tool:
+            # ATOMIC GATE TOKEN CONSUMPTION
+            rows_updated = db.query(models.Decision).filter(
+                models.Decision.id == decision.id,
+                models.Decision.gate_token_used == False,
+                models.Decision.decision == "ALLOW"
+            ).update(
+                {
+                    models.Decision.gate_token_used: True,
+                    models.Decision.execution_status: "CLAIMED",
+                    models.Decision.executed_at: now
+                },
+                synchronize_session=False
+            )
+            db.commit()
+
+            if rows_updated != 1:
+                return {
+                    "success": False,
+                    "status": "GATE_TOKEN_REPLAYED",
+                    "error": "Execution gate token has already been consumed (replay prevented).",
+                    "gate_token": gate_token,
+                    "tool_name": resolved_tool_name
+                }
 
         # Check if tool requires isolated sandbox code execution
         is_sandbox_tool = (
@@ -355,10 +457,8 @@ class ToolProxyService:
         latency_ms = int((time.time() - start_time) * 1000)
 
         # --------------------------------------------------------------------
-        # 5. STATE TRANSITION & ONE-TIME CONSUMPTION
+        # 5. STATE TRANSITION & OUTCOME RECORDING
         # --------------------------------------------------------------------
-        decision.gate_token_used = True
-        decision.executed_at = datetime.datetime.utcnow()
         decision.execution_status = "EXECUTED" if exec_outcome == "EXECUTED" else "EXECUTION_FAILED"
         if tool_record:
             decision.tool_id = tool_record.id
@@ -367,6 +467,7 @@ class ToolProxyService:
         # --------------------------------------------------------------------
         # 6. TELEMETRY & PROVENANCE RECORDING
         # --------------------------------------------------------------------
+        masked_token = f"{gate_token[:8]}...{gate_token[-4:]}" if len(gate_token) > 12 else "gate_***"
         try:
             prov = models.ProvenanceEvent(
                 decision_id=decision.id,

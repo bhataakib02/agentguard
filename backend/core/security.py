@@ -38,7 +38,7 @@ def create_access_token(
     else:
         expire = utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode = {"sub": user_id, "exp": expire}
+    to_encode = {"sub": user_id, "exp": expire, "token_type": "user_access", "type": "user_access"}
     if email:
         to_encode["email"] = email
     if role:

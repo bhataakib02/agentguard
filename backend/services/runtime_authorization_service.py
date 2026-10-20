@@ -197,6 +197,7 @@ class RuntimeAuthorizationService:
             )
 
         matched_tool = db.query(models.Tool).filter(
+            (models.Tool.org_id == agent.org_id) | (models.Tool.org_id == None),
             (models.Tool.name == action) |
             (models.Tool.name == resource) |
             (models.Tool.name == target)
@@ -393,6 +394,7 @@ class RuntimeAuthorizationService:
             execution_gate_token=gate_token,
             gate_token_used=False,
             tool_id=matched_tool.id if matched_tool else None,
+            authorized_endpoint=matched_tool.endpoint if matched_tool else None,
             execution_parameters=parameters or {},
             timestamp=now
         )

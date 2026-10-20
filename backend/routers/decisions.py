@@ -362,12 +362,22 @@ def get_decision_detail(
     agent = db.query(models.Agent).filter(models.Agent.id == dec.agent_id).first()
     if agent and current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
         raise HTTPException(status_code=403, detail="Forbidden: Decision record belongs to another organization")
-    
+
     prov = db.query(models.ProvenanceEvent).filter(models.ProvenanceEvent.decision_id == dec.id).first()
     app_req = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.decision_id == dec.id).first()
 
+    prov_data = None
+    if prov and prov.causal_chain_json:
+        import copy
+        prov_data = copy.deepcopy(prov.causal_chain_json)
+        if isinstance(prov_data, dict):
+            if "gate_token" in prov_data:
+                prov_data["gate_token"] = "[MASKED]"
+            if "execution_gate_token" in prov_data:
+                prov_data["execution_gate_token"] = "[MASKED]"
+
     return {
-        "decision": dec,
-        "provenance": prov.causal_chain_json if prov else None,
+        "decision": schemas.DecisionSchema.model_validate(dec),
+        "provenance": prov_data,
         "approval_request": app_req
     }

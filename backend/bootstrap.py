@@ -160,6 +160,14 @@ def ensure_schema_compatibility(db_engine=engine):
                 conn.execute(text("ALTER TABLE evaluation_datasets ADD COLUMN metadata_json JSON;"))
             conn.commit()
 
+    # Check decisions table columns
+    if "decisions" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("decisions")}
+        with db_engine.connect() as conn:
+            if "authorized_endpoint" not in cols:
+                conn.execute(text("ALTER TABLE decisions ADD COLUMN authorized_endpoint VARCHAR;"))
+            conn.commit()
+
 
 def bootstrap_database():
     """

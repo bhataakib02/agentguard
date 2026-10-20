@@ -363,6 +363,7 @@ class Decision(Base):
     gate_token_used = Column(Boolean, default=False)
     executed_at = Column(DateTime, nullable=True)
     tool_id = Column(GUID(), ForeignKey("tools.id"), nullable=True)
+    authorized_endpoint = Column(String, nullable=True)
     execution_parameters = Column(JSON, default=dict)
 
     agent = relationship("Agent", back_populates="decisions")

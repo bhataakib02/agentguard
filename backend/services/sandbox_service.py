@@ -905,10 +905,28 @@ class SandboxService:
         # --------------------------------------------------------------------
         # 3. ATOMIC TOKEN CONSUMPTION & DURABLE JOB CREATION
         # --------------------------------------------------------------------
-        decision.gate_token_used = True
-        decision.executed_at = now
-        decision.execution_status = "EXECUTED"
+        rows_updated = db.query(models.Decision).filter(
+            models.Decision.id == decision.id,
+            models.Decision.gate_token_used == False,
+            models.Decision.decision == "ALLOW"
+        ).update(
+            {
+                models.Decision.gate_token_used: True,
+                models.Decision.execution_status: "CLAIMED",
+                models.Decision.executed_at: now
+            },
+            synchronize_session=False
+        )
         db.commit()
+
+        if rows_updated != 1:
+            return {
+                "success": False,
+                "status": "GATE_TOKEN_REPLAYED",
+                "execution_id": execution_id,
+                "error": "Execution gate token has already been consumed (replay prevented).",
+                "gate_token": gate_token
+            }
 
         clean_env = cleanse_execution_environment(env_vars)
 

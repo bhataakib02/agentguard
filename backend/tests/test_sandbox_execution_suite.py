@@ -710,7 +710,7 @@ def test_13_backward_compatibility_with_tool_proxy(test_setup):
         json={
             "execution_gate_token": gate_token,
             "tool_name": "python_sandbox",
-            "parameters": {"code": "print('Executed via legacy endpoint')"}
+            "parameters": {"code": "print('Via Tool Proxy')"}
         }
     )
     assert exec_res.status_code == 200

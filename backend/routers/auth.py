@@ -90,6 +90,12 @@ def login(
     from jose import jwt, JWTError
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        tok_type = payload.get("token_type") or payload.get("type")
+        if tok_type in ("machine", "ws_ticket") or payload.get("agent_id") or payload.get("ticket_id") or payload.get("credential_id"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Forbidden: {tok_type or 'Machine'} token cannot be used for human user login."
+            )
         verified_user_id = payload.get("sub")
         verified_email = payload.get("email")
     except JWTError:
@@ -108,6 +114,17 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Authentication token does not match requested email"
         )
+    if not verified_email:
+        token_user = None
+        if verified_user_id:
+            token_user = db.query(models.User).filter(
+                (models.User.id == verified_user_id) | (models.User.auth_user_id == verified_user_id)
+            ).first()
+        if not token_user or token_user.email.lower() != req.email.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication token does not match requested user account"
+            )
     if verified_user_id and req.auth_user_id and str(verified_user_id) != str(req.auth_user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
