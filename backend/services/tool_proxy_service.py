@@ -28,8 +28,21 @@ logger = logging.getLogger("agentguard.tool_proxy")
 
 class ToolProxyService:
     def __init__(self):
-        # By default, disallow local addresses to prevent SSRF unless explicitly enabled for testing
-        self.allow_local_egress = os.getenv("AGENTGUARD_ALLOW_LOCAL_TOOLS", "false").lower() in ("true", "1", "yes")
+        self._mock_client: Optional[httpx.Client] = None
+        self._mock_transport: Optional[httpx.BaseTransport] = None
+
+    @property
+    def allow_local_egress(self) -> bool:
+        """Dynamically inspect environment setting for allowing local test endpoints."""
+        return os.getenv("AGENTGUARD_ALLOW_LOCAL_TOOLS", "false").lower() in ("true", "1", "yes")
+
+    def set_mock_client(self, client: Optional[httpx.Client]):
+        """Inject an explicit mock httpx.Client for test isolation only."""
+        self._mock_client = client
+
+    def set_mock_transport(self, transport: Optional[httpx.BaseTransport]):
+        """Inject an explicit mock httpx transport for test isolation only."""
+        self._mock_transport = transport
 
     def _validate_ssrf_safety(self, url: str) -> Dict[str, Any]:
         """
@@ -227,14 +240,23 @@ class ToolProxyService:
 
         # Verify endpoint snapshot binding
         authorized_ep = getattr(decision, "authorized_endpoint", None)
-        if authorized_ep and tool_record and tool_record.endpoint != authorized_ep:
-            return {
-                "success": False,
-                "status": "NOT_AUTHORIZED",
-                "error": "Security violation: Tool endpoint configuration has changed since authorization was granted.",
-                "gate_token": gate_token,
-                "tool_name": resolved_tool_name
-            }
+        if tool_record and tool_record.endpoint:
+            if not authorized_ep:
+                return {
+                    "success": False,
+                    "status": "NOT_AUTHORIZED",
+                    "error": "Security policy violation: Decision record is missing required authorized endpoint snapshot.",
+                    "gate_token": gate_token,
+                    "tool_name": resolved_tool_name
+                }
+            if tool_record.endpoint != authorized_ep:
+                return {
+                    "success": False,
+                    "status": "NOT_AUTHORIZED",
+                    "error": "Security violation: Tool endpoint configuration has changed since authorization was granted.",
+                    "gate_token": gate_token,
+                    "tool_name": resolved_tool_name
+                }
 
         # Parameter canonicalization and deterministic binding
         def _canonical_json(data: Any) -> str:
@@ -403,34 +425,32 @@ class ToolProxyService:
 
             timeout_sec = (tool_record.timeout_seconds if tool_record else 30) or 30
 
-            if target_endpoint.startswith("mock://") or "example.com" in target_endpoint or target_endpoint.endswith(".test") or "mock" in target_endpoint:
-                status_code = 200
-                response_data = {
-                    "status": "APPROVED",
-                    "refund_id": f"ref_{int(time.time())}",
-                    "tool": resolved_tool_name,
-                    "parameters": effective_params,
-                    "message": "Tool endpoint executed successfully."
-                }
-            else:
-                try:
-                    client = http_client or httpx.Client(timeout=timeout_sec)
-                    resp = client.post(target_endpoint, json=effective_params, headers=headers)
-                    status_code = resp.status_code
-                    try:
-                        response_data = resp.json()
-                    except Exception:
-                        response_data = resp.text
+            try:
+                if http_client is not None:
+                    client = http_client
+                elif self._mock_client is not None:
+                    client = self._mock_client
+                elif self._mock_transport is not None:
+                    client = httpx.Client(transport=self._mock_transport, timeout=timeout_sec)
+                else:
+                    client = httpx.Client(timeout=timeout_sec)
 
-                    if status_code >= 400:
-                        exec_outcome = "ERROR"
-                        error_msg = f"Downstream service returned HTTP {status_code}"
-                except httpx.TimeoutException:
-                    exec_outcome = "TIMEOUT"
-                    error_msg = f"Downstream service timed out after {timeout_sec}s."
-                except Exception as e:
+                resp = client.post(target_endpoint, json=effective_params, headers=headers)
+                status_code = resp.status_code
+                try:
+                    response_data = resp.json()
+                except Exception:
+                    response_data = resp.text
+
+                if status_code >= 400:
                     exec_outcome = "ERROR"
-                    error_msg = f"Downstream connection error: {str(e)}"
+                    error_msg = f"Downstream service returned HTTP {status_code}"
+            except httpx.TimeoutException:
+                exec_outcome = "TIMEOUT"
+                error_msg = f"Downstream service timed out after {timeout_sec}s."
+            except Exception as e:
+                exec_outcome = "ERROR"
+                error_msg = f"Downstream connection error: {str(e)}"
         else:
             # Local / Virtual Tool execution (e.g., standard internal operations)
             status_code = 200
@@ -459,9 +479,17 @@ class ToolProxyService:
         # --------------------------------------------------------------------
         # 5. STATE TRANSITION & OUTCOME RECORDING
         # --------------------------------------------------------------------
-        decision.execution_status = "EXECUTED" if exec_outcome == "EXECUTED" else "EXECUTION_FAILED"
+        final_status = "EXECUTED" if exec_outcome == "EXECUTED" else "EXECUTION_FAILED"
+        decision.execution_status = final_status
         if tool_record:
             decision.tool_id = tool_record.id
+        db.query(models.Decision).filter(models.Decision.id == decision.id).update(
+            {
+                models.Decision.execution_status: final_status,
+                models.Decision.tool_id: (tool_record.id if tool_record else decision.tool_id)
+            },
+            synchronize_session=False
+        )
         db.commit()
 
         # --------------------------------------------------------------------

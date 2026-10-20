@@ -821,3 +821,53 @@ class TestP0Phase1Remediation(unittest.TestCase):
             mig_engine.dispose()
             if os.path.exists(test_db_path):
                 os.remove(test_db_path)
+
+    def test_phase_g_legacy_decision_missing_endpoint_fails_closed(self):
+        """
+        Verify that a legacy decision missing authorized_endpoint cannot execute outbound actions.
+        Fail-closed security policy must return NOT_AUTHORIZED.
+        """
+        import uuid
+        from services.tool_proxy_service import tool_proxy_service
+
+        # Create tool with endpoint
+        tool = models.Tool(
+            org_id=self.org_a.id,
+            name="legacy_target_tool",
+            category="API",
+            endpoint="https://api.example.com/v1/legacy",
+            status="ACTIVE"
+        )
+        self.db.add(tool)
+        self.db.commit()
+        self.db.refresh(tool)
+
+        gate_tok = f"gate_legacy_{uuid.uuid4().hex}"
+        # Create legacy decision record without authorized_endpoint (None)
+        legacy_dec = models.Decision(
+            agent_id=self.agent_a.id,
+            intent_summary="Legacy execution intent",
+            explanation="Legacy test explanation",
+            action_requested="legacy_target_tool",
+            resource_target="api:legacy",
+            decision="ALLOW",
+            execution_status="AUTHORIZED",
+            execution_gate_token=gate_tok,
+            gate_token_used=False,
+            tool_id=tool.id,
+            authorized_endpoint=None,
+            timestamp=datetime.datetime.utcnow()
+        )
+        self.db.add(legacy_dec)
+        self.db.commit()
+
+        # Attempt execution
+        res = tool_proxy_service.execute_tool(
+            db=self.db,
+            agent=self.agent_a,
+            gate_token=gate_tok,
+            tool_name="legacy_target_tool"
+        )
+        self.assertFalse(res["success"])
+        self.assertEqual(res["status"], "NOT_AUTHORIZED")
+        self.assertIn("missing required authorized endpoint snapshot", res["error"])

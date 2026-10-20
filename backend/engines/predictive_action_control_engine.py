@@ -1049,6 +1049,13 @@ class PredictiveActionControlEngine:
             if isinstance(caller_entity, models.User):
                 resolved_user_id = caller_entity.id
 
+            matched_tool = db.query(models.Tool).filter(
+                (models.Tool.org_id == agent.org_id) | (models.Tool.org_id == None),
+                (models.Tool.name == raw_action) |
+                (models.Tool.name == raw_resource) |
+                (models.Tool.name == raw_operation)
+            ).first()
+
             decision_record = models.Decision(
                 agent_id=agent.id,
                 user_id=resolved_user_id,
@@ -1063,6 +1070,8 @@ class PredictiveActionControlEngine:
                 execution_status="EXECUTED" if decision_outcome == "ALLOW" else ("PENDING_APPROVAL" if decision_outcome == "REVIEW" else "BLOCKED"),
                 execution_gate_token=gate_token,
                 gate_token_used=False,
+                tool_id=matched_tool.id if matched_tool else None,
+                authorized_endpoint=matched_tool.endpoint if matched_tool else None,
                 execution_parameters=request.parameters or {},
                 timestamp=now
             )

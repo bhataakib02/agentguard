@@ -255,6 +255,29 @@ class TestE2EMachineAgentLifecycle:
         self.db.commit()
 
         # ----------------------------------------------------------------------
+        # STAGE 8.5: Register Mock Tool in Tool Registry
+        # ----------------------------------------------------------------------
+        tool = models.Tool(
+            id=str(uuid.uuid4()),
+            org_id=org.id,
+            name="treasury_wire_transfer",
+            category="PAYMENT",
+            endpoint="https://api.example.com/treasury/wire",
+            schema_definition={
+                "type": "object",
+                "properties": {
+                    "recipient_account": {"type": "string"},
+                    "amount": {"type": "number"},
+                    "memo": {"type": "string"}
+                },
+                "required": ["recipient_account", "amount"]
+            },
+            status="ACTIVE"
+        )
+        self.db.add(tool)
+        self.db.commit()
+
+        # ----------------------------------------------------------------------
         # STAGE 9: Pre-Flight Runtime Authorization Kernel (POST /api/runtime/authorize)
         # ----------------------------------------------------------------------
         authz_payload = {
@@ -281,27 +304,8 @@ class TestE2EMachineAgentLifecycle:
         assert gate_token.startswith("gate_")
 
         # ----------------------------------------------------------------------
-        # STAGE 10: Register Mock Tool & Execute via Tool Proxy (POST /api/runtime/execute)
+        # STAGE 10: Execute via Tool Proxy (POST /api/runtime/execute)
         # ----------------------------------------------------------------------
-        tool = models.Tool(
-            id=str(uuid.uuid4()),
-            org_id=org.id,
-            name="treasury_wire_transfer",
-            category="PAYMENT",
-            endpoint="https://api.example.com/treasury/wire",
-            schema_definition={
-                "type": "object",
-                "properties": {
-                    "recipient_account": {"type": "string"},
-                    "amount": {"type": "number"},
-                    "memo": {"type": "string"}
-                },
-                "required": ["recipient_account", "amount"]
-            },
-            status="ACTIVE"
-        )
-        self.db.add(tool)
-        self.db.commit()
 
         exec_res = test_client.post(
             "/api/runtime/execute",
@@ -393,6 +397,7 @@ class TestE2EMachineAgentLifecycle:
         assert "AGENT_CREDENTIAL_CREATED" in event_types
 
         # Verify Decision & Execution Record exists
+        self.db.commit()
         decision_record = self.db.query(models.Decision).filter(
             models.Decision.agent_id == agent.id
         ).first()

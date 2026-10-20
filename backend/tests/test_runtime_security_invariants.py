@@ -345,8 +345,9 @@ class TestRuntimeSecurityInvariants:
         assert resp_forged.status_code in [400, 401, 403, 404]
 
     # --- 7. SSRF PROTECTION IN EXECUTION GATEWAY ---
-    def test_11_execution_proxy_blocks_cloud_metadata_ssrf(self):
+    def test_11_execution_proxy_blocks_cloud_metadata_ssrf(self, monkeypatch):
         """Tool proxy execution service strictly blocks AWS/GCP 169.254.169.254 metadata endpoint"""
+        monkeypatch.setenv("AGENTGUARD_ALLOW_LOCAL_TOOLS", "false")
         ssrf_targets = [
             "http://169.254.169.254/latest/meta-data/",
             "http://metadata.google.internal/computeMetadata/v1/",
