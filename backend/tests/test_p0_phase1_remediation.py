@@ -871,3 +871,37 @@ class TestP0Phase1Remediation(unittest.TestCase):
         self.assertFalse(res["success"])
         self.assertEqual(res["status"], "NOT_AUTHORIZED")
         self.assertIn("missing required authorized endpoint snapshot", res["error"])
+
+    def test_production_environment_strictly_prohibits_mock_and_local_egress(self):
+        """
+        Production Invariants:
+        1. set_mock_client and set_mock_transport raise RuntimeError if ENVIRONMENT is production.
+        2. allow_local_egress strictly returns False in production even if AGENTGUARD_ALLOW_LOCAL_TOOLS is true.
+        """
+        from config import settings
+        from services.tool_proxy_service import tool_proxy_service
+        import httpx
+
+        orig_env = settings.ENVIRONMENT
+        orig_local = os.environ.get("AGENTGUARD_ALLOW_LOCAL_TOOLS")
+        try:
+            settings.ENVIRONMENT = "production"
+            os.environ["AGENTGUARD_ALLOW_LOCAL_TOOLS"] = "true"
+
+            # 1. Local egress is strictly disabled in production
+            self.assertFalse(tool_proxy_service.allow_local_egress)
+
+            # 2. Mock injection is prohibited in production
+            with self.assertRaises(RuntimeError) as ctx1:
+                tool_proxy_service.set_mock_client(httpx.Client())
+            self.assertIn("strictly prohibited in production", str(ctx1.exception))
+
+            with self.assertRaises(RuntimeError) as ctx2:
+                tool_proxy_service.set_mock_transport(httpx.MockTransport(lambda r: httpx.Response(200)))
+            self.assertIn("strictly prohibited in production", str(ctx2.exception))
+        finally:
+            settings.ENVIRONMENT = orig_env
+            if orig_local is not None:
+                os.environ["AGENTGUARD_ALLOW_LOCAL_TOOLS"] = orig_local
+            else:
+                os.environ.pop("AGENTGUARD_ALLOW_LOCAL_TOOLS", None)

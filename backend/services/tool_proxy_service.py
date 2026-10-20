@@ -18,6 +18,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 import models
+from config import settings
 from engines.intent_engine import intent_engine
 from engines.pii_engine import pii_engine
 from engines.output_guardrails_engine import output_guardrails_engine
@@ -33,15 +34,21 @@ class ToolProxyService:
 
     @property
     def allow_local_egress(self) -> bool:
-        """Dynamically inspect environment setting for allowing local test endpoints."""
+        """Dynamically inspect environment setting for allowing local test endpoints (strictly disabled in production)."""
+        if getattr(settings, "ENVIRONMENT", "production").lower() == "production":
+            return False
         return os.getenv("AGENTGUARD_ALLOW_LOCAL_TOOLS", "false").lower() in ("true", "1", "yes")
 
     def set_mock_client(self, client: Optional[httpx.Client]):
-        """Inject an explicit mock httpx.Client for test isolation only."""
+        """Inject an explicit mock httpx.Client for test isolation only. Strictly forbidden in production."""
+        if getattr(settings, "ENVIRONMENT", "production").lower() == "production":
+            raise RuntimeError("Mock client injection is strictly prohibited in production environment.")
         self._mock_client = client
 
     def set_mock_transport(self, transport: Optional[httpx.BaseTransport]):
-        """Inject an explicit mock httpx transport for test isolation only."""
+        """Inject an explicit mock httpx transport for test isolation only. Strictly forbidden in production."""
+        if getattr(settings, "ENVIRONMENT", "production").lower() == "production":
+            raise RuntimeError("Mock transport injection is strictly prohibited in production environment.")
         self._mock_transport = transport
 
     def _validate_ssrf_safety(self, url: str) -> Dict[str, Any]:
@@ -426,7 +433,9 @@ class ToolProxyService:
             timeout_sec = (tool_record.timeout_seconds if tool_record else 30) or 30
 
             try:
-                if http_client is not None:
+                if getattr(settings, "ENVIRONMENT", "production").lower() == "production":
+                    client = httpx.Client(timeout=timeout_sec)
+                elif http_client is not None:
                     client = http_client
                 elif self._mock_client is not None:
                     client = self._mock_client
