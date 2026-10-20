@@ -120,7 +120,8 @@ def get_platform_overview(
     licenses = db.query(models.License).order_by(models.License.expiry_date.asc()).limit(5).all()
     for l in licenses:
         o = db.query(models.Organization).filter(models.Organization.id == l.org_id).first()
-        days_rem = (l.expiry_date - now).days if l.expiry_date else 365
+        exp_dt = l.expiry_date if (l.expiry_date and l.expiry_date.tzinfo) else (l.expiry_date.replace(tzinfo=datetime.timezone.utc) if l.expiry_date else None)
+        days_rem = (exp_dt - now).days if exp_dt else 365
         org_user_cnt = db.query(models.User).filter(models.User.org_id == l.org_id).count()
         u_val = getattr(l, "max_users", 0)
         max_u_val = float(u_val) if u_val else 0.0

@@ -403,7 +403,7 @@ class ToolProxyService:
 
             timeout_sec = (tool_record.timeout_seconds if tool_record else 30) or 30
 
-            if target_endpoint.startswith("mock://") or "example.com" in target_endpoint or target_endpoint.endswith(".test"):
+            if target_endpoint.startswith("mock://") or "example.com" in target_endpoint or target_endpoint.endswith(".test") or "mock" in target_endpoint:
                 status_code = 200
                 response_data = {
                     "status": "APPROVED",

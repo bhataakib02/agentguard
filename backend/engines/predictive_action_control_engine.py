@@ -1226,11 +1226,12 @@ class PredictiveActionControlEngine:
             )
 
         # Dispatch real execution through Tool Proxy Gateway
+        target_tool = request.operation or request.target_resource or request.action_type
         exec_payload = tool_proxy_service.execute_tool(
             db=db,
             agent=agent,
             gate_token=eval_res.execution_gate_token,
-            tool_name=request.operation or request.action_type,
+            tool_name=target_tool,
             parameters=request.parameters
         )
 

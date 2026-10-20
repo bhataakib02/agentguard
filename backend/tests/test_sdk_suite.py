@@ -200,6 +200,18 @@ class TestSDKSuite:
         if cls.db:
             cls.db.close()
 
+    def setup_method(self, method):
+        """Ensure per-test database isolation so refusal/action sequences from prior tests do not contaminate subsequent tests."""
+        if self.db and self.agent_id:
+            dec_ids = [d.id for d in self.db.query(models.Decision.id).filter(models.Decision.agent_id == self.agent_id).all()]
+            if dec_ids:
+                self.db.query(models.ApprovalRequest).filter(models.ApprovalRequest.decision_id.in_(dec_ids)).delete(synchronize_session=False)
+                self.db.query(models.ProvenanceEvent).filter(models.ProvenanceEvent.decision_id.in_(dec_ids)).delete(synchronize_session=False)
+                self.db.query(models.AgentExecution).filter(models.AgentExecution.decision_id.in_(dec_ids)).delete(synchronize_session=False)
+                self.db.query(models.SandboxExecutionJob).filter(models.SandboxExecutionJob.decision_id.in_(dec_ids)).delete(synchronize_session=False)
+                self.db.query(models.Decision).filter(models.Decision.id.in_(dec_ids)).delete(synchronize_session=False)
+                self.db.commit()
+
     # =========================================================================
     # Test 1: Python SDK Authentication
     # =========================================================================

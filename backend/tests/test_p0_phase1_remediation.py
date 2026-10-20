@@ -35,6 +35,8 @@ client = TestClient(app)
 class TestP0Phase1Remediation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from bootstrap import ensure_canonical_plans
+        ensure_canonical_plans()
         cls.db = SessionLocal()
         cls.suffix = uuid.uuid4().hex[:6]
 
@@ -743,3 +745,79 @@ class TestP0Phase1Remediation(unittest.TestCase):
             }
         )
         self.assertEqual(exec_resp.status_code, 200)
+
+    def test_phase_g_schema_migration_and_idempotence(self):
+        """
+        Phase G Invariant:
+        1. Fresh database initialization includes authorized_endpoint on decisions.
+        2. Schema upgrade from an older table missing authorized_endpoint adds the column.
+        3. Existing table data is preserved during migration.
+        4. Re-running the migration is strictly idempotent and safe.
+        """
+        from sqlalchemy import create_engine, text, inspect
+        from database import Base
+        from bootstrap import ensure_schema_compatibility
+
+        test_db_path = "test_phase_g_migration.db"
+        if os.path.exists(test_db_path):
+            os.remove(test_db_path)
+
+        mig_engine = create_engine(f"sqlite:///{test_db_path}")
+
+        try:
+            # 1. Simulate legacy database with old decisions schema and existing production-like record
+            with mig_engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE decisions (
+                        id VARCHAR PRIMARY KEY,
+                        agent_id VARCHAR,
+                        action_requested VARCHAR,
+                        resource_target VARCHAR,
+                        decision VARCHAR,
+                        explanation TEXT,
+                        timestamp DATETIME
+                    );
+                """))
+                conn.execute(text("""
+                    INSERT INTO decisions (id, agent_id, action_requested, resource_target, decision, explanation, timestamp)
+                    VALUES ('dec-legacy-1', 'ag-1', 'tool_query', 'db', 'ALLOW', 'Legacy test decision', '2026-01-01 00:00:00');
+                """))
+                conn.commit()
+
+            # Verify column is missing initially
+            inspector = inspect(mig_engine)
+            cols_before = {c["name"] for c in inspector.get_columns("decisions")}
+            self.assertNotIn("authorized_endpoint", cols_before)
+
+            # 2. Run schema compatibility upgrade
+            ensure_schema_compatibility(mig_engine)
+
+            # Verify column exists after upgrade
+            inspector = inspect(mig_engine)
+            cols_after = {c["name"] for c in inspector.get_columns("decisions")}
+            self.assertIn("authorized_endpoint", cols_after)
+
+            # 3. Verify existing row data preserved
+            with mig_engine.connect() as conn:
+                row = conn.execute(text("SELECT id, action_requested, authorized_endpoint FROM decisions WHERE id = 'dec-legacy-1';")).fetchone()
+                self.assertEqual(row[0], "dec-legacy-1")
+                self.assertEqual(row[1], "tool_query")
+                self.assertIsNone(row[2])
+
+            # 4. Idempotence: running upgrade second time must succeed without error
+            ensure_schema_compatibility(mig_engine)
+
+            # 5. Insert row with authorized_endpoint into upgraded schema
+            with mig_engine.connect() as conn:
+                conn.execute(text("""
+                    INSERT INTO decisions (id, agent_id, action_requested, resource_target, decision, explanation, timestamp, authorized_endpoint)
+                    VALUES ('dec-new-2', 'ag-1', 'tool_query', 'db', 'ALLOW', 'New upgraded decision', '2026-10-20 00:00:00', 'https://api.internal/tool');
+                """))
+                conn.commit()
+                new_row = conn.execute(text("SELECT authorized_endpoint FROM decisions WHERE id = 'dec-new-2';")).fetchone()
+                self.assertEqual(new_row[0], "https://api.internal/tool")
+
+        finally:
+            mig_engine.dispose()
+            if os.path.exists(test_db_path):
+                os.remove(test_db_path)

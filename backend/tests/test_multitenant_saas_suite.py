@@ -4,10 +4,13 @@ import datetime
 import sys
 import os
 
+os.environ["DATABASE_URL"] = "sqlite:///test_multitenant_saas.db"
+os.environ["ENVIRONMENT"] = "test"
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from starlette.testclient import TestClient
 from main import app
-from database import SessionLocal
+from database import SessionLocal, Base, engine
 from core import security
 import models
 
@@ -16,6 +19,8 @@ client = TestClient(app)
 class TestMultiTenantSaaSSystem(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         cls.db = SessionLocal()
 
         # Seed plans
@@ -49,6 +54,10 @@ class TestMultiTenantSaaSSystem(unittest.TestCase):
             cls.db.add(cls.super_admin)
             cls.db.commit()
             cls.db.refresh(cls.super_admin)
+
+        # Clean up any leftover invited users from prior runs
+        cls.db.query(models.User).filter(models.User.email.in_(["user2@alpha.com", "user3@alpha.com"])).delete(synchronize_session=False)
+        cls.db.commit()
 
     @classmethod
     def tearDownClass(cls):
