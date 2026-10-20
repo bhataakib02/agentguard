@@ -905,3 +905,148 @@ class TestP0Phase1Remediation(unittest.TestCase):
                 os.environ["AGENTGUARD_ALLOW_LOCAL_TOOLS"] = orig_local
             else:
                 os.environ.pop("AGENTGUARD_ALLOW_LOCAL_TOOLS", None)
+
+    def test_gate_token_expiry_timestamp_timezone_handling(self):
+        """
+        Regression Test: Gate token timestamp expiration calculation
+        1. Timezone-aware timestamp (PostgreSQL timestamptz) does not raise TypeError.
+        2. Naive timestamp (SQLite) is explicitly interpreted as UTC.
+        3. Non-UTC timezone (e.g. UTC+5:30) is correctly normalized to UTC.
+        4. Decision within 300s TTL is accepted.
+        5. Decision older than 300s TTL is rejected with GATE_TOKEN_EXPIRED.
+        """
+        from services.tool_proxy_service import tool_proxy_service
+        import datetime
+
+        # Setup agent, tool, and decision in self.db
+        agent = self.agent_a
+        tool = models.Tool(
+            org_id=self.org_a.id,
+            name="tz_test_tool",
+            endpoint="https://api.tz-test.internal/v1/run",
+            status="ACTIVE"
+        )
+        self.db.add(tool)
+        self.db.commit()
+        self.db.refresh(tool)
+
+        # 1. PostgreSQL-style timezone-aware recent timestamp (UTC)
+        recent_aware = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=10)
+        token_aware = f"gate_aware_{uuid.uuid4().hex}"
+        dec_aware = models.Decision(
+            agent_id=agent.id,
+            user_id=self.owner_user_a.id,
+            intent_summary="TZ Aware Recent",
+            action_requested="run",
+            resource_target="https://api.tz-test.internal/v1/run",
+            decision="ALLOW",
+            explanation="Recent aware",
+            execution_status="EXECUTED",
+            execution_gate_token=token_aware,
+            authorized_endpoint="https://api.tz-test.internal/v1/run",
+            gate_token_used=False,
+            tool_id=tool.id,
+            timestamp=recent_aware
+        )
+        self.db.add(dec_aware)
+        self.db.commit()
+
+        # Should not raise TypeError and pass expiration check
+        res = tool_proxy_service.execute_tool(
+            db=self.db,
+            agent=agent,
+            gate_token=token_aware,
+            tool_name="tz_test_tool"
+        )
+        self.assertNotEqual(res.get("status"), "GATE_TOKEN_EXPIRED")
+        self.assertNotIn("can't subtract", str(res.get("error", "")))
+
+        # 2. Naive recent timestamp (SQLite style)
+        recent_naive = datetime.datetime.utcnow() - datetime.timedelta(seconds=15)
+        token_naive = f"gate_naive_{uuid.uuid4().hex}"
+        dec_naive = models.Decision(
+            agent_id=agent.id,
+            user_id=self.owner_user_a.id,
+            intent_summary="TZ Naive Recent",
+            action_requested="run",
+            resource_target="https://api.tz-test.internal/v1/run",
+            decision="ALLOW",
+            explanation="Recent naive",
+            execution_status="EXECUTED",
+            execution_gate_token=token_naive,
+            authorized_endpoint="https://api.tz-test.internal/v1/run",
+            gate_token_used=False,
+            tool_id=tool.id,
+            timestamp=recent_naive
+        )
+        self.db.add(dec_naive)
+        self.db.commit()
+
+        res_naive = tool_proxy_service.execute_tool(
+            db=self.db,
+            agent=agent,
+            gate_token=token_naive,
+            tool_name="tz_test_tool"
+        )
+        self.assertNotEqual(res_naive.get("status"), "GATE_TOKEN_EXPIRED")
+
+        # 3. Non-UTC timezone (e.g. UTC+5:30) correctly normalized
+        ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        recent_ist = datetime.datetime.now(ist) - datetime.timedelta(seconds=20)
+        token_ist = f"gate_ist_{uuid.uuid4().hex}"
+        dec_ist = models.Decision(
+            agent_id=agent.id,
+            user_id=self.owner_user_a.id,
+            intent_summary="TZ IST Recent",
+            action_requested="run",
+            resource_target="https://api.tz-test.internal/v1/run",
+            decision="ALLOW",
+            explanation="Recent IST",
+            execution_status="EXECUTED",
+            execution_gate_token=token_ist,
+            authorized_endpoint="https://api.tz-test.internal/v1/run",
+            gate_token_used=False,
+            tool_id=tool.id,
+            timestamp=recent_ist
+        )
+        self.db.add(dec_ist)
+        self.db.commit()
+
+        res_ist = tool_proxy_service.execute_tool(
+            db=self.db,
+            agent=agent,
+            gate_token=token_ist,
+            tool_name="tz_test_tool"
+        )
+        self.assertNotEqual(res_ist.get("status"), "GATE_TOKEN_EXPIRED")
+
+        # 4. Expired decision (> 300s TTL)
+        expired_ts = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=400)
+        token_expired = f"gate_expired_{uuid.uuid4().hex}"
+        dec_expired = models.Decision(
+            agent_id=agent.id,
+            user_id=self.owner_user_a.id,
+            intent_summary="TZ Expired",
+            action_requested="run",
+            resource_target="https://api.tz-test.internal/v1/run",
+            decision="ALLOW",
+            explanation="Expired",
+            execution_status="EXECUTED",
+            execution_gate_token=token_expired,
+            authorized_endpoint="https://api.tz-test.internal/v1/run",
+            gate_token_used=False,
+            tool_id=tool.id,
+            timestamp=expired_ts
+        )
+        self.db.add(dec_expired)
+        self.db.commit()
+
+        res_expired = tool_proxy_service.execute_tool(
+            db=self.db,
+            agent=agent,
+            gate_token=token_expired,
+            tool_name="tz_test_tool"
+        )
+        self.assertFalse(res_expired["success"])
+        self.assertEqual(res_expired["status"], "GATE_TOKEN_EXPIRED")
+        self.assertIn("expired", res_expired["error"])

@@ -113,7 +113,7 @@ class ToolProxyService:
         enforces schema and SSRF constraints, dispatches the HTTP call, and
         records execution telemetry and provenance.
         """
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         execution_id = f"exec_{int(time.time()*1000)}"
 
         # --------------------------------------------------------------------
@@ -197,7 +197,15 @@ class ToolProxyService:
 
         # Check token expiration (TTL: 300 seconds / 5 minutes)
         if decision.timestamp:
-            age_seconds = (now - decision.timestamp).total_seconds()
+            dec_time = decision.timestamp
+            if dec_time.tzinfo is None:
+                # Naive timestamp (e.g. SQLite / legacy contract): interpret explicitly as UTC
+                dec_time = dec_time.replace(tzinfo=datetime.timezone.utc)
+            else:
+                # Timezone-aware timestamp (e.g. PostgreSQL timestamptz): normalize to UTC
+                dec_time = dec_time.astimezone(datetime.timezone.utc)
+
+            age_seconds = (now - dec_time).total_seconds()
             if age_seconds > 300:
                 return {
                     "success": False,
