@@ -10,10 +10,12 @@ import ipaddress
 import json
 import logging
 import os
+import socket
 import time
 import urllib.parse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple, Callable, Set
 
+import httpcore
 import httpx
 from sqlalchemy.orm import Session
 
@@ -26,11 +28,152 @@ from services.runtime_telemetry_service import record_execution
 
 logger = logging.getLogger("agentguard.tool_proxy")
 
+DEFAULT_ALLOWED_PORTS: Set[int] = {80, 443, 8000, 8080, 8443}
+
+BLOCKED_HOSTNAMES: Set[str] = {
+    "metadata.google.internal",
+    "metadata.goog",
+    "metadata",
+    "instance-data",
+    "169.254.169.254",
+    "100.100.100.200",
+}
+
+BLOCKED_METADATA_IPS: Set[str] = {
+    "169.254.169.254",
+    "100.100.100.200",
+}
+
+PROHIBITED_NETWORKS = [
+    # IPv4
+    ipaddress.ip_network("0.0.0.0/8"),          # Current network (RFC 1122)
+    ipaddress.ip_network("10.0.0.0/8"),         # Private-use (RFC 1918)
+    ipaddress.ip_network("100.64.0.0/10"),      # Shared Address Space / CGNAT (RFC 6598)
+    ipaddress.ip_network("127.0.0.0/8"),        # Loopback
+    ipaddress.ip_network("169.254.0.0/16"),     # Link-Local / Cloud Metadata
+    ipaddress.ip_network("172.16.0.0/12"),      # Private-use (RFC 1918)
+    ipaddress.ip_network("192.0.0.0/24"),       # IETF Protocol Assignments
+    ipaddress.ip_network("192.0.2.0/24"),       # Documentation (TEST-NET-1)
+    ipaddress.ip_network("192.88.99.0/24"),     # 6to4 Relay Anycast (RFC 7526)
+    ipaddress.ip_network("192.168.0.0/16"),     # Private-use (RFC 1918)
+    ipaddress.ip_network("198.18.0.0/15"),      # Benchmarking (RFC 2544)
+    ipaddress.ip_network("198.51.100.0/24"),    # Documentation (TEST-NET-2)
+    ipaddress.ip_network("203.0.113.0/24"),     # Documentation (TEST-NET-3)
+    ipaddress.ip_network("224.0.0.0/4"),        # Multicast (RFC 5771)
+    ipaddress.ip_network("240.0.0.0/4"),        # Reserved / Future use (RFC 1112)
+    ipaddress.ip_network("255.255.255.255/32"), # Broadcast
+    # IPv6
+    ipaddress.ip_network("::/128"),             # Unspecified
+    ipaddress.ip_network("::1/128"),            # Loopback
+    ipaddress.ip_network("::ffff:0:0/96"),      # IPv4-mapped IPv6 (RFC 4291)
+    ipaddress.ip_network("64:ff9b::/96"),       # IPv4/IPv6 translation (RFC 6052)
+    ipaddress.ip_network("100::/64"),           # Discard prefix (RFC 6666)
+    ipaddress.ip_network("2001:db8::/32"),      # Documentation
+    ipaddress.ip_network("fc00::/7"),           # Unique Local Address (ULA)
+    ipaddress.ip_network("fe80::/10"),          # Link-Local Unicast
+    ipaddress.ip_network("ff00::/8"),           # Multicast
+]
+
+PRIVATE_OR_LOOPBACK_NETWORKS = {
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+}
+
+
+def parse_numeric_ipv4(host: str) -> Optional[ipaddress.IPv4Address]:
+    """Parses noncanonical numeric host representations (decimal, octal, hex, multi-part BSD style)."""
+    if host.isdigit():
+        val = int(host)
+        if 0 <= val <= 0xFFFFFFFF:
+            return ipaddress.IPv4Address(val)
+    if host.lower().startswith("0x"):
+        try:
+            val = int(host, 16)
+            if 0 <= val <= 0xFFFFFFFF:
+                return ipaddress.IPv4Address(val)
+        except ValueError:
+            pass
+    parts = host.split(".")
+    if 1 <= len(parts) <= 4:
+        nums = []
+        for p in parts:
+            try:
+                if p.lower().startswith("0x"):
+                    nums.append(int(p, 16))
+                elif p.startswith("0") and len(p) > 1 and p.isdigit():
+                    nums.append(int(p, 8))
+                elif p.isdigit():
+                    nums.append(int(p, 10))
+                else:
+                    return None
+            except ValueError:
+                return None
+        if len(nums) == 4:
+            if all(0 <= n <= 255 for n in nums):
+                return ipaddress.IPv4Address((nums[0] << 24) | (nums[1] << 16) | (nums[2] << 8) | nums[3])
+        elif len(nums) == 3:
+            if 0 <= nums[0] <= 255 and 0 <= nums[1] <= 255 and 0 <= nums[2] <= 65535:
+                return ipaddress.IPv4Address((nums[0] << 24) | (nums[1] << 16) | nums[2])
+        elif len(nums) == 2:
+            if 0 <= nums[0] <= 255 and 0 <= nums[1] <= 16777215:
+                return ipaddress.IPv4Address((nums[0] << 24) | nums[1])
+        elif len(nums) == 1:
+            if 0 <= nums[0] <= 0xFFFFFFFF:
+                return ipaddress.IPv4Address(nums[0])
+    return None
+
+
+class PinningNetworkBackend(httpcore.SyncBackend):
+    """
+    Constrains network TCP connections to a pre-validated, pinned destination IP address.
+    Preserves original hostname for TLS SNI and HTTP Host header while preventing
+    DNS rebinding and time-of-check/time-of-use (TOCTOU) address switching.
+    """
+    def __init__(self, pinned_ip: str):
+        super().__init__()
+        self.pinned_ip = pinned_ip
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: Optional[float] = None,
+        local_address: Optional[str] = None,
+        socket_options=None,
+    ) -> httpcore.NetworkStream:
+        return super().connect_tcp(
+            host=self.pinned_ip,
+            port=port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+
+class PinningTransport(httpx.HTTPTransport):
+    """
+    Custom HTTP transport ensuring all connections are pinned to the verified IP address.
+    """
+    def __init__(self, pinned_ip: str, **kwargs):
+        super().__init__(**kwargs)
+        self.pinned_ip = pinned_ip
+        self._pool = httpcore.ConnectionPool(
+            ssl_context=self._pool._ssl_context,
+            max_connections=1,
+            max_keepalive_connections=0,
+            network_backend=PinningNetworkBackend(pinned_ip)
+        )
+
 
 class ToolProxyService:
     def __init__(self):
         self._mock_client: Optional[httpx.Client] = None
         self._mock_transport: Optional[httpx.BaseTransport] = None
+        self._dns_resolver: Optional[Callable[[str, int], List[str]]] = None
 
     @property
     def allow_local_egress(self) -> bool:
@@ -51,51 +194,185 @@ class ToolProxyService:
             raise RuntimeError("Mock transport injection is strictly prohibited in production environment.")
         self._mock_transport = transport
 
+    def set_dns_resolver(self, resolver: Optional[Callable[[str, int], List[str]]]):
+        """Inject an explicit DNS resolver for test isolation only. Strictly forbidden in production."""
+        if getattr(settings, "ENVIRONMENT", "production").lower() == "production":
+            raise RuntimeError("DNS resolver injection is strictly prohibited in production environment.")
+        self._dns_resolver = resolver
+
+    def _resolve_host(self, hostname: str, port: int) -> List[str]:
+        """
+        Resolves hostname to a list of IP address strings.
+        In production, strictly uses socket.getaddrinfo.
+        In test environment, supports injected test resolver or synthetic test domain fallbacks.
+        """
+        is_production = getattr(settings, "ENVIRONMENT", "production").lower() == "production"
+        if not is_production and self._dns_resolver is not None:
+            return self._dns_resolver(hostname, port)
+
+        try:
+            addr_info = socket.getaddrinfo(hostname, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+            ips = [r[4][0] for r in addr_info if r and len(r) >= 5 and r[4]]
+            return list(dict.fromkeys(ips))
+        except (socket.gaierror, socket.herror, OSError):
+            if not is_production and (self._mock_transport is not None or self._mock_client is not None or self.allow_local_egress):
+                if (
+                    hostname.endswith((".internal", ".test", ".example", ".invalid"))
+                    or hostname in ("api.example.com", "example.com")
+                    or "test" in hostname
+                    or "mock" in hostname
+                ):
+                    return ["93.184.215.14"]
+            raise
+
+    def _is_ip_allowed(self, ip_obj: Any) -> Tuple[bool, str]:
+        """Validates an ipaddress.IPv4Address or IPv6Address against prohibited egress ranges."""
+        if isinstance(ip_obj, ipaddress.IPv6Address):
+            if ip_obj.ipv4_mapped:
+                ip_obj = ip_obj.ipv4_mapped
+
+        ip_str = str(ip_obj)
+
+        if ip_str in BLOCKED_METADATA_IPS:
+            return False, f"Access to cloud metadata address '{ip_str}' is blocked."
+
+        if ip_obj.is_unspecified:
+            return False, f"Unspecified address '{ip_str}' is blocked."
+
+        if ip_obj.is_loopback:
+            if not self.allow_local_egress:
+                return False, f"Loopback address '{ip_str}' is blocked."
+
+        if ip_obj.is_link_local:
+            return False, f"Link-local address '{ip_str}' is blocked."
+
+        if ip_obj.is_multicast:
+            return False, f"Multicast address '{ip_str}' is blocked."
+
+        if ip_obj.is_reserved and not (self.allow_local_egress and ip_obj.is_loopback):
+            return False, f"Reserved address '{ip_str}' is blocked."
+
+        if ip_obj.is_private:
+            if not self.allow_local_egress:
+                return False, f"Private network address '{ip_str}' is blocked."
+
+        for net in PROHIBITED_NETWORKS:
+            if ip_obj.version == net.version and ip_obj in net:
+                if self.allow_local_egress and net in PRIVATE_OR_LOOPBACK_NETWORKS:
+                    continue
+                return False, f"Address '{ip_str}' falls within prohibited network range '{net}'."
+
+        return True, "Allowed"
+
     def _validate_ssrf_safety(self, url: str) -> Dict[str, Any]:
         """
         Validates target URL against SSRF attacks. Blocks loopback, link-local,
-        cloud metadata endpoints (e.g. 169.254.169.254), and illegal schemes.
+        cloud metadata endpoints (e.g. 169.254.169.254, 100.100.100.200), private networks,
+        unspecified, multicast, reserved addresses, illegal schemes, embedded credentials,
+        and unauthorized destination ports.
+        Resolves hostnames and validates all resolved IP addresses.
+        Returns pinned_ip on success for connection pinning.
         """
         try:
-            parsed = urllib.parse.urlparse(url)
+            parsed = urllib.parse.urlsplit(url)
         except Exception as e:
             return {"safe": False, "reason": f"Invalid URL format: {str(e)}"}
 
-        if parsed.scheme not in ("http", "https"):
+        if parsed.scheme.lower() not in ("http", "https"):
             return {"safe": False, "reason": f"Scheme '{parsed.scheme}' is not allowed. Only HTTP/HTTPS allowed."}
 
+        # Block userinfo / embedded credentials
+        if parsed.username is not None or parsed.password is not None or "@" in (parsed.netloc or ""):
+            return {"safe": False, "reason": "URLs containing embedded user credentials are not permitted."}
+
         hostname = parsed.hostname
-        if not hostname:
+        if not hostname or not hostname.strip():
             return {"safe": False, "reason": "Missing hostname in target endpoint."}
 
-        host_lower = hostname.lower()
+        host_lower = hostname.strip().lower()
+
+        # Reject hostnames with invalid characters, spaces, or control chars
+        if any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in host_lower):
+            return {"safe": False, "reason": f"Invalid characters in hostname '{hostname}'."}
+
+        # Port validation
+        port = parsed.port
+        if port is None:
+            port = 443 if parsed.scheme.lower() == "https" else 80
+
+        allowed_ports = DEFAULT_ALLOWED_PORTS
+        custom_ports = os.getenv("AGENTGUARD_ALLOWED_TOOL_PORTS")
+        if custom_ports:
+            try:
+                allowed_ports = {int(p.strip()) for p in custom_ports.split(",") if p.strip()}
+            except ValueError:
+                pass
+
+        if not (self.allow_local_egress and port >= 1024):
+            if port not in allowed_ports:
+                return {
+                    "safe": False,
+                    "reason": f"Destination port {port} is not permitted. Only standard web ports ({', '.join(str(p) for p in sorted(allowed_ports))}) are allowed."
+                }
 
         # Block cloud metadata hostnames
-        blocked_hostnames = {
-            "metadata.google.internal",
-            "metadata.goog",
-            "169.254.169.254",
-            "instance-data"
-        }
-        if host_lower in blocked_hostnames:
+        if host_lower in BLOCKED_HOSTNAMES or host_lower.endswith(".metadata.google.internal"):
             return {"safe": False, "reason": f"Access to cloud metadata host '{hostname}' is blocked."}
 
-        # Check IP address restrictions
-        try:
-            ip = ipaddress.ip_address(host_lower)
-            if ip.is_loopback:
-                if not self.allow_local_egress:
-                    return {"safe": False, "reason": f"Loopback address '{hostname}' is blocked."}
-            elif ip.is_link_local:
-                return {"safe": False, "reason": f"Link-local address '{hostname}' is blocked."}
-            elif ip.is_private and not self.allow_local_egress:
-                return {"safe": False, "reason": f"Private network address '{hostname}' is blocked."}
-        except ValueError:
-            # Hostname is a domain name, not a raw IP
-            if (host_lower == "localhost" or host_lower.endswith(".localhost")) and not self.allow_local_egress:
-                return {"safe": False, "reason": f"Localhost domain '{hostname}' is blocked."}
+        # Block localhost variants
+        if (host_lower == "localhost" or host_lower.endswith(".localhost")) and not self.allow_local_egress:
+            return {"safe": False, "reason": f"Localhost domain '{hostname}' is blocked."}
 
-        return {"safe": True, "reason": "URL is safe for egress."}
+        # Check if hostname is a raw IP or noncanonical numeric IP
+        ip_obj = None
+        try:
+            ip_obj = ipaddress.ip_address(host_lower)
+        except ValueError:
+            ip_obj = parse_numeric_ipv4(host_lower)
+
+        if ip_obj is not None:
+            is_allowed, reason = self._is_ip_allowed(ip_obj)
+            if not is_allowed:
+                return {"safe": False, "reason": reason}
+            return {
+                "safe": True,
+                "reason": "URL is safe for egress.",
+                "pinned_ip": str(ip_obj),
+                "resolved_ips": [str(ip_obj)],
+                "port": port
+            }
+
+        # Hostname is a domain name: resolve DNS
+        try:
+            resolved_ips = self._resolve_host(host_lower, port)
+        except Exception as e:
+            return {"safe": False, "reason": f"DNS resolution failed for hostname '{hostname}': {str(e)}"}
+
+        if not resolved_ips:
+            return {"safe": False, "reason": f"No IP addresses resolved for hostname '{hostname}'."}
+
+        # Validate EVERY resolved IP address (reject mixed public/private answers)
+        for ip_str in resolved_ips:
+            try:
+                r_obj = ipaddress.ip_address(ip_str)
+            except ValueError:
+                return {"safe": False, "reason": f"DNS resolution for '{hostname}' returned invalid IP '{ip_str}'."}
+
+            is_allowed, reason = self._is_ip_allowed(r_obj)
+            if not is_allowed:
+                return {
+                    "safe": False,
+                    "reason": f"DNS resolution for '{hostname}' returned prohibited address '{ip_str}': {reason}"
+                }
+
+        pinned_ip = resolved_ips[0]
+        return {
+            "safe": True,
+            "reason": "URL is safe for egress.",
+            "pinned_ip": pinned_ip,
+            "resolved_ips": resolved_ips,
+            "port": port
+        }
 
     def execute_tool(
         self,
@@ -429,6 +706,8 @@ class ToolProxyService:
                     "tool_name": resolved_tool_name
                 }
 
+            pinned_ip = ssrf_check.get("pinned_ip")
+
             headers = {
                 "Content-Type": "application/json",
                 "X-AgentGuard-Execution-ID": execution_id,
@@ -440,17 +719,25 @@ class ToolProxyService:
 
             timeout_sec = (tool_record.timeout_seconds if tool_record else 30) or 30
 
+            client = None
+            close_client = False
             try:
-                if getattr(settings, "ENVIRONMENT", "production").lower() == "production":
-                    client = httpx.Client(timeout=timeout_sec)
+                is_production = getattr(settings, "ENVIRONMENT", "production").lower() == "production"
+                if is_production:
+                    transport = PinningTransport(pinned_ip=pinned_ip)
+                    client = httpx.Client(transport=transport, timeout=timeout_sec, follow_redirects=False)
+                    close_client = True
                 elif http_client is not None:
                     client = http_client
                 elif self._mock_client is not None:
                     client = self._mock_client
                 elif self._mock_transport is not None:
-                    client = httpx.Client(transport=self._mock_transport, timeout=timeout_sec)
+                    client = httpx.Client(transport=self._mock_transport, timeout=timeout_sec, follow_redirects=False)
+                    close_client = True
                 else:
-                    client = httpx.Client(timeout=timeout_sec)
+                    transport = PinningTransport(pinned_ip=pinned_ip)
+                    client = httpx.Client(transport=transport, timeout=timeout_sec, follow_redirects=False)
+                    close_client = True
 
                 resp = client.post(target_endpoint, json=effective_params, headers=headers)
                 status_code = resp.status_code
@@ -459,7 +746,10 @@ class ToolProxyService:
                 except Exception:
                     response_data = resp.text
 
-                if status_code >= 400:
+                if resp.is_redirect or (300 <= status_code < 400):
+                    exec_outcome = "ERROR"
+                    error_msg = f"Downstream service returned redirect HTTP {status_code}, but automatic redirects are disabled for SSRF protection."
+                elif status_code >= 400:
                     exec_outcome = "ERROR"
                     error_msg = f"Downstream service returned HTTP {status_code}"
             except httpx.TimeoutException:
@@ -468,6 +758,12 @@ class ToolProxyService:
             except Exception as e:
                 exec_outcome = "ERROR"
                 error_msg = f"Downstream connection error: {str(e)}"
+            finally:
+                if close_client and client is not None:
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
         else:
             # Local / Virtual Tool execution (e.g., standard internal operations)
             status_code = 200

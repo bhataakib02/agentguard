@@ -154,8 +154,8 @@ def create_checkout_session(
         session_id=session_id,
         gateway=gateway,
         checkout_url=checkout_url,
-        plan_id=plan.id,
-        amount=plan.price_monthly,
+        plan_id=str(plan.id),
+        amount=float(getattr(plan, "price_monthly", 0.0) or 0.0),
         currency="USD",
         mode=mode
     )
@@ -169,7 +169,7 @@ def _is_event_already_processed(db: Session, org_id: Any, event_id: Optional[str
         models.AuditLog.event_type == "LICENSE_PROVISIONED"
     ).order_by(models.AuditLog.timestamp.desc()).limit(50).all()
     for a in recent_audits:
-        if a.metadata_json and a.metadata_json.get("event_id") == str(event_id):
+        if a.metadata_json and a.metadata_json.get("event_id") == event_id:
             return True
     return False
 
@@ -372,13 +372,13 @@ def simulate_sandbox_payment(
     if not plan:
         raise HTTPException(status_code=404, detail=f"Plan '{req.plan_id}' does not exist")
 
-    license_record = _provision_license(db, org, plan.id)
+    license_record = _provision_license(db, org, str(plan.id))
 
     return {
         "status": "SUCCESS",
         "message": f"Successfully upgraded organization '{org.name}' to plan '{plan.name}'.",
         "organization_id": str(org.id),
-        "plan_id": plan.id,
+        "plan_id": str(plan.id),
         "valid_until": license_record.valid_until.isoformat(),
         "license_status": license_record.status
     }
@@ -387,11 +387,11 @@ def simulate_sandbox_payment(
 def _provision_license(db: Session, org: models.Organization, plan_id: str, event_id: Optional[str] = None) -> models.License:
     """Idempotently updates organization plan and extends license validity by 30 days."""
     license_rec = db.query(models.License).filter(models.License.org_id == org.id).first()
-    new_expiry = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+    new_expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
 
     if license_rec:
-        license_rec.plan_id = plan_id
-        license_rec.status = "ACTIVE"
+        setattr(license_rec, "plan_id", plan_id)
+        setattr(license_rec, "status", "ACTIVE")
         license_rec.valid_until = new_expiry
     else:
         license_rec = models.License(
