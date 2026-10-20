@@ -476,7 +476,6 @@ class ToolResponse(BaseModel):
     status: str
     latency_ms: int = 120
     schema_definition: Optional[Dict[str, Any]] = None
-    headers_json: Optional[Dict[str, str]] = None
     timeout_seconds: int = 30
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None

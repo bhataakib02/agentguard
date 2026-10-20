@@ -182,19 +182,21 @@ async def stripe_webhook(
 ):
     """
     Processes inbound Stripe webhook events with HMAC signature verification.
-    Fails closed: when secret is configured, missing, empty, or invalid signatures are rejected.
+    Fails closed: in production or when verification is mandatory, missing signing secrets,
+    missing signature headers, or invalid signatures are rejected without mutating billing state.
     """
     payload_bytes = await request.body()
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
-    is_mandatory = bool(webhook_secret) or os.getenv("BILLING_WEBHOOK_VERIFICATION_MANDATORY", "false").lower() in ("true", "1")
+    is_production = getattr(settings, "ENVIRONMENT", "production").lower() == "production"
+    is_mandatory = is_production or bool(webhook_secret) or os.getenv("BILLING_WEBHOOK_VERIFICATION_MANDATORY", "false").lower() in ("true", "1")
 
     if is_mandatory:
-        if not stripe_signature or not stripe_signature.strip():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing or empty Stripe-Signature header.")
         if not webhook_secret:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe webhook secret is not configured.")
+        if not stripe_signature or not stripe_signature.strip():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing or empty Stripe-Signature header.")
         try:
-            elements = dict(item.split("=", 1) for item in stripe_signature.split(","))
+            elements = dict(item.split("=", 1) for item in stripe_signature.split(",") if "=" in item)
             timestamp = elements.get("t", "")
             signature = elements.get("v1", "")
             if not timestamp or not signature:
@@ -213,11 +215,15 @@ async def stripe_webhook(
             raise
         except Exception as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stripe signature verification failed: {str(e)}")
-    elif stripe_signature and stripe_signature.strip() and webhook_secret:
+    elif stripe_signature and stripe_signature.strip():
+        if not webhook_secret:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe webhook secret is not configured.")
         try:
-            elements = dict(item.split("=", 1) for item in stripe_signature.split(","))
+            elements = dict(item.split("=", 1) for item in stripe_signature.split(",") if "=" in item)
             timestamp = elements.get("t", "")
             signature = elements.get("v1", "")
+            if not timestamp or not signature:
+                raise ValueError("Missing timestamp (t) or signature (v1) in Stripe-Signature header.")
             signed_payload = f"{timestamp}.".encode("utf-8") + payload_bytes
             computed_hmac = hmac.new(
                 webhook_secret.encode("utf-8"),
@@ -228,8 +234,8 @@ async def stripe_webhook(
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe webhook signature.")
         except HTTPException:
             raise
-        except Exception:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stripe signature verification failed.")
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stripe signature verification failed: {str(e)}")
 
     try:
         data = json.loads(payload_bytes.decode("utf-8"))
@@ -272,15 +278,32 @@ async def razorpay_webhook(
 ):
     """
     Processes inbound Razorpay webhook events with HMAC signature verification.
-    Fails closed: when secret is configured, missing, empty, or invalid signatures are rejected.
+    Fails closed: in production or when verification is mandatory, missing signing secrets,
+    missing signature headers, or invalid signatures are rejected without mutating billing state.
     """
     payload_bytes = await request.body()
     webhook_secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "").strip()
-    is_mandatory = bool(webhook_secret) or os.getenv("BILLING_WEBHOOK_VERIFICATION_MANDATORY", "false").lower() in ("true", "1")
+    is_production = getattr(settings, "ENVIRONMENT", "production").lower() == "production"
+    is_mandatory = is_production or bool(webhook_secret) or os.getenv("BILLING_WEBHOOK_VERIFICATION_MANDATORY", "false").lower() in ("true", "1")
 
     if is_mandatory:
+        if not webhook_secret:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Razorpay webhook secret is not configured.")
         if not x_razorpay_signature or not x_razorpay_signature.strip():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing or empty X-Razorpay-Signature header.")
+        try:
+            computed = hmac.new(
+                webhook_secret.encode("utf-8"),
+                payload_bytes,
+                hashlib.sha256
+            ).hexdigest()
+            if not hmac.compare_digest(x_razorpay_signature.strip(), computed):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Razorpay webhook signature.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Razorpay signature verification failed: {str(e)}")
+    elif x_razorpay_signature and x_razorpay_signature.strip():
         if not webhook_secret:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Razorpay webhook secret is not configured.")
         try:
@@ -295,14 +318,6 @@ async def razorpay_webhook(
             raise
         except Exception as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Razorpay signature verification failed: {str(e)}")
-    elif x_razorpay_signature and x_razorpay_signature.strip() and webhook_secret:
-        computed = hmac.new(
-            webhook_secret.encode("utf-8"),
-            payload_bytes,
-            hashlib.sha256
-        ).hexdigest()
-        if not hmac.compare_digest(x_razorpay_signature.strip(), computed):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Razorpay webhook signature.")
 
     try:
         data = json.loads(payload_bytes.decode("utf-8"))

@@ -1098,3 +1098,456 @@ class TestP0Phase1Remediation(unittest.TestCase):
             self.assertFalse(dec_boundary_expired.gate_token_used, "Expired token must not be marked used")
         finally:
             tool_proxy_service.set_mock_transport(None)
+
+    # =========================================================================
+    # PHASE 2A: P0 Remediation — Webhooks & Tool Credentials
+    # =========================================================================
+
+    def test_phase2a_stripe_fail_closed_verification(self):
+        """
+        FINDING-D1: Stripe webhook verification fails closed.
+        1. In production, missing signing secret rejects unsigned, fake-signed, and malformed requests with HTTP 500 without mutating billing.
+        2. With mandatory flag enabled, missing signing secret rejects requests with HTTP 500.
+        3. With secret configured: missing header (400), empty header (400), invalid header (400), invalid signature (400),
+           malformed JSON body (400), valid signature (200), and duplicate event delivery (200 with duplicate: True).
+        """
+        from config import settings
+        orig_env = settings.ENVIRONMENT
+        orig_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
+        orig_mandatory = os.environ.get("BILLING_WEBHOOK_VERIFICATION_MANDATORY")
+
+        # Snapshot initial license plan
+        self.db.expire_all()
+        initial_plan = self.org_a.plan_id
+
+        payload_obj = {
+            "id": f"evt_stripe_p2a_{uuid.uuid4().hex[:8]}",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "client_reference_id": str(self.org_a.id),
+                    "metadata": {"plan_id": "PROFESSIONAL"}
+                }
+            }
+        }
+        payload_bytes = json.dumps(payload_obj).encode("utf-8")
+
+        try:
+            # 1. Production environment without STRIPE_WEBHOOK_SECRET -> MUST FAIL CLOSED (HTTP 500)
+            settings.ENVIRONMENT = "production"
+            os.environ.pop("STRIPE_WEBHOOK_SECRET", None)
+            os.environ.pop("BILLING_WEBHOOK_VERIFICATION_MANDATORY", None)
+
+            # (a) Unsigned request
+            r_no_sig = client.post("/api/billing/webhook/stripe", content=payload_bytes, headers={"Content-Type": "application/json"})
+            self.assertEqual(r_no_sig.status_code, 500)
+            self.assertIn("secret is not configured", r_no_sig.json()["detail"])
+
+            # (b) Fake-signed request
+            r_fake_sig = client.post(
+                "/api/billing/webhook/stripe",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "Stripe-Signature": "t=1700000000,v1=abcdef0123456789"}
+            )
+            self.assertEqual(r_fake_sig.status_code, 500)
+            self.assertIn("secret is not configured", r_fake_sig.json()["detail"])
+
+            # (c) Malformed body
+            r_malformed_prod = client.post(
+                "/api/billing/webhook/stripe",
+                content=b"not-json{{{",
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(r_malformed_prod.status_code, 500)
+
+            # Assert billing state did NOT mutate
+            self.db.expire_all()
+            self.assertEqual(self.org_a.plan_id, initial_plan)
+
+            # 2. Mandatory flag enabled in non-production without secret -> HTTP 500
+            settings.ENVIRONMENT = "test"
+            os.environ["BILLING_WEBHOOK_VERIFICATION_MANDATORY"] = "true"
+            r_mand = client.post("/api/billing/webhook/stripe", content=payload_bytes, headers={"Content-Type": "application/json"})
+            self.assertEqual(r_mand.status_code, 500)
+            self.assertIn("secret is not configured", r_mand.json()["detail"])
+
+            # 3. With secret configured
+            test_secret = "whsec_stripe_test_secret_p2a_9999"
+            os.environ["STRIPE_WEBHOOK_SECRET"] = test_secret
+
+            # (a) Missing signature header -> 400
+            r_missing_hdr = client.post("/api/billing/webhook/stripe", content=payload_bytes, headers={"Content-Type": "application/json"})
+            self.assertEqual(r_missing_hdr.status_code, 400)
+            self.assertIn("Missing or empty", r_missing_hdr.json()["detail"])
+
+            # (b) Empty signature header -> 400
+            r_empty_hdr = client.post(
+                "/api/billing/webhook/stripe",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "Stripe-Signature": "   "}
+            )
+            self.assertEqual(r_empty_hdr.status_code, 400)
+            self.assertIn("Missing or empty", r_empty_hdr.json()["detail"])
+
+            # (c) Malformed signature header -> 400
+            r_bad_hdr = client.post(
+                "/api/billing/webhook/stripe",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "Stripe-Signature": "invalid_header_format"}
+            )
+            self.assertEqual(r_bad_hdr.status_code, 400)
+
+            # (d) Invalid signature HMAC mismatch -> 400
+            r_bad_sig = client.post(
+                "/api/billing/webhook/stripe",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "Stripe-Signature": "t=1700000000,v1=0000000000000000000000000000000000000000000000000000000000000000"}
+            )
+            self.assertEqual(r_bad_sig.status_code, 400)
+            self.assertIn("Invalid Stripe webhook signature", r_bad_sig.json()["detail"])
+
+            # (e) Malformed JSON body with valid HMAC -> 400
+            malformed_bytes = b"invalid-raw-json-data"
+            t_malformed = str(int(time.time()))
+            sig_malformed = hmac.new(test_secret.encode("utf-8"), f"{t_malformed}.".encode("utf-8") + malformed_bytes, hashlib.sha256).hexdigest()
+            r_malformed = client.post(
+                "/api/billing/webhook/stripe",
+                content=malformed_bytes,
+                headers={"Content-Type": "application/json", "Stripe-Signature": f"t={t_malformed},v1={sig_malformed}"}
+            )
+            self.assertEqual(r_malformed.status_code, 400)
+            self.assertIn("Malformed JSON webhook body", r_malformed.json()["detail"])
+
+            # (f) Valid signature -> 200, provisions license
+            t_valid = str(int(time.time()))
+            sig_valid = hmac.new(test_secret.encode("utf-8"), f"{t_valid}.".encode("utf-8") + payload_bytes, hashlib.sha256).hexdigest()
+            r_valid = client.post(
+                "/api/billing/webhook/stripe",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "Stripe-Signature": f"t={t_valid},v1={sig_valid}"}
+            )
+            self.assertEqual(r_valid.status_code, 200)
+            self.assertTrue(r_valid.json().get("received"))
+
+            # Verify DB updated
+            self.db.expire_all()
+            self.assertEqual(self.org_a.plan_id, "PROFESSIONAL")
+
+            # (g) Duplicate event delivery -> 200 with duplicate: True
+            r_dup = client.post(
+                "/api/billing/webhook/stripe",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "Stripe-Signature": f"t={t_valid},v1={sig_valid}"}
+            )
+            self.assertEqual(r_dup.status_code, 200)
+            self.assertTrue(r_dup.json().get("duplicate"))
+        finally:
+            settings.ENVIRONMENT = orig_env
+            if orig_secret is not None:
+                os.environ["STRIPE_WEBHOOK_SECRET"] = orig_secret
+            else:
+                os.environ.pop("STRIPE_WEBHOOK_SECRET", None)
+            if orig_mandatory is not None:
+                os.environ["BILLING_WEBHOOK_VERIFICATION_MANDATORY"] = orig_mandatory
+            else:
+                os.environ.pop("BILLING_WEBHOOK_VERIFICATION_MANDATORY", None)
+
+    def test_phase2a_razorpay_fail_closed_verification(self):
+        """
+        FINDING-D1: Razorpay webhook verification fails closed.
+        1. In production, missing signing secret rejects unsigned, fake-signed, and malformed requests with HTTP 500 without mutating billing.
+        2. With mandatory flag enabled, missing signing secret rejects requests with HTTP 500.
+        3. With secret configured: missing header (400), empty header (400), invalid signature (400),
+           malformed JSON body (400), valid signature (200), and duplicate event delivery (200 with duplicate: True).
+        """
+        from config import settings
+        orig_env = settings.ENVIRONMENT
+        orig_secret = os.environ.get("RAZORPAY_WEBHOOK_SECRET")
+        orig_mandatory = os.environ.get("BILLING_WEBHOOK_VERIFICATION_MANDATORY")
+
+        # Snapshot initial license plan
+        self.db.expire_all()
+        initial_plan = self.org_b.plan_id
+
+        event_id = f"evt_rzp_p2a_{uuid.uuid4().hex[:8]}"
+        payload_obj = {
+            "id": event_id,
+            "event": "order.paid",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": f"pay_rzp_{uuid.uuid4().hex[:6]}",
+                        "notes": {"org_id": str(self.org_b.id), "plan_id": "ENTERPRISE"}
+                    }
+                }
+            }
+        }
+        payload_bytes = json.dumps(payload_obj).encode("utf-8")
+
+        try:
+            # 1. Production environment without RAZORPAY_WEBHOOK_SECRET -> MUST FAIL CLOSED (HTTP 500)
+            settings.ENVIRONMENT = "production"
+            os.environ.pop("RAZORPAY_WEBHOOK_SECRET", None)
+            os.environ.pop("BILLING_WEBHOOK_VERIFICATION_MANDATORY", None)
+
+            # (a) Unsigned request
+            r_no_sig = client.post("/api/billing/webhook/razorpay", content=payload_bytes, headers={"Content-Type": "application/json"})
+            self.assertEqual(r_no_sig.status_code, 500)
+            self.assertIn("secret is not configured", r_no_sig.json()["detail"])
+
+            # (b) Fake-signed request
+            r_fake_sig = client.post(
+                "/api/billing/webhook/razorpay",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "X-Razorpay-Signature": "abcdef0123456789"}
+            )
+            self.assertEqual(r_fake_sig.status_code, 500)
+            self.assertIn("secret is not configured", r_fake_sig.json()["detail"])
+
+            # (c) Malformed body
+            r_malformed_prod = client.post(
+                "/api/billing/webhook/razorpay",
+                content=b"not-json{{{",
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(r_malformed_prod.status_code, 500)
+
+            # Assert billing state did NOT mutate
+            self.db.expire_all()
+            self.assertEqual(self.org_b.plan_id, initial_plan)
+
+            # 2. Mandatory flag enabled in non-production without secret -> HTTP 500
+            settings.ENVIRONMENT = "test"
+            os.environ["BILLING_WEBHOOK_VERIFICATION_MANDATORY"] = "true"
+            r_mand = client.post("/api/billing/webhook/razorpay", content=payload_bytes, headers={"Content-Type": "application/json"})
+            self.assertEqual(r_mand.status_code, 500)
+            self.assertIn("secret is not configured", r_mand.json()["detail"])
+
+            # 3. With secret configured
+            test_secret = "rzp_sec_test_secret_p2a_8888"
+            os.environ["RAZORPAY_WEBHOOK_SECRET"] = test_secret
+
+            # (a) Missing signature header -> 400
+            r_missing_hdr = client.post("/api/billing/webhook/razorpay", content=payload_bytes, headers={"Content-Type": "application/json"})
+            self.assertEqual(r_missing_hdr.status_code, 400)
+            self.assertIn("Missing or empty", r_missing_hdr.json()["detail"])
+
+            # (b) Empty signature header -> 400
+            r_empty_hdr = client.post(
+                "/api/billing/webhook/razorpay",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "X-Razorpay-Signature": "   "}
+            )
+            self.assertEqual(r_empty_hdr.status_code, 400)
+            self.assertIn("Missing or empty", r_empty_hdr.json()["detail"])
+
+            # (c) Invalid signature HMAC mismatch -> 400
+            r_bad_sig = client.post(
+                "/api/billing/webhook/razorpay",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "X-Razorpay-Signature": "0000000000000000000000000000000000000000000000000000000000000000"}
+            )
+            self.assertEqual(r_bad_sig.status_code, 400)
+            self.assertIn("Invalid Razorpay webhook signature", r_bad_sig.json()["detail"])
+
+            # (d) Malformed JSON body with valid HMAC -> 400
+            malformed_bytes = b"invalid-razorpay-json"
+            sig_malformed = hmac.new(test_secret.encode("utf-8"), malformed_bytes, hashlib.sha256).hexdigest()
+            r_malformed = client.post(
+                "/api/billing/webhook/razorpay",
+                content=malformed_bytes,
+                headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_malformed}
+            )
+            self.assertEqual(r_malformed.status_code, 400)
+            self.assertIn("Malformed JSON webhook body", r_malformed.json()["detail"])
+
+            # (e) Valid signature -> 200, provisions license
+            sig_valid = hmac.new(test_secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
+            r_valid = client.post(
+                "/api/billing/webhook/razorpay",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_valid}
+            )
+            self.assertEqual(r_valid.status_code, 200)
+            self.assertTrue(r_valid.json().get("received"))
+
+            # Verify DB updated
+            self.db.expire_all()
+            self.assertEqual(self.org_b.plan_id, "ENTERPRISE")
+
+            # (f) Duplicate event delivery -> 200 with duplicate: True
+            r_dup = client.post(
+                "/api/billing/webhook/razorpay",
+                content=payload_bytes,
+                headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_valid}
+            )
+            self.assertEqual(r_dup.status_code, 200)
+            self.assertTrue(r_dup.json().get("duplicate"))
+        finally:
+            settings.ENVIRONMENT = orig_env
+            if orig_secret is not None:
+                os.environ["RAZORPAY_WEBHOOK_SECRET"] = orig_secret
+            else:
+                os.environ.pop("RAZORPAY_WEBHOOK_SECRET", None)
+            if orig_mandatory is not None:
+                os.environ["BILLING_WEBHOOK_VERIFICATION_MANDATORY"] = orig_mandatory
+            else:
+                os.environ.pop("BILLING_WEBHOOK_VERIFICATION_MANDATORY", None)
+
+    def test_phase2a_tool_credential_disclosure_prevention(self):
+        """
+        FINDING-E1: Prevent downstream tool credential disclosure.
+        1. Tool registration (POST /api/tools) accepts headers_json but response schema never leaks it or its secrets.
+        2. Tool listing (GET /api/tools) omits headers_json and leaks no secrets.
+        3. Tool detail (GET /api/tools/{tool_id}) omits headers_json and leaks no secrets.
+        4. Tool update (PUT /api/tools/{tool_id}) updates credentials in DB but response omits headers_json.
+        5. Authorized backend tool proxy execution preserves access to stored credentials in DB without client exposure.
+        """
+        import httpx
+        from services.tool_proxy_service import tool_proxy_service
+
+        auth_headers = {"Authorization": f"Bearer {self.token_owner_a}"}
+
+        # Synthetic fake credentials only
+        synth_secret_key = "synth-secret-key-alpha-99999"
+        synth_bearer_token = "synth-bearer-token-beta-88888"
+        tool_name = f"secure_cred_tool_{uuid.uuid4().hex[:8]}"
+
+        tool_payload = {
+            "name": tool_name,
+            "category": "API",
+            "endpoint": "https://api.secure-downstream.internal/v1/resource",
+            "description": "Tool testing credential encapsulation",
+            "risk_level": "HIGH",
+            "schema_definition": {
+                "type": "object",
+                "properties": {"action": {"type": "string"}}
+            },
+            "headers_json": {
+                "Authorization": f"Bearer {synth_bearer_token}",
+                "X-Api-Key": synth_secret_key,
+                "X-Custom-Auth": "CustomHeaderSecretValue123"
+            },
+            "timeout_seconds": 20
+        }
+
+        # 1. Create Tool (POST /api/tools)
+        create_resp = client.post("/api/tools", json=tool_payload, headers=auth_headers)
+        self.assertEqual(create_resp.status_code, 201, create_resp.text)
+        created_data = create_resp.json()
+        tool_id = created_data["id"]
+
+        # Assert headers_json is not present in response model
+        self.assertNotIn("headers_json", created_data)
+        self.assertNotIn(synth_secret_key, create_resp.text)
+        self.assertNotIn(synth_bearer_token, create_resp.text)
+        self.assertNotIn("CustomHeaderSecretValue123", create_resp.text)
+
+        # 2. List Tools (GET /api/tools)
+        list_resp = client.get("/api/tools", headers=auth_headers)
+        self.assertEqual(list_resp.status_code, 200)
+        tools_list = list_resp.json()
+        matching = [t for t in tools_list if t["id"] == tool_id]
+        self.assertEqual(len(matching), 1)
+        self.assertNotIn("headers_json", matching[0])
+        self.assertNotIn(synth_secret_key, list_resp.text)
+        self.assertNotIn(synth_bearer_token, list_resp.text)
+        self.assertNotIn("CustomHeaderSecretValue123", list_resp.text)
+
+        # 3. Get Tool Detail by ID (GET /api/tools/{tool_id})
+        get_id_resp = client.get(f"/api/tools/{tool_id}", headers=auth_headers)
+        self.assertEqual(get_id_resp.status_code, 200)
+        get_id_data = get_id_resp.json()
+        self.assertNotIn("headers_json", get_id_data)
+        self.assertNotIn(synth_secret_key, get_id_resp.text)
+        self.assertNotIn(synth_bearer_token, get_id_resp.text)
+        self.assertNotIn("CustomHeaderSecretValue123", get_id_resp.text)
+
+        # 4. Get Tool Detail by Name (GET /api/tools/{name})
+        get_name_resp = client.get(f"/api/tools/{tool_name}", headers=auth_headers)
+        self.assertEqual(get_name_resp.status_code, 200)
+        get_name_data = get_name_resp.json()
+        self.assertNotIn("headers_json", get_name_data)
+        self.assertNotIn(synth_secret_key, get_name_resp.text)
+        self.assertNotIn(synth_bearer_token, get_name_resp.text)
+        self.assertNotIn("CustomHeaderSecretValue123", get_name_resp.text)
+
+        # 5. Update Tool (PUT /api/tools/{tool_id})
+        synth_updated_bearer = "synth-updated-bearer-token-77777"
+        update_payload = {
+            "description": "Updated tool description",
+            "headers_json": {
+                "Authorization": f"Bearer {synth_updated_bearer}"
+            }
+        }
+        update_resp = client.put(f"/api/tools/{tool_id}", json=update_payload, headers=auth_headers)
+        self.assertEqual(update_resp.status_code, 200)
+        update_data = update_resp.json()
+        self.assertNotIn("headers_json", update_data)
+        self.assertNotIn(synth_updated_bearer, update_resp.text)
+
+        # 6. Verify credentials remain safely persisted in DB and accessible by authorized backend services
+        self.db.expire_all()
+        db_tool = self.db.query(models.Tool).filter(models.Tool.id == tool_id).first()
+        self.assertIsNotNone(db_tool)
+        self.assertEqual(db_tool.headers_json.get("Authorization"), f"Bearer {synth_updated_bearer}")
+
+        # 7. Outbound proxy gateway execution attaches credentials to downstream request without exposing to client
+        captured_requests = []
+        def mock_handler(request: httpx.Request):
+            captured_requests.append({
+                "url": str(request.url),
+                "headers": dict(request.headers)
+            })
+            return httpx.Response(200, json={"downstream_status": "ok"})
+
+        tool_proxy_service.set_mock_transport(httpx.MockTransport(mock_handler))
+        try:
+            # Grant permission to agent_a
+            perm = models.Permission(
+                agent_id=self.agent_a.id,
+                resource_type="TOOL",
+                resource_name=tool_name,
+                action="call",
+                is_allowed=True
+            )
+            self.db.add(perm)
+
+            # Issue decision and gate token
+            gate_token = f"gate_cred_test_{uuid.uuid4().hex}"
+            dec = models.Decision(
+                agent_id=self.agent_a.id,
+                user_id=self.owner_user_a.id,
+                intent_summary="Credential test call",
+                action_requested="call",
+                resource_target=tool_name,
+                decision="ALLOW",
+                explanation="Testing credential encapsulation in execution",
+                execution_status="EXECUTED",
+                execution_gate_token=gate_token,
+                execution_parameters={"action": "test"},
+                authorized_endpoint="https://api.secure-downstream.internal/v1/resource",
+                gate_token_used=False,
+                tool_id=tool_id,
+                timestamp=datetime.datetime.utcnow()
+            )
+            self.db.add(dec)
+            self.db.commit()
+
+            # Execute tool through proxy
+            exec_result = tool_proxy_service.execute_tool(
+                db=self.db,
+                agent=self.agent_a,
+                gate_token=gate_token,
+                tool_name=tool_name,
+                parameters={"action": "test"}
+            )
+            self.assertTrue(exec_result["success"], f"Execution failed: {exec_result}")
+            self.assertEqual(exec_result["status"], "EXECUTED")
+
+            # Verify outbound call included the updated secret credentials
+            self.assertEqual(len(captured_requests), 1)
+            outbound_headers = captured_requests[0]["headers"]
+            self.assertEqual(outbound_headers.get("authorization"), f"Bearer {synth_updated_bearer}")
+        finally:
+            tool_proxy_service.set_mock_transport(None)

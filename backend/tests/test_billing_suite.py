@@ -4,6 +4,11 @@ Verifies Stripe/Razorpay gateway inspection, checkout session creation,
 HMAC webhook event processing, automatic license renewal, and plan tier provisioning.
 """
 
+import os
+os.environ["ENVIRONMENT"] = "test"
+from config import settings
+settings.reload()
+
 import unittest
 import uuid
 import datetime
@@ -152,7 +157,7 @@ class TestBillingSuite(unittest.TestCase):
     def test_05_stripe_webhook_processing(self):
         """Verifies Stripe checkout webhook automatically provisions plan and license."""
         webhook_payload = {
-            "id": "evt_test_checkout_completed",
+            "id": f"evt_test_checkout_{uuid.uuid4().hex[:6]}",
             "type": "checkout.session.completed",
             "data": {
                 "object": {
@@ -183,7 +188,7 @@ class TestBillingSuite(unittest.TestCase):
             "payload": {
                 "payment": {
                     "entity": {
-                        "id": "pay_test_rzp_987",
+                        "id": f"pay_test_rzp_{uuid.uuid4().hex[:6]}",
                         "notes": {
                             "org_id": str(self.org.id),
                             "plan_id": "PROFESSIONAL"
