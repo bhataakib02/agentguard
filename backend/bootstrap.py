@@ -169,6 +169,10 @@ def ensure_schema_compatibility(db_engine=engine):
                 conn.execute(text("ALTER TABLE decisions ADD COLUMN authorized_endpoint VARCHAR;"))
             conn.commit()
 
+    # Ensure otp_challenges table exists for OTP verification flows
+    if "otp_challenges" not in inspector.get_table_names():
+        models.OtpChallenge.__table__.create(bind=db_engine, checkfirst=True)
+
 
 def bootstrap_database():
     """

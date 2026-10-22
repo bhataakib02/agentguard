@@ -135,8 +135,10 @@ class Settings:
         else:
             self.CELERY_TASK_ALWAYS_EAGER = not bool(self.REDIS_URL)
 
-        # Email / SMTP Delivery
-        self.EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "NONE").upper()  # NONE, SMTP, MOCK
+        # Email / SMTP / Resend Delivery
+        self.EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "NONE").upper()  # NONE, SMTP, RESEND, MOCK
+        self.RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+        self.RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "AgentGuard <onboarding@resend.dev>").strip()
         self.SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
         self.SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
         self.SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()

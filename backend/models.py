@@ -552,6 +552,29 @@ class UserInvitation(Base):
     accepted_at = Column(DateTime, nullable=True)
 
 
+class OtpChallenge(Base):
+    """
+    Secure, cryptographic, one-time passcode challenge.
+    Stores only keyed HMAC representation of the OTP code (never plaintext).
+    Bound to email, purpose, challenge ID, expiration, and maximum 5 attempts.
+    """
+    __tablename__ = "otp_challenges"
+
+    id = Column(GUID(), primary_key=True, default=gen_uuid)
+    email = Column(String, nullable=False, index=True)
+    purpose = Column(String, nullable=False, index=True)  # REGISTRATION, PASSWORDLESS_LOGIN, PASSWORD_RESET
+    code_hash = Column(String, nullable=False, index=True)  # Keyed HMAC-SHA256
+    attempts = Column(Integer, default=0, nullable=False)
+    max_attempts = Column(Integer, default=5, nullable=False)
+    consumed = Column(Boolean, default=False, nullable=False, index=True)
+    consumed_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    resend_available_at = Column(DateTime, nullable=False)
+    ip_address = Column(String, nullable=True)
+    metadata_json = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+
 class AiModel(Base):
     __tablename__ = "ai_models"
 

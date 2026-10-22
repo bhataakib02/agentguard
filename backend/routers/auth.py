@@ -1,16 +1,677 @@
 from typing import Optional, List, Dict, Any
 import logging
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
 from core import security
 from core.deps import get_current_user
+from services.otp_service import (
+    otp_service,
+    PURPOSE_REGISTRATION,
+    PURPOSE_PASSWORDLESS_LOGIN,
+    PURPOSE_PASSWORD_RESET
+)
+from services.email_service import email_service
+from core.supabase_admin import supabase_admin
 
 logger = logging.getLogger("agentguard.auth")
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+
+# ============================================================================
+# FLOW 1: REGISTRATION WITH EMAIL OTP
+# ============================================================================
+
+@router.post("/register/request-otp", response_model=schemas.OtpActionResponse)
+def register_request_otp(
+    req: schemas.RegisterOtpRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Step 1 of Registration: Request a 6-digit email OTP.
+    - Validates inputs.
+    - Prevents account enumeration by returning generic response if account already exists.
+    - Enforces resend cooldown and rate limits.
+    - Stores pending registration state securely (password_hash only, never plaintext).
+    - Dispatches 6-digit OTP code with 10-minute validity via email.
+    """
+    clean_email = otp_service.normalize_email(req.email)
+    ip_addr = get_client_ip(request)
+
+    if not clean_email or "@" not in clean_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Valid email address is required"
+        )
+
+    if not req.password or len(req.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters long"
+        )
+
+    if not req.full_name or not req.full_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Full name is required"
+        )
+
+    # 1. Anti-Enumeration & Duplicate Check:
+    # If account exists, return generic response and DO NOT issue OTP
+    existing_user = db.query(models.User).filter(models.User.email == clean_email).first()
+    if existing_user:
+        # Audit log the attempt (without logging secrets)
+        audit = models.AuditLog(
+            event_type="USER_REGISTER_OTP_REQUESTED",
+            actor_type="SYSTEM",
+            actor_id="anonymous",
+            action="REQUEST_REGISTRATION_OTP",
+            resource="users",
+            result="IGNORED_DUPLICATE",
+            metadata_json={"email": clean_email, "ip": ip_addr}
+        )
+        db.add(audit)
+        db.commit()
+        return schemas.OtpActionResponse(
+            status="SUCCESS",
+            message="If this email address is eligible, a 6-digit verification code has been sent.",
+            cooldown_seconds=60
+        )
+
+    # 2. Resend Cooldown Check
+    is_cd, remaining = otp_service.check_resend_cooldown(db, clean_email, PURPOSE_REGISTRATION)
+    if is_cd:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Please wait {remaining} seconds before requesting a new verification code."
+        )
+
+    # 3. Rate Limit Check
+    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
+    if is_limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=reason
+        )
+
+    # 4. Hash password before storing in pending challenge metadata
+    hashed_pw = security.get_password_hash(req.password)
+    org_title = req.org_name.strip() if req.org_name and req.org_name.strip() else f"{req.full_name.strip()}'s Organization"
+
+    challenge_meta = {
+        "full_name": req.full_name.strip(),
+        "org_name": org_title,
+        "password_hash": hashed_pw
+    }
+
+    # 5. Issue cryptographic challenge (HMAC-stored, expires in 10 minutes)
+    challenge, raw_code = otp_service.issue_challenge(
+        db,
+        clean_email,
+        PURPOSE_REGISTRATION,
+        ip_address=ip_addr,
+        metadata_json=challenge_meta
+    )
+
+    # 6. Send OTP via configured email provider (Resend, SMTP, or MOCK)
+    delivery = email_service.send_otp_email(clean_email, raw_code, PURPOSE_REGISTRATION)
+
+    # 7. Audit log event
+    audit = models.AuditLog(
+        event_type="USER_REGISTER_OTP_REQUESTED",
+        actor_type="SYSTEM",
+        actor_id="anonymous",
+        action="REQUEST_REGISTRATION_OTP",
+        resource="users",
+        result="SUCCESS" if delivery.get("delivered") or delivery.get("status") == "EMAIL_SENT" else "FAILED",
+        metadata_json={"email": clean_email, "ip": ip_addr, "provider": delivery.get("provider")}
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.OtpActionResponse(
+        status="SUCCESS",
+        message="If this email address is eligible, a 6-digit verification code has been sent.",
+        cooldown_seconds=60
+    )
+
+
+@router.post("/register/verify-otp", response_model=schemas.TokenResponse)
+def register_verify_otp(
+    req: schemas.RegisterVerifyOtpRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Step 2 of Registration: Verify the 6-digit OTP and complete account creation.
+    - Atomically verifies challenge with attempt limit check.
+    - Creates Organization and User with safe default role 'USER'.
+    - Synchronizes with Supabase Auth when configured.
+    - Issues authenticated session and access token.
+    """
+    clean_email = otp_service.normalize_email(req.email)
+    ip_addr = get_client_ip(request)
+
+    if not req.otp or len(req.otp.strip()) != 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code must be exactly 6 digits."
+        )
+
+    # 1. Atomic Verification (Enforces max 5 attempts & 10-minute expiration)
+    valid, err_msg, challenge = otp_service.verify_challenge(
+        db, clean_email, PURPOSE_REGISTRATION, req.otp
+    )
+    if not valid or not challenge:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err_msg or "Invalid or expired verification code."
+        )
+
+    # 2. Check if user already exists
+    existing_user = db.query(models.User).filter(models.User.email == clean_email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email address already exists. Please log in."
+        )
+
+    meta = challenge.metadata_json or {}
+    full_name = meta.get("full_name") or clean_email.split("@")[0].capitalize()
+    org_name = meta.get("org_name") or f"{full_name}'s Organization"
+    password_hash = meta.get("password_hash")
+
+    # 3. Transactional Organization Creation
+    org = models.Organization(name=org_name)
+    db.add(org)
+    db.commit()
+    db.refresh(org)
+
+    # 4. Safe Supabase Auth Synchronization (if configured)
+    auth_user_id = None
+    if supabase_admin.is_configured:
+        try:
+            auth_user_id = supabase_admin.create_user(
+                clean_email,
+                password="",
+                full_name=full_name,
+                email_confirm=True
+            )
+        except Exception as e:
+            logger.warning(f"[Registration] Supabase Auth creation notice: {e}")
+
+    # 5. Transactional User Creation (Strictly defaults to USER role)
+    user = models.User(
+        org_id=org.id,
+        auth_user_id=auth_user_id,
+        email=clean_email,
+        password_hash=password_hash,
+        full_name=full_name,
+        role="USER",
+        department="General",
+        status="ACTIVE"
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # 6. Session Creation
+    token = security.create_access_token(user.id, email=user.email, role=user.role)
+    session = models.Session(
+        user_id=user.id,
+        token=token,
+        ip_address=ip_addr,
+        expires_at=security.utcnow() + security.timedelta(hours=24)
+    )
+    db.add(session)
+
+    # 7. Audit log event
+    audit = models.AuditLog(
+        org_id=user.org_id,
+        event_type="USER_REGISTER_VERIFIED",
+        actor_type="USER",
+        actor_id=str(user.id),
+        action="VERIFY_REGISTRATION_OTP",
+        resource=f"users:{user.id}",
+        result="SUCCESS",
+        metadata_json={"email": user.email, "ip": ip_addr, "role": user.role}
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.TokenResponse(
+        access_token=token,
+        user_id=user.id,
+        auth_user_id=user.auth_user_id,
+        role=user.role,
+        full_name=user.full_name,
+        email=user.email,
+        org_name=org.name
+    )
+
+
+# ============================================================================
+# FLOW 3: LOGIN METHOD B: PASSWORDLESS EMAIL OTP
+# ============================================================================
+
+@router.post("/login/request-otp", response_model=schemas.OtpActionResponse)
+def login_request_otp(
+    req: schemas.LoginOtpRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Step 1 of Passwordless Login: Request a 6-digit login OTP.
+    - User enters email without password.
+    - Anti-enumeration: Returns generic response regardless of whether account exists.
+    - Only issues OTP to eligible ACTIVE accounts.
+    - Enforces resend cooldown and distributed rate limiting.
+    """
+    clean_email = otp_service.normalize_email(req.email)
+    ip_addr = get_client_ip(request)
+
+    if not clean_email or "@" not in clean_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Valid email address is required"
+        )
+
+    # 1. Anti-Enumeration & Eligibility Check:
+    user = db.query(models.User).filter(models.User.email == clean_email).first()
+    if not user or user.status != "ACTIVE":
+        audit = models.AuditLog(
+            event_type="USER_LOGIN_OTP_REQUESTED",
+            actor_type="SYSTEM",
+            actor_id="anonymous",
+            action="REQUEST_LOGIN_OTP",
+            resource="users",
+            result="IGNORED_INELIGIBLE",
+            metadata_json={"email": clean_email, "ip": ip_addr}
+        )
+        db.add(audit)
+        db.commit()
+        return schemas.OtpActionResponse(
+            status="SUCCESS",
+            message="If the account exists and is eligible, a 6-digit verification code has been sent.",
+            cooldown_seconds=60
+        )
+
+    # 2. Resend Cooldown Check
+    is_cd, remaining = otp_service.check_resend_cooldown(db, clean_email, PURPOSE_PASSWORDLESS_LOGIN)
+    if is_cd:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Please wait {remaining} seconds before requesting a new login code."
+        )
+
+    # 3. Rate Limit Check
+    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
+    if is_limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=reason
+        )
+
+    # 4. Issue challenge (HMAC-stored, 10 min expiry)
+    challenge, raw_code = otp_service.issue_challenge(
+        db,
+        clean_email,
+        PURPOSE_PASSWORDLESS_LOGIN,
+        ip_address=ip_addr
+    )
+
+    # 5. Dispatch email
+    delivery = email_service.send_otp_email(clean_email, raw_code, PURPOSE_PASSWORDLESS_LOGIN)
+
+    # 6. Audit log
+    audit = models.AuditLog(
+        org_id=user.org_id,
+        event_type="USER_LOGIN_OTP_REQUESTED",
+        actor_type="USER",
+        actor_id=str(user.id),
+        action="REQUEST_LOGIN_OTP",
+        resource="users",
+        result="SUCCESS" if delivery.get("delivered") or delivery.get("status") == "EMAIL_SENT" else "FAILED",
+        metadata_json={"email": clean_email, "ip": ip_addr, "provider": delivery.get("provider")}
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.OtpActionResponse(
+        status="SUCCESS",
+        message="If the account exists and is eligible, a 6-digit verification code has been sent.",
+        cooldown_seconds=60
+    )
+
+
+@router.post("/login/verify-otp", response_model=schemas.TokenResponse)
+def login_verify_otp(
+    req: schemas.LoginVerifyOtpRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Step 2 of Passwordless Login: Verify 6-digit OTP and establish session.
+    - Atomically verifies challenge with attempt limit check.
+    - Validates account eligibility and status.
+    - Creates server-side session and issues access token.
+    """
+    clean_email = otp_service.normalize_email(req.email)
+    ip_addr = get_client_ip(request)
+
+    if not req.otp or len(req.otp.strip()) != 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code must be exactly 6 digits."
+        )
+
+    # 1. Atomic Verification
+    valid, err_msg, challenge = otp_service.verify_challenge(
+        db, clean_email, PURPOSE_PASSWORDLESS_LOGIN, req.otp
+    )
+    if not valid or not challenge:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err_msg or "Invalid or expired verification code."
+        )
+
+    # 2. Account Eligibility Check
+    user = db.query(models.User).filter(models.User.email == clean_email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account not found."
+        )
+
+    if user.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Account status is {user.status}"
+        )
+
+    # 3. Update Last Login
+    user.last_login_at = security.utcnow()
+    db.commit()
+
+    # 4. Create Session
+    session_token = security.create_access_token(user.id, email=user.email, role=user.role)
+    session = models.Session(
+        user_id=user.id,
+        token=session_token,
+        ip_address=ip_addr,
+        expires_at=security.utcnow() + security.timedelta(hours=24)
+    )
+    db.add(session)
+
+    # 5. Audit Log
+    audit = models.AuditLog(
+        org_id=user.org_id,
+        event_type="USER_LOGIN_OTP_SUCCESS",
+        actor_type="USER",
+        actor_id=str(user.id),
+        action="LOGIN_PASSWORDLESS_OTP",
+        resource="sessions",
+        result="SUCCESS",
+        metadata_json={"email": user.email, "ip": ip_addr}
+    )
+    db.add(audit)
+    db.commit()
+
+    org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
+    org_name = org.name if org else "AgentGuard Enterprise"
+
+    return schemas.TokenResponse(
+        access_token=session_token,
+        user_id=user.id,
+        auth_user_id=user.auth_user_id,
+        role=user.role,
+        full_name=user.full_name,
+        email=user.email,
+        org_name=org_name
+    )
+
+
+# ============================================================================
+# FLOW 4: FORGOT PASSWORD / PASSWORD RECOVERY WITH OTP
+# ============================================================================
+
+@router.post("/forgot-password/request-otp", response_model=schemas.OtpActionResponse)
+def forgot_password_request_otp(
+    req: schemas.ForgotPasswordOtpRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Step 1 of Password Reset: Request a 6-digit recovery OTP.
+    - Anti-enumeration: Returns generic response regardless of whether account exists.
+    - Issues recovery OTP only to eligible active accounts.
+    - Bound to PASSWORD_RESET purpose with 10-minute validity.
+    """
+    clean_email = otp_service.normalize_email(req.email)
+    ip_addr = get_client_ip(request)
+
+    if not clean_email or "@" not in clean_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Valid email address is required"
+        )
+
+    # 1. Anti-Enumeration & User Check:
+    user = db.query(models.User).filter(models.User.email == clean_email).first()
+    if not user or user.status != "ACTIVE":
+        audit = models.AuditLog(
+            event_type="PASSWORD_RESET_OTP_REQUESTED",
+            actor_type="SYSTEM",
+            actor_id="anonymous",
+            action="REQUEST_PASSWORD_RESET_OTP",
+            resource="users",
+            result="IGNORED_INELIGIBLE",
+            metadata_json={"email": clean_email, "ip": ip_addr}
+        )
+        db.add(audit)
+        db.commit()
+        return schemas.OtpActionResponse(
+            status="SUCCESS",
+            message="If the account exists and is eligible, a 6-digit recovery code has been sent.",
+            cooldown_seconds=60
+        )
+
+    # 2. Resend Cooldown Check
+    is_cd, remaining = otp_service.check_resend_cooldown(db, clean_email, PURPOSE_PASSWORD_RESET)
+    if is_cd:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Please wait {remaining} seconds before requesting a new recovery code."
+        )
+
+    # 3. Rate Limit Check
+    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
+    if is_limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=reason
+        )
+
+    # 4. Issue challenge (HMAC-stored, 10 min expiry)
+    challenge, raw_code = otp_service.issue_challenge(
+        db,
+        clean_email,
+        PURPOSE_PASSWORD_RESET,
+        ip_address=ip_addr
+    )
+
+    # 5. Dispatch email
+    delivery = email_service.send_otp_email(clean_email, raw_code, PURPOSE_PASSWORD_RESET)
+
+    # 6. Audit Log
+    audit = models.AuditLog(
+        org_id=user.org_id,
+        event_type="PASSWORD_RESET_OTP_REQUESTED",
+        actor_type="USER",
+        actor_id=str(user.id),
+        action="REQUEST_PASSWORD_RESET_OTP",
+        resource="users",
+        result="SUCCESS" if delivery.get("delivered") or delivery.get("status") == "EMAIL_SENT" else "FAILED",
+        metadata_json={"email": clean_email, "ip": ip_addr, "provider": delivery.get("provider")}
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.OtpActionResponse(
+        status="SUCCESS",
+        message="If the account exists and is eligible, a 6-digit recovery code has been sent.",
+        cooldown_seconds=60
+    )
+
+
+@router.post("/forgot-password/verify-otp", response_model=schemas.OtpActionResponse)
+def forgot_password_verify_otp(
+    req: schemas.ForgotPasswordVerifyOtpRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Step 2 of Password Reset: Verify recovery OTP and issue short-lived reset ticket.
+    """
+    clean_email = otp_service.normalize_email(req.email)
+
+    if not req.otp or len(req.otp.strip()) != 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code must be exactly 6 digits."
+        )
+
+    valid, err_msg, challenge = otp_service.verify_challenge(
+        db, clean_email, PURPOSE_PASSWORD_RESET, req.otp
+    )
+    if not valid or not challenge:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err_msg or "Invalid or expired recovery code."
+        )
+
+    user = db.query(models.User).filter(models.User.email == clean_email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request.")
+
+    ticket = otp_service.create_reset_ticket(str(user.id), user.email)
+
+    audit = models.AuditLog(
+        org_id=user.org_id,
+        event_type="PASSWORD_RESET_OTP_VERIFIED",
+        actor_type="USER",
+        actor_id=str(user.id),
+        action="VERIFY_PASSWORD_RESET_OTP",
+        resource="users",
+        result="SUCCESS",
+        metadata_json={"email": user.email}
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.OtpActionResponse(
+        status="SUCCESS",
+        message="Recovery code verified successfully. Please enter your new password.",
+        reset_ticket=ticket
+    )
+
+
+@router.post("/forgot-password/reset", response_model=schemas.OtpActionResponse)
+def forgot_password_reset(
+    req: schemas.ForgotPasswordResetRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Step 3 of Password Reset: Set new password and revoke all existing sessions.
+    - Requires either a verified reset_ticket or direct valid OTP.
+    - Updates local password_hash and Supabase Auth password when configured.
+    - Revokes ALL existing active sessions for this user.
+    """
+    clean_email = otp_service.normalize_email(req.email)
+    ip_addr = get_client_ip(request)
+
+    if not req.new_password or len(req.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 6 characters long."
+        )
+
+    user = None
+    if req.reset_ticket:
+        valid, err_msg, user_id = otp_service.verify_reset_ticket(req.reset_ticket, clean_email)
+        if not valid or not user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg or "Invalid reset ticket.")
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+    elif req.otp:
+        valid, err_msg, challenge = otp_service.verify_challenge(
+            db, clean_email, PURPOSE_PASSWORD_RESET, req.otp
+        )
+        if not valid or not challenge:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg or "Invalid recovery code.")
+        user = db.query(models.User).filter(models.User.email == clean_email).first()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either reset_ticket or otp is required to reset password."
+        )
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User account not found.")
+
+    # 1. Update Database Password Hash
+    user.password_hash = security.get_password_hash(req.new_password)
+
+    # 2. Update Supabase Auth Password if configured
+    if user.auth_user_id and supabase_admin.is_configured:
+        try:
+            supabase_admin.update_user_password(user.auth_user_id, req.new_password)
+        except Exception as e:
+            logger.warning(f"[PasswordReset] Supabase Auth password update notice: {e}")
+
+    # 3. Session Revocation Policy: Revoke all active sessions for this user
+    revoked_count = db.query(models.Session).filter(
+        models.Session.user_id == user.id,
+        models.Session.revoked == False
+    ).update({"revoked": True}, synchronize_session=False)
+
+    # 4. Audit Log
+    audit = models.AuditLog(
+        org_id=user.org_id,
+        event_type="PASSWORD_RESET_COMPLETED",
+        actor_type="USER",
+        actor_id=str(user.id),
+        action="RESET_PASSWORD",
+        resource=f"users:{user.id}",
+        result="SUCCESS",
+        metadata_json={
+            "email": user.email,
+            "ip": ip_addr,
+            "revoked_sessions_count": revoked_count
+        }
+    )
+    db.add(audit)
+    db.commit()
+
+    return schemas.OtpActionResponse(
+        status="SUCCESS",
+        message="Password has been reset successfully. All active sessions have been revoked. Please log in with your new password."
+    )
+
+
+# ============================================================================
+# LEGACY & DIRECT REGISTRATION
+# ============================================================================
 
 @router.post("/register", response_model=schemas.TokenResponse)
 def register_organization(req: schemas.RegisterRequest, db: Session = Depends(get_db)):
@@ -28,11 +689,24 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
     db.commit()
     db.refresh(org)
 
-    # 3. Transactional User Creation (Strictly default to USER role)
+    # 3. Synchronize with Supabase Auth if configured and not already provided
+    auth_user_id = req.auth_user_id
+    if not auth_user_id and supabase_admin.is_configured and req.password:
+        try:
+            auth_user_id = supabase_admin.create_user(
+                req.email,
+                password=req.password,
+                full_name=req.full_name,
+                email_confirm=True
+            )
+        except Exception as e:
+            logger.warning(f"[LegacyRegister] Supabase Admin sync notice: {e}")
+
+    # 4. Transactional User Creation (Strictly default to safe USER role)
     hashed_pw = security.get_password_hash(req.password) if req.password else None
     user = models.User(
         org_id=org.id,
-        auth_user_id=req.auth_user_id,
+        auth_user_id=auth_user_id,
         email=req.email,
         password_hash=hashed_pw,
         full_name=req.full_name,
@@ -44,7 +718,7 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
     db.commit()
     db.refresh(user)
 
-    # 4. Session & Access Token Creation
+    # 5. Session & Access Token Creation
     token = security.create_access_token(user.id, email=user.email, role=user.role)
     session = models.Session(
         user_id=user.id,

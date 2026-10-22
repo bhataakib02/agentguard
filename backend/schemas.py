@@ -19,6 +19,42 @@ class LocalLoginRequest(BaseModel):
     email: str
     password: str
 
+class OtpActionResponse(BaseModel):
+    status: str
+    message: str
+    cooldown_seconds: Optional[int] = None
+    reset_ticket: Optional[str] = None
+
+class RegisterOtpRequest(BaseModel):
+    full_name: str
+    email: str
+    password: str
+    org_name: Optional[str] = None
+
+class RegisterVerifyOtpRequest(BaseModel):
+    email: str
+    otp: str
+
+class LoginOtpRequest(BaseModel):
+    email: str
+
+class LoginVerifyOtpRequest(BaseModel):
+    email: str
+    otp: str
+
+class ForgotPasswordOtpRequest(BaseModel):
+    email: str
+
+class ForgotPasswordVerifyOtpRequest(BaseModel):
+    email: str
+    otp: str
+
+class ForgotPasswordResetRequest(BaseModel):
+    email: str
+    otp: Optional[str] = None
+    reset_ticket: Optional[str] = None
+    new_password: str
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
