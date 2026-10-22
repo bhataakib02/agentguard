@@ -1,0 +1,5513 @@
+{
+  "summary": {
+    "total_orm_tables": 49,
+    "total_supabase_migration_tables": 16,
+    "tables_in_orm_only": [
+      "agent_budget_configs",
+      "agent_credentials",
+      "agent_executions",
+      "agent_relationships",
+      "agent_runtime_sessions",
+      "ai_models",
+      "anomaly_events",
+      "api_keys",
+      "behavior_profiles",
+      "budgets",
+      "capabilities",
+      "evaluation_dataset_records",
+      "evaluation_datasets",
+      "license_usages",
+      "licenses",
+      "model_pricing",
+      "notifications",
+      "policy_rules",
+      "provenance_events",
+      "report_histories",
+      "reputation_scores",
+      "resource_usages",
+      "risk_scores",
+      "runtime_risk_signals",
+      "scheduled_reports",
+      "security_incidents",
+      "security_tests",
+      "simulations",
+      "tools",
+      "transactions",
+      "user_invitations",
+      "webhook_deliveries",
+      "webhook_endpoints"
+    ],
+    "tables_in_supabase_only": [],
+    "extensions": [
+      "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\""
+    ],
+    "rls_tables_count": 13,
+    "rls_tables": [
+      "agent_passports",
+      "agents",
+      "approval_requests",
+      "audit_logs",
+      "capability_tokens",
+      "decisions",
+      "evaluation_dataset_records",
+      "evaluation_datasets",
+      "licenses",
+      "organizations",
+      "permissions",
+      "policies",
+      "users"
+    ],
+    "policies_count": 12,
+    "policies": [
+      {
+        "policy": "\"Allow public read agents\" ON agents FOR SELECT USING (true)",
+        "source": "20260831000000_agentguard_schema.sql"
+      },
+      {
+        "policy": "\"Allow public read decisions\" ON decisions FOR SELECT USING (true)",
+        "source": "20260831000000_agentguard_schema.sql"
+      },
+      {
+        "policy": "\"Allow public read audit_logs\" ON audit_logs FOR SELECT USING (true)",
+        "source": "20260831000000_agentguard_schema.sql"
+      },
+      {
+        "policy": "\"Allow public read organizations\" ON organizations FOR SELECT USING (true)",
+        "source": "20260831000000_agentguard_schema.sql"
+      },
+      {
+        "policy": "\"Allow public read users\" ON users FOR SELECT USING (true)",
+        "source": "20260831000000_agentguard_schema.sql"
+      },
+      {
+        "policy": "tenant_isolation_organizations ON organizations",
+        "source": "rls_tenant_policies.sql"
+      },
+      {
+        "policy": "tenant_isolation_users ON users",
+        "source": "rls_tenant_policies.sql"
+      },
+      {
+        "policy": "tenant_isolation_agents ON agents",
+        "source": "rls_tenant_policies.sql"
+      },
+      {
+        "policy": "tenant_isolation_licenses ON licenses",
+        "source": "rls_tenant_policies.sql"
+      },
+      {
+        "policy": "tenant_isolation_audit_logs ON audit_logs",
+        "source": "rls_tenant_policies.sql"
+      },
+      {
+        "policy": "tenant_isolation_evaluation_datasets ON evaluation_datasets",
+        "source": "rls_tenant_policies.sql"
+      },
+      {
+        "policy": "tenant_isolation_evaluation_dataset_records ON evaluation_dataset_records",
+        "source": "rls_tenant_policies.sql"
+      }
+    ]
+  },
+  "tables": {
+    "organizations": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "slug": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "display_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "domain": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255)",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "admin_email": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "logo_url": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "logo_path": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "kms_provider": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "kms_key_arn": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "kms_key_alias": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "kms_key_status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "kms_config_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_organizations_slug"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": []
+    },
+    "plans": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR PRIMARY KEY",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "description": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "price_monthly": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "FLOAT DEFAULT 0.0",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '0.0', ORM has None"
+        },
+        "max_users": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 5",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '5', ORM has None"
+        },
+        "max_ai_agents": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 3",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '3', ORM has None"
+        },
+        "max_api_keys": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 2",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '2', ORM has None"
+        },
+        "max_monthly_api_requests": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 50000",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '50000', ORM has None"
+        },
+        "max_storage_gb": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "FLOAT DEFAULT 10.0",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '10.0', ORM has None"
+        },
+        "feature_flags": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "JSONB DEFAULT '{}'::jsonb",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''{}'::JSONB', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": []
+    },
+    "licenses": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "plan_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "start_date": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "expiry_date": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "max_users": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "max_ai_agents": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "max_api_keys": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "max_monthly_api_requests": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "max_storage_gb": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "feature_flags": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('plans.id')"
+      ]
+    },
+    "license_usages": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "api_requests_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "storage_used_gb": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "last_calculated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "users": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "auth_user_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) UNIQUE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES organizations(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "email": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) UNIQUE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "password_hash": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255)",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "full_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "role": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'MANAGER'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''MANAGER'', ORM has None"
+        },
+        "department": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) DEFAULT 'General'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''GENERAL'', ORM has None"
+        },
+        "job_title": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "phone": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'ACTIVE'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''ACTIVE'', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "last_login_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_users_email",
+        "ix_users_auth_user_id"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "sessions": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "user_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES users(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "token": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "refresh_token": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "ip_address": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(45) DEFAULT '127.0.0.1'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''127.0.0.1'', ORM has None"
+        },
+        "user_agent": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT DEFAULT 'Browser'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''BROWSER'', ORM has None"
+        },
+        "expires_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "revoked": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "BOOLEAN DEFAULT FALSE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'FALSE', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        }
+      },
+      "indexes_in_orm": [
+        "ix_sessions_token"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('users.id')"
+      ]
+    },
+    "agents": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "agent_code": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) UNIQUE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES organizations(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "owner_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES users(id) ON DELETE RESTRICT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "department": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) DEFAULT 'Operations'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''OPERATIONS'', ORM has None"
+        },
+        "purpose": {
+          "orm_type": "TEXT",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "model_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) DEFAULT 'gpt-4o'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''GPT-4O'', ORM has None"
+        },
+        "model_version": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT '1.0.0'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''1.0.0'', ORM has None"
+        },
+        "environment": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'PRODUCTION'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''PRODUCTION'', ORM has None"
+        },
+        "autonomy_level": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'MEDIUM'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''MEDIUM'', ORM has None"
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'NORMAL'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''NORMAL'', ORM has None"
+        },
+        "risk_score": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 15",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '15', ORM has None"
+        },
+        "trust_score": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 95",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '95', ORM has None"
+        },
+        "daily_budget": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "NUMERIC(12,2) DEFAULT 10000.00",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '10000.00', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "expires_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_agents_agent_code"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('users.id')",
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "agent_passports": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID UNIQUE REFERENCES agents(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "passport_number": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) UNIQUE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "algorithm": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "key_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "passport_version": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "claims": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "digital_signature": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "issued_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "expires_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "verification_status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'VERIFIED'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''VERIFIED'', ORM has None"
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "agent_credentials": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "key_prefix": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "credential_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "key_hash": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "expires_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "last_used_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "revoked_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "agent_runtime_sessions": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "session_token_jti": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "started_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "last_heartbeat_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "expires_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "client_ip": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "user_agent": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_agent_runtime_sessions_session_token_jti"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "permissions": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES agents(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resource_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resource_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "action": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "is_allowed": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "BOOLEAN DEFAULT TRUE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'TRUE', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "tools": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "category": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "endpoint": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "description": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "risk_level": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "latency_ms": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "schema_definition": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "headers_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timeout_seconds": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_tools_name"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "capabilities": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resource": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "action": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "default_ttl_seconds": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "max_amount": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": []
+    },
+    "capability_tokens": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "token_code": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) UNIQUE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES agents(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "capability_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "scope": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "amount_limit": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "NUMERIC(12,2) DEFAULT 0.00",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '0.00', ORM has None"
+        },
+        "issued_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "expires_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'ACTIVE'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''ACTIVE'', ORM has None"
+        }
+      },
+      "indexes_in_orm": [
+        "ix_capability_tokens_token_code"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "policies": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES organizations(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "category": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) DEFAULT 'FINANCE'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''FINANCE'', ORM has None"
+        },
+        "priority": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 1",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '1', ORM has None"
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'ACTIVE'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''ACTIVE'', ORM has None"
+        },
+        "version": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT '1.0.0'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''1.0.0'', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "policy_rules": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "policy_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "condition_expression": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "decision_output": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "risk_delta": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "description": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('policies.id')"
+      ]
+    },
+    "decisions": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES agents(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "user_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES users(id) ON DELETE SET NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "intent_summary": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "action_requested": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resource_target": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "amount": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "NUMERIC(12,2) DEFAULT 0.00",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '0.00', ORM has None"
+        },
+        "decision": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "risk_score": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 15",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '15', ORM has None"
+        },
+        "policy_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255)",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "explanation": {
+          "orm_type": "TEXT",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "execution_status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'EXECUTED'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''EXECUTED'', ORM has None"
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "execution_gate_token": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "gate_token_used": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "executed_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "tool_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "authorized_endpoint": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "execution_parameters": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_decisions_execution_gate_token"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')",
+        "ForeignKey('users.id')",
+        "ForeignKey('tools.id')"
+      ]
+    },
+    "approval_requests": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "decision_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES decisions(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES agents(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "approver_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES users(id) ON DELETE SET NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "amount": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "NUMERIC(12,2) DEFAULT 0.00",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '0.00', ORM has None"
+        },
+        "reason": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'PENDING'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''PENDING'', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "resolved_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('decisions.id')",
+        "ForeignKey('agents.id')",
+        "ForeignKey('users.id')"
+      ]
+    },
+    "risk_scores": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "overall_score": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "identity_risk": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "permission_risk": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "behavior_risk": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "financial_risk": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "data_sensitivity_risk": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "behavior_profiles": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "avg_daily_actions": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "normal_operating_hours": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "allowed_tools_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "baseline_spending": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "reputation_scores": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "trust_score": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "successful_tasks": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "violations_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "anomalies_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "overrides_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "anomaly_events": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "anomaly_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "severity": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "description": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "deviation_score": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "security_incidents": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "title": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "description": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "severity": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "source": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "affected_user_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "assigned_to_user_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resolution_notes": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timeline_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resolved_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_security_incidents_org_id"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('users.id')",
+        "ForeignKey('agents.id')",
+        "ForeignKey('users.id')"
+      ]
+    },
+    "circuit_breakers": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID UNIQUE REFERENCES agents(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "state": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'NORMAL'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''NORMAL'', ORM has None"
+        },
+        "trigger_reason": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "tripped_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "restored_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "provenance_events": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "decision_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "human_initiator_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "delegated_agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "tool_used": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "data_accessed": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "causal_chain_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')",
+        "ForeignKey('agents.id')",
+        "ForeignKey('decisions.id')",
+        "ForeignKey('users.id')"
+      ]
+    },
+    "audit_logs": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": "Column exists in ORM but MISSING in Supabase migration history",
+          "server_default_discrepancy": null
+        },
+        "event_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "actor_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'AGENT'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''AGENT'', ORM has None"
+        },
+        "actor_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "action": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resource": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(255) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "result": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "metadata_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "JSONB DEFAULT '{}'::jsonb",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''{}'::JSONB', ORM has None"
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        }
+      },
+      "indexes_in_orm": [
+        "ix_audit_logs_timestamp",
+        "ix_audit_logs_actor_id",
+        "ix_audit_logs_org_id",
+        "ix_audit_logs_event_type"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "agent_relationships": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "parent_agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "child_agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "trust_status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "allowed_delegation_types": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')",
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "api_keys": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "owner_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "key_prefix": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "key_hash": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "scopes": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "is_revoked": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "revoked_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "revoked_by_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "last_used_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "expires_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_api_keys_key_hash",
+        "ix_api_keys_org_id",
+        "ix_api_keys_key_prefix"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('users.id')",
+        "ForeignKey('users.id')"
+      ]
+    },
+    "user_invitations": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "email": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "role": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "invited_by_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "token_hash": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "expires_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "accepted_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_user_invitations_token_hash",
+        "ix_user_invitations_email",
+        "ix_user_invitations_org_id"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('users.id')"
+      ]
+    },
+    "ai_models": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "model_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "provider": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "cost_per_1k_tokens": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "avg_latency_ms": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "accuracy_rating": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": []
+    },
+    "budgets": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "daily_limit": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "monthly_limit": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "current_daily_spend": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "current_monthly_spend": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "currency": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "transactions": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "amount": {
+          "orm_type": "FLOAT",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "vendor": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "currency": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "security_tests": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "test_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "attack_payload": {
+          "orm_type": "TEXT",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "defense_result": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "security_score": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "simulations": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "scenario_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "readiness_score": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "metrics_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "resource_usages": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "cpu_pct": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "gpu_pct": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "memory_mb": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "compute_cost": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "notifications": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "user_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "title": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "message": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "severity": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "is_read": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('users.id')"
+      ]
+    },
+    "report_histories": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "user_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "report_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "title": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "file_format": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "file_path": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "file_size_bytes": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "filters_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('users.id')"
+      ]
+    },
+    "scheduled_reports": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "user_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "report_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "title": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "file_format": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "frequency": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "recipient_emails": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "last_run_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "next_run_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('users.id')"
+      ]
+    },
+    "webhook_endpoints": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "url": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "secret_hash": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "secret_preview": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "secret_key": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "is_active": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "event_types": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "webhook_deliveries": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "webhook_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "event_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "response_code": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "attempt_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "error_message": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "payload_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "response_body_preview": {
+          "orm_type": "VARCHAR(500)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "next_attempt_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "delivered_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_webhook_delivery_status_next"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('webhook_endpoints.id')"
+      ]
+    },
+    "agent_executions": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "request_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "execution_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "action": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resource": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "outcome": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "risk_score": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "policy_decision": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "policy_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "policy_rule_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "decision_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "input_token_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "output_token_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "total_token_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "estimated_cost": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "provider": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "model_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "latency_ms": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "error_code": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "metadata_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_agent_executions_execution_id",
+        "ix_agent_executions_request_id",
+        "ix_agent_executions_org_ts",
+        "ix_agent_executions_agent_ts"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('decisions.id')",
+        "ForeignKey('organizations.id')",
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "model_pricing": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "provider": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "model": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "input_cost_per_1k": {
+          "orm_type": "FLOAT",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "output_cost_per_1k": {
+          "orm_type": "FLOAT",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "currency": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "effective_from": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "active": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_model_pricing_provider_model"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": []
+    },
+    "agent_budget_configs": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "daily_token_limit": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "monthly_token_limit": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "daily_cost_limit": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "monthly_cost_limit": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "execution_count_limit": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "warning_threshold_pct": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "exceeded_threshold_pct": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "auto_suspend_on_exceeded": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "budget_state": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "current_daily_tokens": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "current_monthly_tokens": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "current_daily_cost": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "current_monthly_cost": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "current_daily_executions": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "last_reset_daily": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "last_reset_monthly": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_budget_config_org_agent"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('agents.id')",
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "runtime_risk_signals": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "signal_type": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "severity": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "title": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "description": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "evidence_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resolved_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resolved_by": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "timestamp": {
+          "orm_type": "DATETIME",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_risk_signals_status",
+        "ix_risk_signals_agent_ts",
+        "ix_risk_signals_org_ts"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "siem_configs": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES organizations(id) ON DELETE CASCADE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) DEFAULT 'Primary SIEM Collector'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''PRIMARY SIEM COLLECTOR'', ORM has None"
+        },
+        "provider": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'GENERIC_HTTP'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''GENERIC_HTTP'', ORM has None"
+        },
+        "collector_url": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(500) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "auth_token_encrypted": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(500)",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "auth_token_preview": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50)",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "format": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(20) DEFAULT 'JSONL'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''JSONL'', ORM has None"
+        },
+        "is_active": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "BOOLEAN DEFAULT TRUE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'TRUE', ORM has None"
+        },
+        "batch_size": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 100",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '100', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        }
+      },
+      "indexes_in_orm": [
+        "ix_siem_configs_org_id"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "siem_deliveries": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "batch_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) UNIQUE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "provider": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "format": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(20) DEFAULT 'JSONL'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''JSONL'', ORM has None"
+        },
+        "event_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 0",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '0', ORM has None"
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'PENDING'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''PENDING'', ORM has None"
+        },
+        "attempt_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 0",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '0', ORM has None"
+        },
+        "response_code": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "error_message": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "start_event_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100)",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "end_event_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100)",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "lock_token": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100)",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "locked_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "next_attempt_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "delivered_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        }
+      },
+      "indexes_in_orm": [
+        "ix_siem_deliveries_status",
+        "ix_siem_deliveries_created_at",
+        "ix_siem_deliveries_org_id",
+        "ix_siem_deliveries_batch_id",
+        "ix_siem_deliveries_status_next",
+        "ix_siem_deliveries_org_created"
+      ],
+      "indexes_in_sql": [
+        "ix_siem_deliveries_org_id",
+        "ix_siem_deliveries_status",
+        "ix_siem_deliveries_status_next",
+        "ix_siem_deliveries_org_created"
+      ],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "sandbox_execution_jobs": {
+      "in_supabase_migration": true,
+      "rls_enabled_in_sql": false,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID PRIMARY KEY DEFAULT uuid_generate_v4()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'UUID_GENERATE_V4()', ORM has None"
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES agents(id) ON DELETE CASCADE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "decision_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "UUID REFERENCES decisions(id) ON DELETE SET NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "execution_id": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) UNIQUE NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "tool_name": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(100) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "language": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'python' NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''PYTHON' NOT NULL', ORM has None"
+        },
+        "code_hash": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(64) NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'PENDING' NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''PENDING' NOT NULL', ORM has None"
+        },
+        "provider": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'NOT_CONFIGURED' NOT NULL",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''NOT_CONFIGURED' NOT NULL', ORM has None"
+        },
+        "isolation_level": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'CONTAINER_HARDENED'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''CONTAINER_HARDENED'', ORM has None"
+        },
+        "cpu_limit": {
+          "orm_type": "FLOAT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "FLOAT DEFAULT 1.0",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '1.0', ORM has None"
+        },
+        "memory_limit_mb": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 512",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '512', ORM has None"
+        },
+        "timeout_seconds": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT DEFAULT 30",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default '30', ORM has None"
+        },
+        "network_isolated": {
+          "orm_type": "BOOLEAN",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "BOOLEAN DEFAULT TRUE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'TRUE', ORM has None"
+        },
+        "exit_code": {
+          "orm_type": "INTEGER",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "INT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "stdout": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "stderr": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "error_message": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TEXT",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "resource_usage_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "JSONB DEFAULT '{}'::jsonb",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''{}'::JSONB', ORM has None"
+        },
+        "artifacts_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "JSONB DEFAULT '[]'::jsonb",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''[]'::JSONB', ORM has None"
+        },
+        "cleanup_status": {
+          "orm_type": "VARCHAR",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "VARCHAR(50) DEFAULT 'CLEANED'",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default ''CLEANED'', ORM has None"
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
+          "type_discrepancy": null,
+          "server_default_discrepancy": "SQL has server default 'NOW()', ORM has None"
+        },
+        "started_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "completed_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": true,
+          "sql_spec": "TIMESTAMP WITH TIME ZONE",
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_sandbox_execution_jobs_status",
+        "ix_sandbox_execution_jobs_execution_id",
+        "ix_sandbox_jobs_agent_created",
+        "ix_sandbox_execution_jobs_org_id",
+        "ix_sandbox_execution_jobs_agent_id",
+        "ix_sandbox_execution_jobs_decision_id",
+        "ix_sandbox_execution_jobs_created_at",
+        "ix_sandbox_execution_jobs_code_hash",
+        "ix_sandbox_jobs_org_created",
+        "ix_sandbox_jobs_status_created"
+      ],
+      "indexes_in_sql": [
+        "ix_sandbox_jobs_org_id",
+        "ix_sandbox_jobs_agent_id",
+        "ix_sandbox_jobs_decision_id",
+        "ix_sandbox_jobs_execution_id",
+        "ix_sandbox_jobs_status",
+        "ix_sandbox_jobs_code_hash",
+        "ix_sandbox_jobs_org_created",
+        "ix_sandbox_jobs_status_created",
+        "ix_sandbox_jobs_agent_created"
+      ],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('decisions.id')",
+        "ForeignKey('agents.id')"
+      ]
+    },
+    "evaluation_datasets": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "name": {
+          "orm_type": "VARCHAR(255)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "description": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "provenance": {
+          "orm_type": "VARCHAR(100)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "records_count": {
+          "orm_type": "INTEGER",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "tags": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "metadata_json": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "updated_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_evaluation_datasets_created_at",
+        "ix_evaluation_datasets_org_name",
+        "ix_evaluation_datasets_org_created",
+        "ix_evaluation_datasets_org_id"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')"
+      ]
+    },
+    "evaluation_dataset_records": {
+      "in_supabase_migration": false,
+      "rls_enabled_in_sql": true,
+      "columns": {
+        "id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "dataset_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "org_id": {
+          "orm_type": "CHAR(36)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "record_id": {
+          "orm_type": "VARCHAR(100)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "provenance": {
+          "orm_type": "VARCHAR(100)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "agent_profile": {
+          "orm_type": "JSON",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "initial_history": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "action_sequence": {
+          "orm_type": "JSON",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "ground_truth_label": {
+          "orm_type": "VARCHAR(50)",
+          "orm_nullable": false,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "ground_truth_notes": {
+          "orm_type": "TEXT",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "tags": {
+          "orm_type": "JSON",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        },
+        "created_at": {
+          "orm_type": "DATETIME",
+          "orm_nullable": true,
+          "orm_server_default": null,
+          "in_supabase_sql": false,
+          "sql_spec": null,
+          "type_discrepancy": null,
+          "server_default_discrepancy": null
+        }
+      },
+      "indexes_in_orm": [
+        "ix_evaluation_dataset_records_dataset_id",
+        "ix_evaluation_dataset_records_org_id",
+        "ix_eval_records_org_label",
+        "ix_eval_records_dataset_record",
+        "ix_evaluation_dataset_records_created_at"
+      ],
+      "indexes_in_sql": [],
+      "foreign_keys_in_orm": [
+        "ForeignKey('organizations.id')",
+        "ForeignKey('evaluation_datasets.id')"
+      ]
+    }
+  }
+}

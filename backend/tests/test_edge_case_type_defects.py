@@ -2,8 +2,17 @@ import unittest
 import uuid
 import sys
 import os
+import shutil
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+test_db_path = os.path.join(backend_dir, "test_agentguard_global.db")
+os.environ.setdefault("ENVIRONMENT", "testing")
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{test_db_path}")
+os.environ.setdefault("SECRET_KEY", "agentguard-test-secret-key-32charactersmin")
+os.environ.setdefault("ALLOW_DEMO_SEED", "true")
+os.environ.setdefault("AGENTGUARD_ALLOW_LOCAL_TOOLS", "false")
+
+sys.path.insert(0, backend_dir)
 from starlette.testclient import TestClient
 from main import app
 from database import SessionLocal
@@ -11,6 +20,7 @@ from core import security
 import models
 from engines.digital_twin_engine import digital_twin_engine
 from routers.profile import build_profile_response
+from routers.reports import STORAGE_DIR
 
 client = TestClient(app)
 
@@ -18,6 +28,8 @@ client = TestClient(app)
 class TestEdgeCaseTypeDefects(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Guarantee cleanup runs even if setUpClass fails partway through
+        cls.addClassCleanup(cls.cleanup_resources)
         cls.db = SessionLocal()
 
         # Isolated test tenant
@@ -59,8 +71,79 @@ class TestEdgeCaseTypeDefects(unittest.TestCase):
         cls.db.refresh(cls.agent)
 
     @classmethod
+    def cleanup_resources(cls):
+        """Clean up all database records and disk artifacts created by this test class."""
+        org_id = str(cls.org.id) if (hasattr(cls, "org") and cls.org is not None) else None
+        user_id = str(cls.user.id) if (hasattr(cls, "user") and cls.user is not None) else None
+        agent_id = str(cls.agent.id) if (hasattr(cls, "agent") and cls.agent is not None) else None
+
+        if org_id is not None:
+            db = SessionLocal()
+            try:
+                # 1. Delete audit logs associated with this org or actor
+                if user_id:
+                    db.query(models.AuditLog).filter(
+                        (models.AuditLog.org_id == org_id)
+                        | ((models.AuditLog.actor_id == user_id) & models.AuditLog.org_id.is_(None))
+                    ).delete(synchronize_session=False)
+                else:
+                    db.query(models.AuditLog).filter(models.AuditLog.org_id == org_id).delete(synchronize_session=False)
+
+                # 2. Delete report histories
+                db.query(models.ReportHistory).filter(models.ReportHistory.org_id == org_id).delete(synchronize_session=False)
+
+                # 3. Delete budget configurations
+                db.query(models.AgentBudgetConfig).filter(models.AgentBudgetConfig.org_id == org_id).delete(synchronize_session=False)
+
+                # 4. Delete telemetry & execution risk signals
+                db.query(models.RuntimeRiskSignal).filter(models.RuntimeRiskSignal.org_id == org_id).delete(synchronize_session=False)
+                db.query(models.AgentExecution).filter(models.AgentExecution.org_id == org_id).delete(synchronize_session=False)
+
+                # 5. Delete agent child records if any were created
+                if agent_id:
+                    db.query(models.CircuitBreaker).filter(models.CircuitBreaker.agent_id == agent_id).delete(synchronize_session=False)
+                    db.query(models.BehaviorProfile).filter(models.BehaviorProfile.agent_id == agent_id).delete(synchronize_session=False)
+                    db.query(models.Decision).filter(models.Decision.agent_id == agent_id).delete(synchronize_session=False)
+                    db.query(models.AgentPassport).filter(models.AgentPassport.agent_id == agent_id).delete(synchronize_session=False)
+                    db.query(models.AgentCredential).filter(models.AgentCredential.agent_id == agent_id).delete(synchronize_session=False)
+                    db.query(models.Permission).filter(models.Permission.agent_id == agent_id).delete(synchronize_session=False)
+                    db.query(models.Agent).filter(models.Agent.id == agent_id).delete(synchronize_session=False)
+                else:
+                    db.query(models.Agent).filter(models.Agent.org_id == org_id).delete(synchronize_session=False)
+
+                # 6. Delete user(s)
+                if user_id:
+                    db.query(models.User).filter(models.User.id == user_id).delete(synchronize_session=False)
+                else:
+                    db.query(models.User).filter(models.User.org_id == org_id).delete(synchronize_session=False)
+
+                # 7. Delete organization
+                db.query(models.Organization).filter(models.Organization.id == org_id).delete(synchronize_session=False)
+                db.commit()
+
+                # Clean up any generated report directory on disk for this org
+                org_dir = os.path.join(STORAGE_DIR, f"org_{org_id}")
+                if os.path.exists(org_dir):
+                    if os.path.abspath(org_dir) != os.path.abspath(STORAGE_DIR):
+                        shutil.rmtree(org_dir)
+            except Exception as exc:
+                db.rollback()
+                raise RuntimeError(f"Database cleanup failed in TestEdgeCaseTypeDefects: {exc}") from exc
+            finally:
+                db.close()
+                cls.org = None
+                cls.user = None
+                cls.agent = None
+
+        if hasattr(cls, "db") and cls.db is not None:
+            try:
+                cls.db.close()
+            finally:
+                cls.db = None
+
+    @classmethod
     def tearDownClass(cls):
-        cls.db.close()
+        cls.cleanup_resources()
 
     def test_01_optimization_compute_usage_empty_dataset(self):
         """Confirm get_compute_usage handles None/empty stats safely without 500 error."""
