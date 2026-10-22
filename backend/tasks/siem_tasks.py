@@ -50,7 +50,7 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
         # Atomic Concurrency Claim:
         # Prevents concurrent workers from simultaneously dispatching the exact same batch
         worker_lock = uuid.uuid4().hex
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         stale_lock_cutoff = now - datetime.timedelta(minutes=5)
 
         claimed_rows = db.query(models.SiemDelivery).filter(
@@ -76,20 +76,23 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
 
         # Reload delivery record after claim
         delivery = db.query(models.SiemDelivery).filter(models.SiemDelivery.id == delivery_id).first()
+        if not delivery:
+            logger.error(f"[forward_siem_batch_task] Delivery record {delivery_id} not found after claim.")
+            return {"status": "DELIVERY_NOT_FOUND", "delivery_id": delivery_id}
 
         # 1. Resolve SIEM collector configuration
         cfg = resolve_siem_config(db, org_id=str(delivery.org_id))
         if not cfg.configured:
-            delivery.status = "DEAD_LETTER"
-            delivery.error_message = "SIEM collector is NOT_CONFIGURED"
+            setattr(delivery, "status", "DEAD_LETTER")
+            setattr(delivery, "error_message", "SIEM collector is NOT_CONFIGURED")
             db.commit()
             return {"status": "NOT_CONFIGURED", "delivery_id": delivery_id}
 
         # 2. SSRF Destination Safety Check
         is_safe, ssrf_err = validate_webhook_url(cfg.collector_url)
         if not is_safe:
-            delivery.status = "DEAD_LETTER"
-            delivery.error_message = f"SSRF Protection: {ssrf_err}"
+            setattr(delivery, "status", "DEAD_LETTER")
+            setattr(delivery, "error_message", f"SSRF Protection: {ssrf_err}")
             db.commit()
 
             audit = models.AuditLog(
@@ -107,7 +110,9 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
             return {"status": "SSRF_BLOCKED", "reason": ssrf_err}
 
         # 3. Retrieve eligible audit events strictly within the authorized organization scope
-        limit_size = delivery.event_count if delivery.event_count > 0 else cfg.batch_size
+        raw_cnt = getattr(delivery, "event_count", 0)
+        event_cnt_val = int(raw_cnt or 0)
+        limit_size = event_cnt_val if event_cnt_val > 0 else cfg.batch_size
         audit_query = db.query(models.AuditLog).filter(
             models.AuditLog.org_id == delivery.org_id
         )
@@ -117,24 +122,24 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
         for ev in events:
             if str(ev.org_id) != str(delivery.org_id):
                 logger.critical(f"[forward_siem_batch_task] Tenant isolation violation: Event org {ev.org_id} != Delivery org {delivery.org_id}")
-                delivery.status = "FAILED"
-                delivery.error_message = "Cross-tenant isolation violation detected"
+                setattr(delivery, "status", "FAILED")
+                setattr(delivery, "error_message", "Cross-tenant isolation violation detected")
                 db.commit()
                 return {"status": "TENANT_VIOLATION_ABORTED"}
 
         if not events:
-            delivery.status = "DELIVERED"
-            delivery.delivered_at = datetime.datetime.utcnow()
-            delivery.event_count = 0
-            delivery.error_message = None
+            setattr(delivery, "status", "DELIVERED")
+            setattr(delivery, "delivered_at", datetime.datetime.now(datetime.timezone.utc))
+            setattr(delivery, "event_count", 0)
+            setattr(delivery, "error_message", None)
             db.commit()
             return {"status": "DELIVERED", "event_count": 0, "message": "No audit events to forward"}
 
-        delivery.event_count = len(events)
-        delivery.start_event_id = str(events[-1].id)
-        delivery.end_event_id = str(events[0].id)
-        delivery.format = delivery.format or cfg.format_type
-        delivery.provider = cfg.provider
+        setattr(delivery, "event_count", len(events))
+        setattr(delivery, "start_event_id", str(events[-1].id))
+        setattr(delivery, "end_event_id", str(events[0].id))
+        setattr(delivery, "format", str(delivery.format or cfg.format_type))
+        setattr(delivery, "provider", str(cfg.provider))
         db.commit()
 
         # 4. Prepare batch payload using the appropriate provider adapter
@@ -143,11 +148,11 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
             events=events,
             collector_url=cfg.collector_url,
             auth_token=cfg.auth_token,
-            format_type=delivery.format,
-            batch_id=delivery.batch_id
+            format_type=str(delivery.format),
+            batch_id=str(delivery.batch_id)
         )
 
-        delivery.status = "DELIVERING"
+        setattr(delivery, "status", "DELIVERING")
         db.commit()
 
         # 5. Dispatch HTTP POST to external collector with bounded timeouts and pinned IP
@@ -160,12 +165,12 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
             timeout=(SIEM_CONNECT_TIMEOUT_SECONDS, SIEM_READ_TIMEOUT_SECONDS),
         )
 
-        delivery.response_code = dispatch_result.get("status_code")
+        setattr(delivery, "response_code", dispatch_result.get("status_code"))
         if dispatch_result["success"]:
-            delivery.status = "DELIVERED"
-            delivery.delivered_at = datetime.datetime.utcnow()
-            delivery.error_message = None
-            delivery.next_attempt_at = None
+            setattr(delivery, "status", "DELIVERED")
+            setattr(delivery, "delivered_at", datetime.datetime.now(datetime.timezone.utc))
+            setattr(delivery, "error_message", None)
+            setattr(delivery, "next_attempt_at", None)
             db.commit()
 
             # Record immutable audit log for delivery provenance
@@ -196,14 +201,14 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
             }
         elif dispatch_result.get("ssrf_blocked"):
             # Fatal error, do not retry unsafe destinations
-            delivery.status = "DEAD_LETTER"
-            delivery.error_message = f"SSRF Protection: {dispatch_result.get('error')}"
+            setattr(delivery, "status", "DEAD_LETTER")
+            setattr(delivery, "error_message", f"SSRF Protection: {dispatch_result.get('error')}")
             db.commit()
             return {"status": "SSRF_BLOCKED", "reason": dispatch_result.get("error")}
         elif dispatch_result.get("is_redirect"):
             # Redirects to unvalidated destinations strictly prohibited
-            delivery.status = "DEAD_LETTER"
-            delivery.error_message = f"SSRF Protection: Redirect detected and blocked ({dispatch_result.get('error')})"
+            setattr(delivery, "status", "DEAD_LETTER")
+            setattr(delivery, "error_message", f"SSRF Protection: Redirect detected and blocked ({dispatch_result.get('error')})")
             db.commit()
             return {"status": "SSRF_REDIRECT_BLOCKED", "reason": dispatch_result.get("error")}
         else:
@@ -211,17 +216,19 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
 
         # 6. Retry & Dead-Letter handling with sanitized error messages
         sanitized_err = sanitize_error(last_err)
-        delivery.error_message = sanitized_err
+        setattr(delivery, "error_message", sanitized_err)
 
-        if delivery.attempt_count < max_attempts:
-            delivery.status = "RETRYING"
+        raw_attempt = getattr(delivery, "attempt_count", 1)
+        attempt_cnt = int(raw_attempt or 1)
+        if attempt_cnt < max_attempts:
+            setattr(delivery, "status", "RETRYING")
             # Exponential backoff: 15s, 60s, 240s
-            backoff_secs = 15 * (4 ** (delivery.attempt_count - 1))
-            delivery.next_attempt_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=backoff_secs)
+            backoff_secs = 15 * (4 ** max(0, attempt_cnt - 1))
+            setattr(delivery, "next_attempt_at", datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=backoff_secs))
             db.commit()
 
             logger.warning(
-                f"[forward_siem_batch_task] Delivery {delivery.id} failed (attempt {delivery.attempt_count}). "
+                f"[forward_siem_batch_task] Delivery {delivery.id} failed (attempt {attempt_cnt}). "
                 f"Retrying in {backoff_secs}s. Error: {sanitized_err}"
             )
 
@@ -233,14 +240,14 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
             return {
                 "status": "RETRY_SCHEDULED",
                 "delivery_id": str(delivery.id),
-                "attempt": delivery.attempt_count,
+                "attempt": attempt_cnt,
                 "next_attempt_seconds": backoff_secs,
                 "error": sanitized_err
             }
         else:
             # Retries exhausted -> DEAD_LETTER
-            delivery.status = "DEAD_LETTER"
-            delivery.next_attempt_at = None
+            setattr(delivery, "status", "DEAD_LETTER")
+            setattr(delivery, "next_attempt_at", None)
             db.commit()
 
             audit = models.AuditLog(
@@ -254,7 +261,7 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
                 metadata_json={
                     "delivery_id": str(delivery.id),
                     "batch_id": delivery.batch_id,
-                    "attempts": delivery.attempt_count,
+                    "attempts": attempt_cnt,
                     "last_error": sanitized_err
                 }
             )
@@ -264,7 +271,7 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
             return {
                 "status": "DEAD_LETTER",
                 "delivery_id": str(delivery.id),
-                "attempts": delivery.attempt_count,
+                "attempts": attempt_cnt,
                 "error": sanitized_err
             }
 
@@ -279,7 +286,7 @@ def retry_pending_siem_deliveries_task() -> Dict[str, Any]:
     """
     db = SessionLocal()
     try:
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         due_deliveries = db.query(models.SiemDelivery).filter(
             models.SiemDelivery.status.in_(["RETRYING", "RETRY_SCHEDULED"]),
             models.SiemDelivery.next_attempt_at <= now
@@ -287,9 +294,9 @@ def retry_pending_siem_deliveries_task() -> Dict[str, Any]:
 
         enqueued_count = 0
         for d in due_deliveries:
-            d.status = "QUEUED"
+            setattr(d, "status", "QUEUED")
             db.commit()
-            forward_siem_batch_task.delay(str(d.id))
+            getattr(forward_siem_batch_task, "delay")(str(d.id))
             enqueued_count += 1
 
         return {"status": "SUCCESS", "enqueued_retries": enqueued_count}

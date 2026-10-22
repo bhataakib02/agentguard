@@ -67,8 +67,10 @@ def get_organization_dashboard(
     max_agents = lic.max_ai_agents if lic else 3
     max_api_requests = lic.max_monthly_api_requests if lic else 50000
 
-    api_count = lic_usage.api_requests_count if lic_usage else 0
-    api_pct = round((api_count / max_api_requests) * 100, 1) if max_api_requests > 0 else 0.0
+    api_count = float(getattr(lic_usage, "api_requests_count", 0) or 0) if lic_usage else 0.0
+    raw_max_req = getattr(lic, "max_monthly_api_requests", 50000) if lic else 50000
+    max_api_req_float = float(raw_max_req or 50000)
+    api_pct = round((api_count / max_api_req_float) * 100, 1) if max_api_req_float > 0 else 0.0
 
     alerts_count = db.query(models.SecurityIncident).filter(
         models.SecurityIncident.org_id == target_org_id
@@ -86,12 +88,12 @@ def get_organization_dashboard(
         "org_name": org.name,
         "display_name": org.display_name or org.name,
         "logo_url": org.logo_url,
-        "initials": get_org_initials(org.name),
+        "initials": get_org_initials(str(org.name)),
         "domain": org.domain or "",
         "status": org.status or "ACTIVE",
         "plan_id": plan_id,
         "license_status": lic_status,
-        "expiry_date": lic.expiry_date.isoformat() if (lic and lic.expiry_date) else None,
+        "expiry_date": lic.expiry_date.isoformat() if (lic and getattr(lic, "expiry_date", None) is not None) else None,
         "metrics": {
             "users": {"current": user_count, "max": max_users},
             "ai_agents": {"current": agent_count, "max": max_agents},
@@ -117,7 +119,7 @@ def get_organization_branding(
         "name": org.name,
         "display_name": org.display_name or org.name,
         "logo_url": org.logo_url,
-        "initials": get_org_initials(org.name)
+        "initials": get_org_initials(str(org.name))
     }
 
 @router.patch("/branding")
@@ -135,11 +137,11 @@ def update_organization_branding(
         raise HTTPException(status_code=404, detail="Organization not found")
 
     if payload.name:
-        org.name = payload.name.strip()
+        setattr(org, "name", payload.name.strip())
     if payload.display_name:
-        org.display_name = payload.display_name.strip()
+        setattr(org, "display_name", payload.display_name.strip())
     if payload.logo_url is not None:
-        org.logo_url = payload.logo_url.strip() if payload.logo_url else None
+        setattr(org, "logo_url", payload.logo_url.strip() if payload.logo_url else None)
 
     db.commit()
     db.refresh(org)
@@ -162,7 +164,7 @@ def update_organization_branding(
         "name": org.name,
         "display_name": org.display_name,
         "logo_url": org.logo_url,
-        "initials": get_org_initials(org.name)
+        "initials": get_org_initials(str(org.name))
     }
 
 @router.delete("/branding/logo")
@@ -178,8 +180,8 @@ def remove_organization_logo(
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    org.logo_url = None
-    org.logo_path = None
+    setattr(org, "logo_url", None)
+    setattr(org, "logo_path", None)
     db.commit()
 
     audit = models.AuditLog(
@@ -198,7 +200,7 @@ def remove_organization_logo(
         "status": "SUCCESS",
         "org_id": str(org.id),
         "logo_url": None,
-        "initials": get_org_initials(org.name)
+        "initials": get_org_initials(str(org.name))
     }
 
 @router.get("/settings")
@@ -219,18 +221,18 @@ def get_organization_settings(
         "name": org.name,
         "display_name": org.display_name or org.name,
         "logo_url": org.logo_url,
-        "initials": get_org_initials(org.name),
+        "initials": get_org_initials(str(org.name)),
         "domain": org.domain or "",
         "status": org.status or "ACTIVE",
         "admin_email": org.admin_email or "",
-        "created_at": org.created_at.isoformat() if org.created_at else None,
+        "created_at": org.created_at.isoformat() if getattr(org, "created_at", None) is not None else None,
         "license": {
             "plan_id": lic.plan_id if lic else "FREE",
             "status": lic.status if lic else "ACTIVE",
             "max_users": lic.max_users if lic else 5,
             "max_ai_agents": lic.max_ai_agents if lic else 3,
             "max_monthly_api_requests": lic.max_monthly_api_requests if lic else 50000,
-            "expiry_date": lic.expiry_date.isoformat() if (lic and lic.expiry_date) else None
+            "expiry_date": lic.expiry_date.isoformat() if (lic and getattr(lic, "expiry_date", None) is not None) else None
         }
     }
 
@@ -245,9 +247,9 @@ def update_organization_settings(
         raise HTTPException(status_code=404, detail="Organization not found")
 
     if payload.name:
-        org.name = payload.name.strip()
+        setattr(org, "name", payload.name.strip())
     if payload.domain:
-        org.domain = payload.domain.strip()
+        setattr(org, "domain", payload.domain.strip())
 
     db.commit()
     db.refresh(org)
@@ -331,7 +333,7 @@ def invite_user_to_organization(
     from services.email_service import email_service
     if email_service.is_configured():
         send_res = email_service.send_email(
-            to_email=new_user.email,
+            to_email=str(new_user.email),
             subject=f"Welcome to AGENTGUARD: Organization Invitation",
             body_text=f"Hello {new_user.full_name},\n\nYou have been invited to join AGENTGUARD as {target_role}.\nYour temporary credentials:\nEmail: {new_user.email}\nPassword: {plain_password}\n\nPlease log in and change your password."
         )
@@ -387,13 +389,13 @@ def get_organization_byok_config(
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    is_custom = bool(org.kms_provider and org.kms_provider != "SYSTEM_MANAGED")
+    is_custom = bool(org.kms_provider and str(org.kms_provider) != "SYSTEM_MANAGED")
     return schemas.BYOKConfigResponse(
         org_id=str(org.id),
-        provider=org.kms_provider or "SYSTEM_MANAGED",
-        key_arn=org.kms_key_arn,
-        key_alias=org.kms_key_alias,
-        status=org.kms_key_status or ("ACTIVE" if is_custom else "NOT_CONFIGURED"),
+        provider=str(org.kms_provider or "SYSTEM_MANAGED"),
+        key_arn=str(org.kms_key_arn) if getattr(org, "kms_key_arn", None) is not None else None,
+        key_alias=str(org.kms_key_alias) if getattr(org, "kms_key_alias", None) is not None else None,
+        status=str(org.kms_key_status or ("ACTIVE" if is_custom else "NOT_CONFIGURED")),
         is_custom_key=is_custom
     )
 
@@ -440,13 +442,13 @@ def configure_organization_byok(
     db.add(audit)
     db.commit()
 
-    is_custom = bool(updated_org.kms_provider and updated_org.kms_provider != "SYSTEM_MANAGED")
+    is_custom = bool(updated_org.kms_provider and str(updated_org.kms_provider) != "SYSTEM_MANAGED")
     return schemas.BYOKConfigResponse(
         org_id=str(updated_org.id),
-        provider=updated_org.kms_provider,
-        key_arn=updated_org.kms_key_arn,
-        key_alias=updated_org.kms_key_alias,
-        status=updated_org.kms_key_status,
+        provider=str(updated_org.kms_provider or "SYSTEM_MANAGED"),
+        key_arn=str(updated_org.kms_key_arn) if getattr(updated_org, "kms_key_arn", None) is not None else None,
+        key_alias=str(updated_org.kms_key_alias) if getattr(updated_org, "kms_key_alias", None) is not None else None,
+        status=str(updated_org.kms_key_status or "ACTIVE"),
         is_custom_key=is_custom
     )
 
@@ -481,13 +483,13 @@ def rotate_organization_byok(
     db.add(audit)
     db.commit()
 
-    is_custom = bool(updated_org.kms_provider and updated_org.kms_provider != "SYSTEM_MANAGED")
+    is_custom = bool(updated_org.kms_provider and str(updated_org.kms_provider) != "SYSTEM_MANAGED")
     return schemas.BYOKConfigResponse(
         org_id=str(updated_org.id),
-        provider=updated_org.kms_provider or "SYSTEM_MANAGED",
-        key_arn=updated_org.kms_key_arn,
-        key_alias=updated_org.kms_key_alias,
-        status=updated_org.kms_key_status or "ACTIVE",
+        provider=str(updated_org.kms_provider or "SYSTEM_MANAGED"),
+        key_arn=str(updated_org.kms_key_arn) if getattr(updated_org, "kms_key_arn", None) is not None else None,
+        key_alias=str(updated_org.kms_key_alias) if getattr(updated_org, "kms_key_alias", None) is not None else None,
+        status=str(updated_org.kms_key_status or "ACTIVE"),
         is_custom_key=is_custom
     )
 
@@ -520,10 +522,10 @@ def disable_organization_byok(
 
     return schemas.BYOKConfigResponse(
         org_id=str(reverted_org.id),
-        provider=reverted_org.kms_provider,
-        key_arn=reverted_org.kms_key_arn,
-        key_alias=reverted_org.kms_key_alias,
-        status=reverted_org.kms_key_status,
+        provider=str(reverted_org.kms_provider or "SYSTEM_MANAGED"),
+        key_arn=str(reverted_org.kms_key_arn) if getattr(reverted_org, "kms_key_arn", None) is not None else None,
+        key_alias=str(reverted_org.kms_key_alias) if getattr(reverted_org, "kms_key_alias", None) is not None else None,
+        status=str(reverted_org.kms_key_status or "NOT_CONFIGURED"),
         is_custom_key=False
     )
 

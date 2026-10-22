@@ -1,4 +1,5 @@
-from typing import List, Optional
+import datetime
+from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from database import get_db
@@ -20,11 +21,26 @@ router = APIRouter(prefix="/policies", tags=["Governance Policies"])
 
 
 def _check_policy_tenant_access(policy: models.Policy, current_user: models.User):
-    if current_user.role != "SUPER_ADMIN" and policy.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(policy.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot access policies belonging to another organization"
         )
+
+
+def _to_policy_schema(p: models.Policy, rules: list) -> schemas.PolicySchema:
+    return schemas.PolicySchema(
+        id=str(p.id),
+        org_id=str(p.org_id),
+        name=str(p.name),
+        category=str(p.category),
+        priority=int(getattr(p, "priority", 0) or 0),
+        status=str(p.status),
+        version=str(p.version),
+        created_at=cast(datetime.datetime, p.created_at),
+        rules=[schemas.PolicyRuleSchema.model_validate(r) for r in rules],
+        rules_count=len(rules)
+    )
 
 
 @router.get("", response_model=List[schemas.PolicySchema])
@@ -34,7 +50,7 @@ def list_policies(
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Policy)
-    if current_user.role != "SUPER_ADMIN":
+    if str(current_user.role) != "SUPER_ADMIN":
         query = query.filter(models.Policy.org_id == current_user.org_id)
     if status_filter and status_filter.upper() != "ALL":
         query = query.filter(models.Policy.status == status_filter.upper())
@@ -45,18 +61,7 @@ def list_policies(
     result = []
     for p in policies:
         p_rules = db.query(models.PolicyRule).filter(models.PolicyRule.policy_id == p.id).all()
-        result.append(schemas.PolicySchema(
-            id=str(p.id),
-            org_id=str(p.org_id),
-            name=p.name,
-            category=p.category,
-            priority=p.priority,
-            status=p.status,
-            version=p.version,
-            created_at=p.created_at,
-            rules=[schemas.PolicyRuleSchema.model_validate(r) for r in p_rules],
-            rules_count=len(p_rules)
-        ))
+        result.append(_to_policy_schema(p, p_rules))
     return result
 
 
@@ -72,18 +77,7 @@ def get_policy(
     _check_policy_tenant_access(policy, current_user)
 
     rules = db.query(models.PolicyRule).filter(models.PolicyRule.policy_id == policy.id).all()
-    return schemas.PolicySchema(
-        id=str(policy.id),
-        org_id=str(policy.org_id),
-        name=policy.name,
-        category=policy.category,
-        priority=policy.priority,
-        status=policy.status,
-        version=policy.version,
-        created_at=policy.created_at,
-        rules=[schemas.PolicyRuleSchema.model_validate(r) for r in rules],
-        rules_count=len(rules)
-    )
+    return _to_policy_schema(policy, rules)
 
 
 @router.post("", response_model=schemas.PolicySchema, status_code=status.HTTP_201_CREATED)
@@ -94,9 +88,9 @@ def create_policy(
     db: Session = Depends(get_db)
 ):
     org_id = current_user.org_id
-    if current_user.role == "SUPER_ADMIN" and target_org_id:
+    if str(current_user.role) == "SUPER_ADMIN" and target_org_id:
         org_id = target_org_id
-    if not org_id:
+    if org_id is None:
         raise HTTPException(status_code=400, detail="Organization ID is required to create a policy.")
 
     # Validate all initial rules if provided
@@ -149,18 +143,7 @@ def create_policy(
     db.add(audit)
     db.commit()
 
-    return schemas.PolicySchema(
-        id=str(new_policy.id),
-        org_id=str(new_policy.org_id),
-        name=new_policy.name,
-        category=new_policy.category,
-        priority=new_policy.priority,
-        status=new_policy.status,
-        version=new_policy.version,
-        created_at=new_policy.created_at,
-        rules=[schemas.PolicyRuleSchema.model_validate(r) for r in created_rules],
-        rules_count=len(created_rules)
-    )
+    return _to_policy_schema(new_policy, created_rules)
 
 
 @router.patch("/{policy_id}", response_model=schemas.PolicySchema)
@@ -176,15 +159,15 @@ def update_policy(
     _check_policy_tenant_access(policy, current_user)
 
     if req.name is not None:
-        policy.name = req.name
+        setattr(policy, "name", req.name)
     if req.category is not None:
-        policy.category = req.category.upper()
+        setattr(policy, "category", req.category.upper())
     if req.priority is not None:
-        policy.priority = req.priority
+        setattr(policy, "priority", req.priority)
     if req.status is not None:
-        policy.status = req.status.upper()
+        setattr(policy, "status", req.status.upper())
     if req.version is not None:
-        policy.version = req.version
+        setattr(policy, "version", req.version)
 
     db.commit()
     db.refresh(policy)
@@ -203,18 +186,7 @@ def update_policy(
     db.commit()
 
     rules = db.query(models.PolicyRule).filter(models.PolicyRule.policy_id == policy.id).all()
-    return schemas.PolicySchema(
-        id=str(policy.id),
-        org_id=str(policy.org_id),
-        name=policy.name,
-        category=policy.category,
-        priority=policy.priority,
-        status=policy.status,
-        version=policy.version,
-        created_at=policy.created_at,
-        rules=[schemas.PolicyRuleSchema.model_validate(r) for r in rules],
-        rules_count=len(rules)
-    )
+    return _to_policy_schema(policy, rules)
 
 
 @router.post("/{policy_id}/toggle", response_model=schemas.PolicySchema)
@@ -228,23 +200,12 @@ def toggle_policy_status(
         raise HTTPException(status_code=404, detail="Policy not found")
     _check_policy_tenant_access(policy, current_user)
 
-    policy.status = "DISABLED" if policy.status == "ACTIVE" else "ACTIVE"
+    setattr(policy, "status", "DISABLED" if str(policy.status) == "ACTIVE" else "ACTIVE")
     db.commit()
     db.refresh(policy)
 
     rules = db.query(models.PolicyRule).filter(models.PolicyRule.policy_id == policy.id).all()
-    return schemas.PolicySchema(
-        id=str(policy.id),
-        org_id=str(policy.org_id),
-        name=policy.name,
-        category=policy.category,
-        priority=policy.priority,
-        status=policy.status,
-        version=policy.version,
-        created_at=policy.created_at,
-        rules=[schemas.PolicyRuleSchema.model_validate(r) for r in rules],
-        rules_count=len(rules)
-    )
+    return _to_policy_schema(policy, rules)
 
 
 @router.delete("/{policy_id}")
@@ -326,18 +287,18 @@ def update_policy_rule(
         is_valid, err = validate_rule_syntax(req.condition_expression)
         if not is_valid:
             raise HTTPException(status_code=400, detail=f"Invalid rule condition: {err}")
-        rule.condition_expression = req.condition_expression
+        setattr(rule, "condition_expression", req.condition_expression)
 
     if req.decision_output is not None:
         decision_out = req.decision_output.upper()
         if decision_out not in ["ALLOW", "REVIEW", "REFUSE"]:
             raise HTTPException(status_code=400, detail=f"Invalid decision_output '{req.decision_output}'. Must be ALLOW, REVIEW, or REFUSE.")
-        rule.decision_output = decision_out
+        setattr(rule, "decision_output", decision_out)
 
     if req.risk_delta is not None:
-        rule.risk_delta = req.risk_delta
+        setattr(rule, "risk_delta", req.risk_delta)
     if req.description is not None:
-        rule.description = req.description
+        setattr(rule, "description", req.description)
 
     db.commit()
     db.refresh(rule)
@@ -381,17 +342,17 @@ def evaluate_policy(
     db: Session = Depends(get_db)
 ):
     org_id = current_user.org_id
-    if current_user.role == "SUPER_ADMIN" and target_org_id:
+    if str(current_user.role) == "SUPER_ADMIN" and target_org_id:
         org_id = target_org_id
 
     return policy_engine.evaluate_action(
         db=db,
-        org_id=org_id,
+        org_id=str(org_id) if org_id is not None else None,
         agent_name=agent_name,
         action=action,
         resource=resource,
         amount=amount,
         risk_score=risk_score,
         agent_status=agent_status,
-        user_role=current_user.role
+        user_role=str(current_user.role)
     )

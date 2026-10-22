@@ -14,7 +14,7 @@ def list_approvals(
     db: Session = Depends(get_db)
 ):
     query = db.query(models.ApprovalRequest)
-    if current_user.role != "SUPER_ADMIN":
+    if str(current_user.role) != "SUPER_ADMIN":
         query = query.join(models.Agent).filter(models.Agent.org_id == current_user.org_id)
     reqs = query.all()
 
@@ -43,7 +43,7 @@ async def act_on_approval(
     db: Session = Depends(get_db)
 ):
     # Role-based authorization: Only MANAGER, ADMIN, or SUPER_ADMIN may act on approvals
-    if current_user.role not in ["MANAGER", "ADMIN", "SUPER_ADMIN"]:
+    if str(current_user.role) not in ["MANAGER", "ADMIN", "SUPER_ADMIN"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Only Managers, Admins, or Super Admins can resolve approval requests"
@@ -62,36 +62,38 @@ async def act_on_approval(
 
     # Org isolation check
     agent = db.query(models.Agent).filter(models.Agent.id == app_req.agent_id).first()
-    if agent and current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if agent and str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Approval belongs to another organization")
 
     # State transition integrity: Only PENDING requests may be resolved
-    if app_req.status != "PENDING":
+    if str(app_req.status) != "PENDING":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot resolve approval request in '{app_req.status}' state. Only 'PENDING' requests may be resolved."
         )
 
     # Expiry verification (24-hour SLA window)
-    now = datetime.datetime.utcnow()
-    created_dt = app_req.created_at
-    if created_dt and created_dt.tzinfo is not None:
-        created_dt = created_dt.replace(tzinfo=None)
-    if created_dt and created_dt <= (now - datetime.timedelta(hours=24)):
-        app_req.status = "EXPIRED"
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Approval request has expired and cannot be resolved."
-        )
+    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    raw_created = getattr(app_req, "created_at", None)
+    if raw_created is not None:
+        created_dt: datetime.datetime = raw_created
+        if created_dt.tzinfo is not None:
+            created_dt = created_dt.replace(tzinfo=None)
+        if created_dt <= (now - datetime.timedelta(hours=24)):
+            setattr(app_req, "status", "EXPIRED")
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Approval request has expired and cannot be resolved."
+            )
 
     new_status = "APPROVED" if req.action == "APPROVE" else "REJECTED"
 
     # Atomic State Transition under Concurrency
     update_data = {
-        "status": new_status,
-        "resolved_at": now,
-        "approver_id": current_user.id
+        models.ApprovalRequest.status: new_status,
+        models.ApprovalRequest.resolved_at: now,
+        models.ApprovalRequest.approver_id: current_user.id
     }
     updated_rows = db.query(models.ApprovalRequest).filter(
         models.ApprovalRequest.id == id,
@@ -107,21 +109,26 @@ async def act_on_approval(
 
     # Reload record
     app_req = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.id == id).first()
+    if not app_req:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Approval request not found after resolution."
+        )
 
     dec = db.query(models.Decision).filter(models.Decision.id == app_req.decision_id).first()
     if dec:
         if new_status == "APPROVED":
-            dec.decision = "ALLOW"
+            setattr(dec, "decision", "ALLOW")
             # Truthful provenance: action is approved pending tool proxy execution
-            dec.execution_status = "APPROVED_PENDING_EXECUTION"
-            if not dec.execution_gate_token:
+            setattr(dec, "execution_status", "APPROVED_PENDING_EXECUTION")
+            if not getattr(dec, "execution_gate_token", None):
                 import uuid
-                dec.execution_gate_token = f"gate_{uuid.uuid4().hex[:16]}"
-                dec.gate_token_used = False
+                setattr(dec, "execution_gate_token", f"gate_{uuid.uuid4().hex[:16]}")
+                setattr(dec, "gate_token_used", False)
         else:
-            dec.decision = "REFUSE"
-            dec.execution_status = "BLOCKED"
-            dec.gate_token_used = True
+            setattr(dec, "decision", "REFUSE")
+            setattr(dec, "execution_status", "BLOCKED")
+            setattr(dec, "gate_token_used", True)
 
     # Immutable Audit Log for Approval Resolution
     if agent:
@@ -146,10 +153,10 @@ async def act_on_approval(
 
     await ws_manager.broadcast({
         "type": "APPROVAL_RESOLVED",
-        "approval_id": app_req.id,
+        "approval_id": str(app_req.id),
         "action": req.action,
         "status": new_status,
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     })
 
     return {"status": "SUCCESS", "approval_id": id, "new_status": new_status}
@@ -161,7 +168,7 @@ def escalate_overdue_approvals(
     db: Session = Depends(get_db)
 ):
     from tasks.escalation_tasks import escalate_approvals_task
-    org_filter = None if current_user.role == "SUPER_ADMIN" else str(current_user.org_id)
+    org_filter = None if str(current_user.role) == "SUPER_ADMIN" else str(current_user.org_id)
     return escalate_approvals_task(org_id_filter=org_filter)
 
 

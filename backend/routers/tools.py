@@ -93,7 +93,7 @@ def list_tools(
         org_id = entity.org_id
 
     query = db.query(models.Tool)
-    if org_id:
+    if org_id is not None:
         query = query.filter((models.Tool.org_id == org_id) | (models.Tool.org_id == None))
 
     if category:
@@ -142,7 +142,7 @@ def update_tool(
     query = db.query(models.Tool).filter(
         (models.Tool.id == tool_id) | (models.Tool.name == tool_id)
     )
-    if current_user.role != "SUPER_ADMIN":
+    if str(current_user.role) != "SUPER_ADMIN":
         query = query.filter(models.Tool.org_id == current_user.org_id)
 
     tool = query.first()
@@ -150,25 +150,25 @@ def update_tool(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tool not found or unauthorized.")
 
     if req.name is not None:
-        tool.name = req.name
+        setattr(tool, "name", req.name)
     if req.category is not None:
-        tool.category = req.category
+        setattr(tool, "category", req.category)
     if req.endpoint is not None:
-        tool.endpoint = req.endpoint
+        setattr(tool, "endpoint", req.endpoint)
     if req.description is not None:
-        tool.description = req.description
+        setattr(tool, "description", req.description)
     if req.risk_level is not None:
-        tool.risk_level = req.risk_level
+        setattr(tool, "risk_level", req.risk_level)
     if req.status is not None:
-        tool.status = req.status
+        setattr(tool, "status", req.status)
     if req.schema_definition is not None:
-        tool.schema_definition = req.schema_definition
+        setattr(tool, "schema_definition", req.schema_definition)
     if req.headers_json is not None:
-        tool.headers_json = req.headers_json
+        setattr(tool, "headers_json", req.headers_json)
     if req.timeout_seconds is not None:
-        tool.timeout_seconds = req.timeout_seconds
+        setattr(tool, "timeout_seconds", req.timeout_seconds)
 
-    tool.updated_at = datetime.datetime.utcnow()
+    setattr(tool, "updated_at", datetime.datetime.now(datetime.timezone.utc))
     db.commit()
     db.refresh(tool)
     return tool
@@ -186,7 +186,7 @@ def delete_tool(
     query = db.query(models.Tool).filter(
         (models.Tool.id == tool_id) | (models.Tool.name == tool_id)
     )
-    if current_user.role != "SUPER_ADMIN":
+    if str(current_user.role) != "SUPER_ADMIN":
         query = query.filter(models.Tool.org_id == current_user.org_id)
 
     tool = query.first()

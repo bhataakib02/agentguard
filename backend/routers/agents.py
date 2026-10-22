@@ -1,4 +1,5 @@
 import random, datetime
+from typing import cast
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/agents", tags=["Agent Management"])
 
 @router.get("", response_model=list[schemas.AgentSchema])
 def list_agents(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role == "SUPER_ADMIN":
+    if str(current_user.role) == "SUPER_ADMIN":
         return db.query(models.Agent).all()
     return db.query(models.Agent).filter(models.Agent.org_id == current_user.org_id).all()
 
@@ -31,7 +32,7 @@ async def create_agent(
     db: Session = Depends(get_db)
 ):
     # 1. Reject attempts to create agents under another organization
-    if req.org_id and current_user.role != "SUPER_ADMIN" and str(req.org_id) != str(current_user.org_id):
+    if req.org_id and str(current_user.role) != "SUPER_ADMIN" and req.org_id != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot create an AI agent under another organization"
@@ -51,7 +52,7 @@ async def create_agent(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Requested owner with ID {req.owner_id} not found"
             )
-        if current_user.role != "SUPER_ADMIN" and str(target_owner.org_id) != str(org_id):
+        if str(current_user.role) != "SUPER_ADMIN" and str(target_owner.org_id) != str(org_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Agent owner must belong to the same organization"
@@ -117,7 +118,7 @@ async def create_agent(
         "agent_code": agent.agent_code,
         "name": agent.name,
         "department": agent.department,
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     })
 
     return agent
@@ -132,7 +133,7 @@ def get_agent(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot view AI agent belonging to another organization"
@@ -150,7 +151,7 @@ def get_agent_passport(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot view Agent Passport belonging to another organization"
@@ -181,7 +182,7 @@ async def update_agent(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot modify an AI agent belonging to another organization"
@@ -195,7 +196,7 @@ async def update_agent(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Target owner user with ID {req.owner_id} not found"
             )
-        if current_user.role != "SUPER_ADMIN" and str(target_owner.org_id) != str(agent.org_id):
+        if str(current_user.role) != "SUPER_ADMIN" and str(target_owner.org_id) != str(agent.org_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Agent owner must belong to the same organization"
@@ -207,13 +208,13 @@ async def update_agent(
             )
 
         if req.owner_id != agent.owner_id:
-            if not has_permission(current_user.role, PERM_USER_ROLE_ASSIGN) and current_user.role != "SUPER_ADMIN":
+            if not has_permission(str(current_user.role), PERM_USER_ROLE_ASSIGN) and str(current_user.role) != "SUPER_ADMIN":
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Forbidden: Insufficient privileges to reassign agent ownership"
                 )
             old_owner_id = agent.owner_id
-            agent.owner_id = target_owner.id
+            setattr(agent, "owner_id", target_owner.id)
             audit_owner = models.AuditLog(
                 org_id=agent.org_id,
                 event_type="AGENT_OWNER_CHANGE",
@@ -224,7 +225,7 @@ async def update_agent(
                 result="SUCCESS",
                 metadata_json={
                     "agent_id": str(agent.id),
-                    "agent_code": agent.agent_code,
+                    "agent_code": str(agent.agent_code),
                     "old_owner_id": str(old_owner_id),
                     "new_owner_id": str(target_owner.id),
                     "actor_email": current_user.email
@@ -233,40 +234,40 @@ async def update_agent(
             db.add(audit_owner)
 
     if req.name is not None:
-        agent.name = req.name
+        setattr(agent, "name", req.name)
     if req.department is not None:
-        agent.department = req.department
+        setattr(agent, "department", req.department)
     if req.purpose is not None:
-        agent.purpose = req.purpose
+        setattr(agent, "purpose", req.purpose)
     if req.model_name is not None:
-        agent.model_name = req.model_name
+        setattr(agent, "model_name", req.model_name)
     if req.model_version is not None:
-        agent.model_version = req.model_version
+        setattr(agent, "model_version", req.model_version)
     if req.environment is not None:
-        agent.environment = req.environment
+        setattr(agent, "environment", req.environment)
     if req.autonomy_level is not None:
-        if req.autonomy_level != agent.autonomy_level:
-            if current_user.role not in ("ADMIN", "SECURITY_OFFICER", "SUPER_ADMIN"):
+        if req.autonomy_level != str(agent.autonomy_level):
+            if str(current_user.role) not in ("ADMIN", "SECURITY_OFFICER", "SUPER_ADMIN"):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Forbidden: Only administrators or security officers can modify agent autonomy levels"
                 )
-        agent.autonomy_level = req.autonomy_level
+        setattr(agent, "autonomy_level", req.autonomy_level)
 
     if req.daily_budget is not None:
-        if not has_permission(current_user.role, PERM_AGENT_BUDGET_UPDATE) and current_user.role != "SUPER_ADMIN":
+        if not has_permission(str(current_user.role), PERM_AGENT_BUDGET_UPDATE) and str(current_user.role) != "SUPER_ADMIN":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Insufficient privileges to update agent budget"
             )
-        agent.daily_budget = req.daily_budget
+        setattr(agent, "daily_budget", req.daily_budget)
         budget = db.query(models.Budget).filter(models.Budget.agent_id == agent.id).first()
         if budget:
-            budget.daily_limit = req.daily_budget
-            budget.monthly_limit = req.daily_budget * 30
+            setattr(budget, "daily_limit", req.daily_budget)
+            setattr(budget, "monthly_limit", req.daily_budget * 30.0)
         profile = db.query(models.BehaviorProfile).filter(models.BehaviorProfile.agent_id == agent.id).first()
         if profile:
-            profile.baseline_spending = req.daily_budget * 0.25
+            setattr(profile, "baseline_spending", req.daily_budget * 0.25)
         audit_budget = models.AuditLog(
             org_id=agent.org_id,
             event_type="AGENT_BUDGET_UPDATE",
@@ -298,24 +299,24 @@ async def suspend_agent(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if not has_permission(current_user.role, PERM_AGENT_SUSPEND):
+    if not has_permission(str(current_user.role), PERM_AGENT_SUSPEND):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Insufficient privileges to suspend an agent"
         )
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot suspend AI agent belonging to another organization"
         )
 
-    agent.status = "SUSPENDED"
+    setattr(agent, "status", "SUSPENDED")
     cb = db.query(models.CircuitBreaker).filter(models.CircuitBreaker.agent_id == agent.id).first()
     if cb:
-        cb.state = "SUSPENDED"
-        cb.trigger_reason = "MANUAL_SUSPENSION_KILL_SWITCH"
-        cb.tripped_at = datetime.datetime.utcnow()
+        setattr(cb, "state", "SUSPENDED")
+        setattr(cb, "trigger_reason", "MANUAL_SUSPENSION_KILL_SWITCH")
+        setattr(cb, "tripped_at", datetime.datetime.now(datetime.timezone.utc))
 
     db.query(models.CapabilityToken).filter(models.CapabilityToken.agent_id == agent.id).update({"status": "REVOKED"})
 
@@ -329,7 +330,7 @@ async def suspend_agent(
         result="SUCCESS",
         metadata_json={
             "agent_id": str(agent.id),
-            "agent_code": agent.agent_code,
+            "agent_code": str(agent.agent_code),
             "actor_email": current_user.email
         }
     )
@@ -340,7 +341,7 @@ async def suspend_agent(
         "type": "AGENT_SUSPENDED",
         "agent_code": agent.agent_code,
         "name": agent.name,
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     })
 
     return {"status": "SUCCESS", "message": f"Agent {agent.agent_code} has been suspended and all active capabilities revoked."}
@@ -355,23 +356,23 @@ async def restore_agent(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if not has_permission(current_user.role, PERM_AGENT_RESUME):
+    if not has_permission(str(current_user.role), PERM_AGENT_RESUME):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Insufficient privileges to restore an agent"
         )
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot restore AI agent belonging to another organization"
         )
 
-    agent.status = "NORMAL"
+    setattr(agent, "status", "NORMAL")
     cb = db.query(models.CircuitBreaker).filter(models.CircuitBreaker.agent_id == agent.id).first()
     if cb:
-        cb.state = "NORMAL"
-        cb.restored_at = datetime.datetime.utcnow()
+        setattr(cb, "state", "NORMAL")
+        setattr(cb, "restored_at", datetime.datetime.now(datetime.timezone.utc))
 
     audit = models.AuditLog(
         org_id=agent.org_id,
@@ -383,7 +384,7 @@ async def restore_agent(
         result="SUCCESS",
         metadata_json={
             "agent_id": str(agent.id),
-            "agent_code": agent.agent_code,
+            "agent_code": str(agent.agent_code),
             "actor_email": current_user.email
         }
     )
@@ -394,7 +395,7 @@ async def restore_agent(
         "type": "AGENT_RESTORED",
         "agent_code": agent.agent_code,
         "name": agent.name,
-        "timestamp": datetime.datetime.utcnow().isoformat()
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     })
 
     return {"status": "SUCCESS", "message": f"Agent {agent.agent_code} restored to NORMAL operational state."}
@@ -422,13 +423,13 @@ async def create_agent_credential(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot issue credentials for an agent in another organization"
         )
 
-    if current_user.role not in ("SUPER_ADMIN", "ADMIN", "DEVELOPER", "MANAGER"):
+    if str(current_user.role) not in ("SUPER_ADMIN", "ADMIN", "DEVELOPER", "MANAGER"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Only Admin, Developer, or Manager roles can generate agent credentials"
@@ -488,7 +489,7 @@ def list_agent_credentials(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot view credentials of an agent belonging to another organization"
@@ -517,13 +518,13 @@ async def rotate_agent_credential(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot rotate credentials for an agent in another organization"
         )
 
-    if current_user.role not in ("SUPER_ADMIN", "ADMIN", "DEVELOPER", "MANAGER"):
+    if str(current_user.role) not in ("SUPER_ADMIN", "ADMIN", "DEVELOPER", "MANAGER"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Insufficient privileges to rotate agent credentials"
@@ -586,13 +587,13 @@ async def revoke_agent_credential(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot revoke credentials for an agent in another organization"
         )
 
-    if current_user.role not in ("SUPER_ADMIN", "ADMIN", "DEVELOPER", "MANAGER"):
+    if str(current_user.role) not in ("SUPER_ADMIN", "ADMIN", "DEVELOPER", "MANAGER"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Insufficient privileges to revoke agent credentials"
@@ -642,7 +643,7 @@ async def sign_agent_passport(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot sign passport for an agent in another organization"
@@ -665,7 +666,7 @@ async def sign_agent_passport(
         models.CapabilityToken.agent_id == agent.id,
         models.CapabilityToken.status == "ACTIVE"
     ).all()
-    caps = [t.capability_name for t in active_tokens]
+    caps = [str(t.capability_name) for t in active_tokens]
 
     sig = passport_service.sign_passport(agent, passport, capabilities=caps)
     db.commit()
@@ -717,7 +718,7 @@ def verify_agent_passport(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Cannot verify passport of an agent belonging to another organization"
@@ -732,7 +733,7 @@ def verify_agent_passport(
         models.CapabilityToken.agent_id == agent.id,
         models.CapabilityToken.status == "ACTIVE"
     ).all()
-    caps = [t.capability_name for t in active_tokens]
+    caps = [str(t.capability_name) for t in active_tokens]
 
     result = passport_service.verify_passport(passport, agent, capabilities=caps)
     db.commit()  # In case verify_passport updated expired status
@@ -748,7 +749,7 @@ def verify_agent_passport(
             result="FAILURE",
             metadata_json={
                 "agent_id": str(agent.id),
-                "agent_code": agent.agent_code,
+                "agent_code": str(agent.agent_code),
                 "status": result["status"],
                 "reason": result["reason"]
             }
@@ -758,14 +759,14 @@ def verify_agent_passport(
 
     return schemas.PassportVerifyResponse(
         valid=result["valid"],
-        status=result["status"],
-        verification_status=passport.verification_status,
-        agent_code=agent.agent_code,
-        passport_number=passport.passport_number,
-        algorithm=getattr(passport, "algorithm", "Ed25519") or "Ed25519",
-        key_id=getattr(passport, "key_id", passport_service.key_id) or passport_service.key_id,
-        issued_at=passport.issued_at,
-        expires_at=passport.expires_at,
+        status=str(result["status"]),
+        verification_status=str(passport.verification_status),
+        agent_code=str(agent.agent_code),
+        passport_number=str(passport.passport_number),
+        algorithm=str(getattr(passport, "algorithm", "Ed25519") or "Ed25519"),
+        key_id=str(getattr(passport, "key_id", passport_service.key_id) or passport_service.key_id),
+        issued_at=cast(datetime.datetime, passport.issued_at),
+        expires_at=cast(datetime.datetime, passport.expires_at),
         reason=result.get("reason")
     )
 
@@ -787,7 +788,7 @@ def get_agent_permissions(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Cross-tenant access denied")
 
     return db.query(models.Permission).filter(models.Permission.agent_id == agent.id).all()
@@ -803,7 +804,7 @@ def grant_agent_permission(
     """
     Grants a runtime permission to a specific agent.
     """
-    if current_user.role not in ("SUPER_ADMIN", "ADMIN", "OPERATOR", "DEVELOPER", "SECURITY_ANALYST"):
+    if str(current_user.role) not in ("SUPER_ADMIN", "ADMIN", "OPERATOR", "DEVELOPER", "SECURITY_ANALYST"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Insufficient privileges to grant agent permissions"
@@ -813,7 +814,7 @@ def grant_agent_permission(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Cross-tenant access denied")
 
     perm = models.Permission(
@@ -822,7 +823,7 @@ def grant_agent_permission(
         resource_name=req.resource_name,
         action=req.action.upper(),
         is_allowed=req.is_allowed,
-        created_at=datetime.datetime.utcnow()
+        created_at=datetime.datetime.now(datetime.timezone.utc)
     )
     db.add(perm)
     db.commit()
@@ -862,7 +863,7 @@ def revoke_agent_permission(
     """
     Revokes a granted runtime permission from a specific agent.
     """
-    if current_user.role not in ("SUPER_ADMIN", "ADMIN", "OPERATOR", "DEVELOPER", "SECURITY_ANALYST"):
+    if str(current_user.role) not in ("SUPER_ADMIN", "ADMIN", "OPERATOR", "DEVELOPER", "SECURITY_ANALYST"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Insufficient privileges to revoke agent permissions"
@@ -872,7 +873,7 @@ def revoke_agent_permission(
     if not agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    if current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Cross-tenant access denied")
 
     perm = db.query(models.Permission).filter(

@@ -17,7 +17,7 @@ def list_capability_tokens(
     db: Session = Depends(get_db)
 ):
     query = db.query(models.CapabilityToken)
-    if current_user.role != "SUPER_ADMIN":
+    if str(current_user.role) != "SUPER_ADMIN":
         query = query.join(models.Agent).filter(models.Agent.org_id == current_user.org_id)
     return query.all()
 
@@ -28,7 +28,7 @@ async def issue_capability_token(
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Agent).filter((models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id))
-    if current_user.role != "SUPER_ADMIN":
+    if str(current_user.role) != "SUPER_ADMIN":
         query = query.filter(models.Agent.org_id == current_user.org_id)
     agent = query.first()
 
@@ -44,14 +44,15 @@ async def issue_capability_token(
     if req.amount_limit < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Capability amount limit cannot be negative")
 
-    if agent.daily_budget and req.amount_limit > agent.daily_budget and current_user.role not in ("ADMIN", "SUPER_ADMIN"):
+    agent_daily_budget = getattr(agent, "daily_budget", None)
+    if agent_daily_budget and req.amount_limit > float(agent_daily_budget) and str(current_user.role) not in ("ADMIN", "SUPER_ADMIN"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Requested capability amount limit ({req.amount_limit}) exceeds agent daily budget ({agent.daily_budget})"
         )
 
     tok_dict = capability_engine.issue_token(
-        agent_id=agent.id,
+        agent_id=str(agent.id),
         capability_name=req.capability_name,
         scope=req.scope,
         amount_limit=req.amount_limit,
@@ -112,10 +113,10 @@ async def revoke_capability_token(
         raise HTTPException(status_code=404, detail="Capability token not found")
 
     agent = db.query(models.Agent).filter(models.Agent.id == token.agent_id).first()
-    if agent and current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
+    if agent and str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Token belongs to another organization")
 
-    token.status = "REVOKED"
+    setattr(token, "status", "REVOKED")
 
     audit = models.AuditLog(
         org_id=agent.org_id if agent else current_user.org_id,

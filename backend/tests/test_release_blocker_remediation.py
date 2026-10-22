@@ -107,12 +107,12 @@ class TestReleaseBlockerRemediation:
         cls.db.commit()
 
         # Auth tokens
-        cls.token_alpha_admin = security.create_access_token(cls.user_alpha_admin.id, email=cls.user_alpha_admin.email, role="ADMIN")
-        cls.token_alpha_mgr = security.create_access_token(cls.user_alpha_manager.id, email=cls.user_alpha_manager.email, role="MANAGER")
-        cls.token_alpha_dev = security.create_access_token(cls.user_alpha_dev.id, email=cls.user_alpha_dev.email, role="DEVELOPER")
-        cls.token_alpha_viewer = security.create_access_token(cls.user_alpha_viewer.id, email=cls.user_alpha_viewer.email, role="VIEWER")
-        cls.token_alpha_user = security.create_access_token(cls.user_alpha_user.id, email=cls.user_alpha_user.email, role="USER")
-        cls.token_beta_admin = security.create_access_token(cls.user_beta_admin.id, email=cls.user_beta_admin.email, role="ADMIN")
+        cls.token_alpha_admin = security.create_access_token(str(cls.user_alpha_admin.id), email=str(cls.user_alpha_admin.email), role="ADMIN")
+        cls.token_alpha_mgr = security.create_access_token(str(cls.user_alpha_manager.id), email=str(cls.user_alpha_manager.email), role="MANAGER")
+        cls.token_alpha_dev = security.create_access_token(str(cls.user_alpha_dev.id), email=str(cls.user_alpha_dev.email), role="DEVELOPER")
+        cls.token_alpha_viewer = security.create_access_token(str(cls.user_alpha_viewer.id), email=str(cls.user_alpha_viewer.email), role="VIEWER")
+        cls.token_alpha_user = security.create_access_token(str(cls.user_alpha_user.id), email=str(cls.user_alpha_user.email), role="USER")
+        cls.token_beta_admin = security.create_access_token(str(cls.user_beta_admin.id), email=str(cls.user_beta_admin.email), role="ADMIN")
 
         cls.hdr_alpha_admin = {"Authorization": f"Bearer {cls.token_alpha_admin}"}
         cls.hdr_alpha_mgr = {"Authorization": f"Bearer {cls.token_alpha_mgr}"}
@@ -313,7 +313,7 @@ class TestReleaseBlockerRemediation:
     # PHASE C: APPROVAL INTEGRITY & ATOMIC RESOLUTION
     # =========================================================================
 
-    def _create_approval_request(self, agent_id: str, amount: float = 250.0, created_at: datetime.datetime = None):
+    def _create_approval_request(self, agent_id: str, amount: float = 250.0, created_at: datetime.datetime | None = None):
         """Helper to create a decision and associated approval request in PENDING state."""
         dec = models.Decision(
             agent_id=agent_id,
@@ -337,7 +337,7 @@ class TestReleaseBlockerRemediation:
             amount=amount,
             reason="High transaction threshold",
             status="PENDING",
-            created_at=created_at or datetime.datetime.utcnow()
+            created_at=created_at or datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         )
         self.db.add(app_req)
         self.db.commit()
@@ -346,7 +346,7 @@ class TestReleaseBlockerRemediation:
 
     def test_09_approval_resolution_sets_pending_execution_truthfully(self):
         """Approving a request updates decision to APPROVED_PENDING_EXECUTION with gate token (not EXECUTED)."""
-        app_req, dec = self._create_approval_request(self.agent_alpha.id)
+        app_req, dec = self._create_approval_request(str(self.agent_alpha.id))
 
         res = client.post(
             f"/api/approvals/{app_req.id}/act",
@@ -358,14 +358,15 @@ class TestReleaseBlockerRemediation:
 
         self.db.expire_all()
         dec_refreshed = self.db.query(models.Decision).filter_by(id=dec.id).first()
-        assert dec_refreshed.decision == "ALLOW"
-        assert dec_refreshed.execution_status == "APPROVED_PENDING_EXECUTION"
+        assert dec_refreshed is not None
+        assert str(dec_refreshed.decision) == "ALLOW"
+        assert str(dec_refreshed.execution_status) == "APPROVED_PENDING_EXECUTION"
         assert dec_refreshed.execution_gate_token is not None
-        assert not dec_refreshed.gate_token_used
+        assert bool(dec_refreshed.gate_token_used) is False
 
     def test_10_repeat_approval_fails(self):
         """Acting twice on an already approved request fails with 400."""
-        app_req, _ = self._create_approval_request(self.agent_alpha.id)
+        app_req, _ = self._create_approval_request(str(self.agent_alpha.id))
 
         # 1. First approval succeeds
         res1 = client.post(
@@ -387,7 +388,7 @@ class TestReleaseBlockerRemediation:
     def test_11_approve_after_reject_and_reject_after_approve_fail(self):
         """Cross-resolution transitions (approve after reject, reject after approve) are rejected."""
         # A. Reject then Approve
-        app_req_a, dec_a = self._create_approval_request(self.agent_alpha.id)
+        app_req_a, dec_a = self._create_approval_request(str(self.agent_alpha.id))
         res_rej = client.post(
             f"/api/approvals/{app_req_a.id}/act",
             json={"action": "REJECT"},
@@ -398,9 +399,10 @@ class TestReleaseBlockerRemediation:
 
         self.db.expire_all()
         dec_a_refreshed = self.db.query(models.Decision).filter_by(id=dec_a.id).first()
-        assert dec_a_refreshed.decision == "REFUSE"
-        assert dec_a_refreshed.execution_status == "BLOCKED"
-        assert dec_a_refreshed.gate_token_used is True
+        assert dec_a_refreshed is not None
+        assert str(dec_a_refreshed.decision) == "REFUSE"
+        assert str(dec_a_refreshed.execution_status) == "BLOCKED"
+        assert bool(dec_a_refreshed.gate_token_used) is True
 
         res_app_after_rej = client.post(
             f"/api/approvals/{app_req_a.id}/act",
@@ -410,7 +412,7 @@ class TestReleaseBlockerRemediation:
         assert res_app_after_rej.status_code == 400
 
         # B. Approve then Reject
-        app_req_b, _ = self._create_approval_request(self.agent_alpha.id)
+        app_req_b, _ = self._create_approval_request(str(self.agent_alpha.id))
         res_app = client.post(
             f"/api/approvals/{app_req_b.id}/act",
             json={"action": "APPROVE"},
@@ -427,8 +429,8 @@ class TestReleaseBlockerRemediation:
 
     def test_12_expired_approval_rejected(self):
         """Approval request exceeding the 24-hour SLA window cannot be approved."""
-        past_time = datetime.datetime.utcnow() - datetime.timedelta(hours=25)
-        app_req_exp, _ = self._create_approval_request(self.agent_alpha.id, created_at=past_time)
+        past_time = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(hours=25)
+        app_req_exp, _ = self._create_approval_request(str(self.agent_alpha.id), created_at=past_time)
 
         res = client.post(
             f"/api/approvals/{app_req_exp.id}/act",
@@ -440,7 +442,7 @@ class TestReleaseBlockerRemediation:
 
     def test_13_concurrent_resolution_atomic_race(self):
         """Concurrent requests to resolve the same pending approval resolve exactly once."""
-        app_req, _ = self._create_approval_request(self.agent_alpha.id)
+        app_req, _ = self._create_approval_request(str(self.agent_alpha.id))
         results = []
 
         def worker(action):
@@ -472,7 +474,7 @@ class TestReleaseBlockerRemediation:
 
     def test_14_cross_tenant_approval_action_forbidden(self):
         """User from Org Beta cannot act on an approval request belonging to Org Alpha."""
-        app_req, _ = self._create_approval_request(self.agent_alpha.id)
+        app_req, _ = self._create_approval_request(str(self.agent_alpha.id))
 
         res = client.post(
             f"/api/approvals/{app_req.id}/act",
@@ -486,11 +488,11 @@ class TestReleaseBlockerRemediation:
         """Organization dashboard pending_approvals metric strictly reflects authorized tenant only."""
         # 1. Create 3 pending approvals in Org Alpha
         for _ in range(3):
-            self._create_approval_request(self.agent_alpha.id)
+            self._create_approval_request(str(self.agent_alpha.id))
 
         # 2. Create 2 pending approvals in Org Beta
         for _ in range(2):
-            self._create_approval_request(self.agent_beta.id)
+            self._create_approval_request(str(self.agent_beta.id))
 
         # 3. Org Alpha dashboard inspects metrics
         res_alpha = client.get("/api/organization/dashboard", headers=self.hdr_alpha_admin)

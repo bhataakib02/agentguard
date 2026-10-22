@@ -216,8 +216,8 @@ class ToolProxyService:
 
         try:
             addr_info = socket.getaddrinfo(hostname, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-            ips = [r[4][0] for r in addr_info if r and len(r) >= 5 and r[4]]
-            return list(dict.fromkeys(ips))
+            ips = [str(r[4][0]) for r in addr_info if r and len(r) >= 5 and r[4]]
+            return [str(ip) for ip in dict.fromkeys(ips)]
         except (socket.gaierror, socket.herror, OSError):
             if not is_production:
                 if (
@@ -463,7 +463,8 @@ class ToolProxyService:
         close_client = False
         httpx_timeout = timeout[1] if isinstance(timeout, tuple) else float(timeout)
         try:
-            transport = PinningTransport(pinned_ip=pinned_ip)
+            pinned_ip_str = str(pinned_ip) if pinned_ip else ("127.0.0.1" if allow_local else "0.0.0.0")
+            transport = PinningTransport(pinned_ip=pinned_ip_str)
             client = httpx.Client(transport=transport, timeout=httpx_timeout, follow_redirects=False)
             close_client = True
 
@@ -588,7 +589,7 @@ class ToolProxyService:
             }
 
         # Check for replay attack (one-time use gate token)
-        if decision.gate_token_used:
+        if bool(getattr(decision, "gate_token_used", False)):
             return {
                 "success": False,
                 "status": "GATE_TOKEN_REPLAYED",
@@ -625,7 +626,7 @@ class ToolProxyService:
             }
 
         # Check decision outcome
-        if decision.decision != "ALLOW":
+        if str(decision.decision) != "ALLOW":
             return {
                 "success": False,
                 "status": "NOT_AUTHORIZED",
@@ -634,8 +635,9 @@ class ToolProxyService:
             }
 
         # Check token expiration (TTL: 300 seconds / 5 minutes)
-        if decision.timestamp:
-            dec_time = decision.timestamp
+        dec_timestamp = getattr(decision, "timestamp", None)
+        if dec_timestamp is not None:
+            dec_time = dec_timestamp
             if dec_time.tzinfo is None:
                 # Naive timestamp (e.g. SQLite / legacy contract): interpret explicitly as UTC
                 dec_time = dec_time.replace(tzinfo=datetime.timezone.utc)
@@ -656,9 +658,10 @@ class ToolProxyService:
         # 2. RESOLVE TARGET TOOL & BINDING VALIDATION (ORGANIZATION SCOPED)
         # --------------------------------------------------------------------
         tool_record = None
-        if decision.tool_id:
+        dec_tool_id = getattr(decision, "tool_id", None)
+        if dec_tool_id is not None:
             tool_record = db.query(models.Tool).filter(
-                models.Tool.id == decision.tool_id,
+                models.Tool.id == dec_tool_id,
                 (models.Tool.org_id == agent.org_id) | (models.Tool.org_id == None)
             ).first()
         if not tool_record:
@@ -668,7 +671,8 @@ class ToolProxyService:
                 (models.Tool.org_id == agent.org_id) | (models.Tool.org_id == None)
             ).first()
 
-        authorized_tool_name = tool_record.name if tool_record else decision.action_requested
+        tool_rec_name = getattr(tool_record, "name", None) if tool_record else None
+        authorized_tool_name = str(tool_rec_name) if tool_rec_name else str(decision.action_requested or "")
 
         # If caller specified tool_name, verify it matches the authorized tool
         if tool_name and tool_name != authorized_tool_name:
@@ -679,10 +683,11 @@ class ToolProxyService:
                 "gate_token": gate_token,
                 "tool_name": tool_name
             }
-        resolved_tool_name = authorized_tool_name
+        resolved_tool_name: str = authorized_tool_name
 
         # Ensure tool belongs to calling organization
-        if tool_record and tool_record.org_id and str(tool_record.org_id) != str(agent.org_id):
+        tool_org = getattr(tool_record, "org_id", None) if tool_record else None
+        if tool_record and tool_org is not None and str(tool_org) != str(agent.org_id):
             return {
                 "success": False,
                 "status": "NOT_AUTHORIZED",
@@ -693,7 +698,8 @@ class ToolProxyService:
 
         # Verify endpoint snapshot binding
         authorized_ep = getattr(decision, "authorized_endpoint", None)
-        if tool_record and tool_record.endpoint:
+        tool_ep = getattr(tool_record, "endpoint", None) if tool_record else None
+        if tool_record and tool_ep:
             if not authorized_ep:
                 return {
                     "success": False,
@@ -702,7 +708,7 @@ class ToolProxyService:
                     "gate_token": gate_token,
                     "tool_name": resolved_tool_name
                 }
-            if tool_record.endpoint != authorized_ep:
+            if tool_ep != authorized_ep:
                 return {
                     "success": False,
                     "status": "NOT_AUTHORIZED",
@@ -732,7 +738,7 @@ class ToolProxyService:
             effective_params = authorized_params
 
         if tool_record:
-            if tool_record.status != "ACTIVE":
+            if str(tool_record.status) != "ACTIVE":
                 return {
                     "success": False,
                     "status": "TOOL_INACTIVE",
@@ -742,8 +748,10 @@ class ToolProxyService:
                 }
 
             # Parameter validation against tool schema definition
-            if tool_record.schema_definition:
-                val = intent_engine.validate_parameters(tool_record.schema_definition, effective_params)
+            schema_def = getattr(tool_record, "schema_definition", None)
+            if schema_def is not None and isinstance(schema_def, dict):
+                eff_args = effective_params if isinstance(effective_params, dict) else {}
+                val = intent_engine.validate_parameters(schema_def, eff_args)
                 if not val["valid"]:
                     return {
                         "success": False,
@@ -756,7 +764,7 @@ class ToolProxyService:
         # --------------------------------------------------------------------
         # 3. ENDPOINT RESOLUTION (NEVER TRUST CALLER OVERRIDE)
         # --------------------------------------------------------------------
-        target_endpoint = tool_record.endpoint if tool_record else None
+        target_endpoint = str(tool_ep) if (tool_record and tool_ep) else None
 
         # --------------------------------------------------------------------
         # 4. OUTBOUND DISPATCH / SANDBOX DELEGATION
@@ -768,9 +776,10 @@ class ToolProxyService:
         exec_outcome = "EXECUTED"
 
         # Check if tool requires isolated sandbox code execution
-        is_sandbox_tool = (
-            (tool_record and tool_record.category in ("SANDBOX", "CODE_EXECUTION")) or
-            (resolved_tool_name and "sandbox" in resolved_tool_name.lower()) or
+        tool_cat = str(getattr(tool_record, "category", "") or "")
+        is_sandbox_tool = bool(
+            (tool_cat in ("SANDBOX", "CODE_EXECUTION")) or
+            ("sandbox" in resolved_tool_name.lower()) or
             (isinstance(effective_params, dict) and ("code" in effective_params or "script" in effective_params))
         )
 
@@ -799,19 +808,13 @@ class ToolProxyService:
                     "tool_name": resolved_tool_name
                 }
 
-        # Check if tool requires isolated sandbox code execution
-        is_sandbox_tool = (
-            (tool_record and tool_record.category in ("SANDBOX", "CODE_EXECUTION")) or
-            (resolved_tool_name and "sandbox" in resolved_tool_name.lower()) or
-            (isinstance(effective_params, dict) and ("code" in effective_params or "script" in effective_params))
-        )
-
         if is_sandbox_tool:
             from services.sandbox_service import sandbox_service
             code_str = ""
             lang = "python"
             stdin_val = None
-            timeout_val = (tool_record.timeout_seconds if tool_record else None)
+            raw_tval = getattr(tool_record, "timeout_seconds", None) if tool_record else None
+            timeout_val = raw_tval
             net_val = False
             env_val = None
 
@@ -823,6 +826,7 @@ class ToolProxyService:
                 net_val = effective_params.get("network_enabled", False)
                 env_val = effective_params.get("env_vars")
 
+            effective_dict = effective_params if isinstance(effective_params, dict) else None
             sbx_res = sandbox_service.execute_sandboxed_action(
                 db=db,
                 agent=agent,
@@ -831,8 +835,8 @@ class ToolProxyService:
                 language=lang,
                 tool_name=resolved_tool_name,
                 stdin=stdin_val,
-                parameters=effective_params,
-                timeout_seconds=timeout_val,
+                parameters=effective_dict,
+                timeout_seconds=int(timeout_val) if timeout_val is not None else None,
                 network_enabled=net_val,
                 env_vars=env_val
             )
@@ -857,7 +861,8 @@ class ToolProxyService:
 
         if target_endpoint:
             # Validate SSRF safety
-            ssrf_check = self._validate_ssrf_safety(target_endpoint, allow_local=self.allow_local_egress)
+            target_endpoint_str = str(target_endpoint)
+            ssrf_check = self._validate_ssrf_safety(target_endpoint_str, allow_local=self.allow_local_egress)
             if not ssrf_check["safe"]:
                 return {
                     "success": False,
@@ -868,24 +873,27 @@ class ToolProxyService:
                 }
 
             pinned_ip = ssrf_check.get("pinned_ip")
+            pinned_ip_str = str(pinned_ip) if pinned_ip else ("127.0.0.1" if self.allow_local_egress else "0.0.0.0")
 
-            headers = {
+            headers: dict[str, str] = {
                 "Content-Type": "application/json",
                 "X-AgentGuard-Execution-ID": execution_id,
-                "X-AgentGuard-Agent-Code": agent.agent_code,
+                "X-AgentGuard-Agent-Code": str(agent.agent_code),
                 "X-AgentGuard-Gate-Token": gate_token
             }
-            if tool_record and tool_record.headers_json:
-                headers.update(tool_record.headers_json)
+            raw_hdrs = getattr(tool_record, "headers_json", None) if tool_record else None
+            if isinstance(raw_hdrs, dict):
+                headers.update({str(k): str(v) for k, v in raw_hdrs.items()})
 
-            timeout_sec = (tool_record.timeout_seconds if tool_record else 30) or 30
+            raw_timeout = getattr(tool_record, "timeout_seconds", None) if tool_record else None
+            timeout_sec: float = float(raw_timeout) if raw_timeout is not None else 30.0
 
             client = None
             close_client = False
             try:
                 is_production = getattr(settings, "ENVIRONMENT", "production").lower() == "production"
                 if is_production:
-                    transport = PinningTransport(pinned_ip=pinned_ip)
+                    transport = PinningTransport(pinned_ip=pinned_ip_str)
                     client = httpx.Client(transport=transport, timeout=timeout_sec, follow_redirects=False)
                     close_client = True
                 elif http_client is not None:
@@ -896,11 +904,11 @@ class ToolProxyService:
                     client = httpx.Client(transport=self._mock_transport, timeout=timeout_sec, follow_redirects=False)
                     close_client = True
                 else:
-                    transport = PinningTransport(pinned_ip=pinned_ip)
+                    transport = PinningTransport(pinned_ip=pinned_ip_str)
                     client = httpx.Client(transport=transport, timeout=timeout_sec, follow_redirects=False)
                     close_client = True
 
-                resp = client.post(target_endpoint, json=effective_params, headers=headers)
+                resp = client.post(target_endpoint_str, json=effective_params, headers=headers)
                 status_code = resp.status_code
                 try:
                     response_data = resp.json()
@@ -954,9 +962,9 @@ class ToolProxyService:
         # 5. STATE TRANSITION & OUTCOME RECORDING
         # --------------------------------------------------------------------
         final_status = "EXECUTED" if exec_outcome == "EXECUTED" else "EXECUTION_FAILED"
-        decision.execution_status = final_status
+        setattr(decision, "execution_status", final_status)
         if tool_record:
-            decision.tool_id = tool_record.id
+            setattr(decision, "tool_id", tool_record.id)
         db.query(models.Decision).filter(models.Decision.id == decision.id).update(
             {
                 models.Decision.execution_status: final_status,
@@ -975,7 +983,7 @@ class ToolProxyService:
                 decision_id=decision.id,
                 agent_id=agent.id,
                 tool_used=resolved_tool_name,
-                data_accessed=str(list(effective_params.keys())) if effective_params else None,
+                data_accessed=str(list(effective_params.keys())) if (isinstance(effective_params, dict) and effective_params) else None,
                 causal_chain_json={
                     "execution_id": execution_id,
                     "gate_token": gate_token,
@@ -984,7 +992,7 @@ class ToolProxyService:
                     "latency_ms": latency_ms,
                     "outcome": exec_outcome
                 },
-                timestamp=datetime.datetime.utcnow()
+                timestamp=datetime.datetime.now(datetime.timezone.utc)
             )
             db.add(prov)
 
@@ -992,11 +1000,11 @@ class ToolProxyService:
                 db=db,
                 org_id=str(agent.org_id),
                 agent_id=str(agent.id),
-                action=decision.action_requested,
-                resource=decision.resource_target,
+                action=str(decision.action_requested),
+                resource=str(decision.resource_target),
                 outcome=exec_outcome,
-                risk_score=decision.risk_score or 0,
-                policy_decision=decision.decision,
+                risk_score=int(getattr(decision, "risk_score", 0) or 0),
+                policy_decision=str(decision.decision) if getattr(decision, "decision", None) is not None else None,
                 decision_id=str(decision.id),
                 latency_ms=latency_ms,
                 status="COMPLETED" if exec_outcome == "EXECUTED" else exec_outcome,

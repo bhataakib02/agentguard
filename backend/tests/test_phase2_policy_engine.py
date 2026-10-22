@@ -45,7 +45,7 @@ class TestPhase2PolicyEngine(unittest.TestCase):
         cls.db.commit()
         cls.db.refresh(cls.super_admin)
         cls.sa_token = security.create_access_token(
-            cls.super_admin.id, email=cls.super_admin.email, role="SUPER_ADMIN"
+            str(cls.super_admin.id), email=str(cls.super_admin.email), role="SUPER_ADMIN"
         )
 
         # 2. Organization Alpha & User Alpha & Agent Alpha
@@ -70,7 +70,7 @@ class TestPhase2PolicyEngine(unittest.TestCase):
         cls.db.commit()
         cls.db.refresh(cls.user_a)
         cls.user_a_token = security.create_access_token(
-            cls.user_a.id, email=cls.user_a.email, role="ADMIN"
+            str(cls.user_a.id), email=str(cls.user_a.email), role="ADMIN"
         )
 
         cls.agent_a = models.Agent(
@@ -112,7 +112,7 @@ class TestPhase2PolicyEngine(unittest.TestCase):
         cls.db.commit()
         cls.db.refresh(cls.user_b)
         cls.user_b_token = security.create_access_token(
-            cls.user_b.id, email=cls.user_b.email, role="USER"
+            str(cls.user_b.id), email=str(cls.user_b.email), role="USER"
         )
 
         cls.agent_b = models.Agent(
@@ -621,15 +621,18 @@ class TestPhase2PolicyEngine(unittest.TestCase):
         # Inspect persisted Decision
         dec = self.db.query(models.Decision).filter(models.Decision.id == decision_id).first()
         self.assertIsNotNone(dec)
+        assert dec is not None
         self.assertEqual(dec.policy_name, "Provenance Audit Target Policy")
 
         # Inspect ProvenanceEvent
         prov = self.db.query(models.ProvenanceEvent).filter(models.ProvenanceEvent.decision_id == decision_id).first()
         self.assertIsNotNone(prov)
-        self.assertIn("policy_applied", prov.causal_chain_json)
-        self.assertEqual(prov.causal_chain_json["policy_applied"], "Provenance Audit Target Policy")
-        self.assertEqual(prov.causal_chain_json["policy_id"], str(pol.id))
-        self.assertEqual(prov.causal_chain_json["rule_id"], str(rule.id))
+        assert prov is not None
+        causal_chain = getattr(prov, "causal_chain_json", None) or {}
+        self.assertIn("policy_applied", causal_chain)
+        self.assertEqual(causal_chain.get("policy_applied"), "Provenance Audit Target Policy")
+        self.assertEqual(causal_chain.get("policy_id"), str(pol.id))
+        self.assertEqual(causal_chain.get("rule_id"), str(rule.id))
 
         # Inspect AuditLog
         audit = self.db.query(models.AuditLog).filter(
@@ -637,9 +640,11 @@ class TestPhase2PolicyEngine(unittest.TestCase):
             models.AuditLog.result == "REVIEW"
         ).order_by(models.AuditLog.timestamp.desc()).first()
         self.assertIsNotNone(audit)
-        self.assertEqual(audit.metadata_json.get("policy"), "Provenance Audit Target Policy")
-        self.assertEqual(audit.metadata_json.get("policy_id"), str(pol.id))
-        self.assertEqual(audit.metadata_json.get("rule_id"), str(rule.id))
+        assert audit is not None
+        audit_meta = getattr(audit, "metadata_json", None) or {}
+        self.assertEqual(audit_meta.get("policy"), "Provenance Audit Target Policy")
+        self.assertEqual(audit_meta.get("policy_id"), str(pol.id))
+        self.assertEqual(audit_meta.get("rule_id"), str(rule.id))
 
     # ==========================================
     # TEST 15: No global .first() policy fallback exists
@@ -666,7 +671,7 @@ class TestPhase2PolicyEngine(unittest.TestCase):
         self.db.commit()
         self.db.refresh(user_empty)
         token_empty = security.create_access_token(
-            user_empty.id, email=user_empty.email, role="USER"
+            str(user_empty.id), email=str(user_empty.email), role="USER"
         )
 
         agent_empty = models.Agent(

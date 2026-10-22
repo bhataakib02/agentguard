@@ -6,7 +6,7 @@ Enforces strict idempotency to prevent repeated notifications on successive tick
 
 import datetime
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from celery_app import celery_app
 from database import SessionLocal
 import models
@@ -16,14 +16,14 @@ logger = logging.getLogger("agentguard.tasks.escalation")
 
 
 @celery_app.task(name="tasks.escalation_tasks.escalate_approvals_task")
-def escalate_approvals_task(org_id_filter: str = None) -> Dict[str, Any]:
+def escalate_approvals_task(org_id_filter: Optional[str] = None) -> Dict[str, Any]:
     """
     Periodic task to inspect pending approval requests, escalate overdue items,
     and alert on approaching SLA thresholds with strict idempotency.
     """
     db = SessionLocal()
     try:
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         sla_limit = now - datetime.timedelta(hours=24)
         approaching_sla_limit = now - datetime.timedelta(hours=18)
 

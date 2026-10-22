@@ -155,7 +155,7 @@ def test_context(request, db_session):
     token_b = jwt_data_b["access_token"]
 
     # Human Bearer Token
-    human_token = create_access_token(user_id=str(user.id), email=user.email, role=user.role)
+    human_token = create_access_token(user_id=str(user.id), email=str(user.email), role=str(user.role))
 
     # Seed refund_tool for org if not testing the registration endpoint directly
     if request.node.name != "test_tool_registration_and_lookup":

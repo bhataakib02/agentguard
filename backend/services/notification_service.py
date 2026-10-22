@@ -121,12 +121,12 @@ class NotificationService:
         Delivers a webhook event to a registered endpoint with HMAC signature,
         persistent delivery records, bounded retries, and dead-letter handling.
         """
-        if not endpoint.is_active:
+        if not bool(getattr(endpoint, "is_active", True)):
             logger.info(f"Skipping delivery for disabled webhook {endpoint.id}")
             return None
 
         # Format full payload
-        timestamp_str = datetime.datetime.utcnow().isoformat()
+        timestamp_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
         full_payload = {
             "event_id": str(uuid.uuid4()),
             "event_type": event_type,
@@ -140,19 +140,20 @@ class NotificationService:
 
         # Compute HMAC signature using decrypted secret_key (failing closed on tampered ciphertext)
         from core.security import decrypt_secret_at_rest
-        raw_key = endpoint.secret_key
+        raw_key = getattr(endpoint, "secret_key", None)
         if raw_key:
-            if raw_key.startswith("enc:aesgcm:"):
-                signing_key = decrypt_secret_at_rest(raw_key)
+            raw_key_str = str(raw_key)
+            if raw_key_str.startswith("enc:aesgcm:"):
+                signing_key = decrypt_secret_at_rest(raw_key_str)
                 if not signing_key:
                     logger.error(f"[Webhook Dispatch] Tampered or corrupt secret ciphertext for webhook {endpoint.id}. Failing closed.")
                     return None
             else:
-                signing_key = raw_key
+                signing_key = raw_key_str
         else:
-            signing_key = endpoint.secret_hash
+            signing_key = str(endpoint.secret_hash or "")
 
-        signature = compute_webhook_signature(signing_key, payload_bytes, timestamp_str)
+        signature = compute_webhook_signature(str(signing_key), payload_bytes, timestamp_str)
 
         headers = {
             "Content-Type": "application/json",
@@ -177,11 +178,11 @@ class NotificationService:
         # Delegate delivery to Celery Worker
         try:
             from tasks.webhook_tasks import dispatch_webhook_task
-            dispatch_webhook_task.delay(str(delivery.id), max_attempts=max_retries)
+            getattr(dispatch_webhook_task, "delay")(str(delivery.id), max_attempts=max_retries)
         except Exception as e:
             logger.warning(f"Celery dispatch failed, executing fallback delivery: {e}")
             from tasks.webhook_tasks import dispatch_webhook_task
-            dispatch_webhook_task(str(delivery.id), max_attempts=max_retries)
+            getattr(dispatch_webhook_task, "apply")(args=[str(delivery.id)], kwargs={"max_attempts": max_retries})
 
         db.refresh(delivery)
         return delivery
@@ -216,7 +217,7 @@ class NotificationService:
         # 2. Webhooks
         payload = {
             "resource_type": resource_type,
-            "resource_id": str(resource_id),
+            "resource_id": resource_id,
             "data": data
         }
 
@@ -265,7 +266,7 @@ def dispatch_webhook_delivery(
         return False
     if deliv.status in ("DEAD_LETTER", "RETRY_SCHEDULED", "RETRYING"):
         # For legacy Phase 3 synchronous callers expecting synchronous failure status
-        deliv.status = "FAILED"
+        setattr(deliv, "status", "FAILED")
         db.commit()
         return False
     return deliv.status in ("DELIVERED", "SUCCESS")
