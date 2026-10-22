@@ -95,12 +95,13 @@ class BehaviorEngine:
             models.AgentExecution.timestamp >= twenty_four_hours_ago
         ).count()
 
-        avg_actions = max(profile.avg_daily_actions or 150, 1)
-        velocity_ratio = exec_count / avg_actions
+        raw_avg = getattr(profile, "avg_daily_actions", None)
+        avg_actions = max(int(raw_avg or 150), 1)
+        velocity_ratio: float = float(exec_count) / float(avg_actions)
 
         if velocity_ratio >= 3.0:
             severity = "CRITICAL" if velocity_ratio >= 5.0 else "HIGH"
-            dev = min(4.0, (velocity_ratio - 1.0) * 1.0)
+            dev: float = float(min(4.0, (velocity_ratio - 1.0) * 1.0))
             deviation_score += dev
             anomalies_detected.append({
                 "anomaly_type": "VELOCITY_SPIKE",
@@ -151,8 +152,9 @@ class BehaviorEngine:
             models.AgentExecution.agent_id == agent.id,
             models.AgentExecution.timestamp >= twenty_four_hours_ago
         ).all()
-        current_spend = sum(e.estimated_cost or 0.0 for e in daily_executions) + requested_amount
-        baseline_spending = profile.baseline_spending or 2500.0
+        current_spend: float = sum(float(getattr(e, "estimated_cost", 0.0) or 0.0) for e in daily_executions) + float(requested_amount or 0.0)
+        raw_baseline = getattr(profile, "baseline_spending", None)
+        baseline_spending: float = float(raw_baseline or 2500.0)
 
         if baseline_spending > 0 and current_spend > (baseline_spending * 2.5):
             dev = 3.0
@@ -183,7 +185,7 @@ class BehaviorEngine:
                 })
 
         # Final capped deviation score [0.0, 10.0]
-        final_deviation = min(round(deviation_score, 2), 10.0)
+        final_deviation: float = min(round(float(deviation_score), 2), 10.0)
 
         # Persist anomalies to database if requested
         if persist_anomalies and anomalies_detected:
@@ -211,7 +213,7 @@ class BehaviorEngine:
                     evidence_json={
                         "anomalies": anomalies_detected,
                         "deviation_score": final_deviation,
-                        "velocity_ratio": round(velocity_ratio, 2)
+                        "velocity_ratio": round(float(velocity_ratio), 2)
                     },
                     status="ACTIVE",
                     timestamp=now
@@ -230,12 +232,12 @@ class BehaviorEngine:
             "metrics": {
                 "executions_24h": exec_count,
                 "avg_daily_actions": avg_actions,
-                "velocity_ratio": round(velocity_ratio, 2),
+                "velocity_ratio": round(float(velocity_ratio), 2),
                 "is_within_operating_hours": within_hours,
                 "operating_hours": profile.normal_operating_hours,
                 "tool_allowed": tool_allowed,
                 "allowed_tools": allowed_tools,
-                "current_spend": round(current_spend, 2),
+                "current_spend": round(float(current_spend), 2),
                 "baseline_spending": baseline_spending
             }
         }

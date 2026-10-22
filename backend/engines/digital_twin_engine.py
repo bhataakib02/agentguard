@@ -88,9 +88,9 @@ class DigitalTwinEngine:
             
             # Estimate budget exhaustion under 50k requests
             total_projected_tokens = simulated_requests * baseline_avg_tokens
-            budget_headroom_pct = 100.0
-            if daily_budget_tokens and daily_budget_tokens > 0:
-                budget_headroom_pct = max(0.0, round(((daily_budget_tokens - total_projected_tokens) / daily_budget_tokens) * 100.0, 1))
+            if daily_budget_tokens and float(daily_budget_tokens) > 0:
+                limit_tokens = float(daily_budget_tokens)
+                budget_headroom_pct = max(0.0, round(((limit_tokens - float(total_projected_tokens)) / limit_tokens) * 100.0, 1))
                 if total_projected_tokens > daily_budget_tokens:
                     circuit_breaker_tripped = True
 

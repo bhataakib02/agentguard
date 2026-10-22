@@ -203,23 +203,23 @@ def evaluate_condition(condition_expr: str, context: Dict[str, Any]) -> Tuple[bo
                 elif isinstance(op, ast.In):
                     if isinstance(r_val, str) and isinstance(l_val, str):
                         res = l_val.strip().lower() in r_val.strip().lower()
-                    elif isinstance(r_val, (list, tuple, set)):
+                    elif isinstance(r_val, (list, tuple, set, dict)):
                         res = any(
                             (l_val.strip().lower() == str(item).strip().lower() if isinstance(l_val, str) else l_val == item)
                             for item in r_val
                         )
                     else:
-                        res = l_val in r_val
+                        raise ValueError(f"Right-hand side of 'in' operator must be a string or collection, got {type(r_val).__name__}")
                 elif isinstance(op, ast.NotIn):
                     if isinstance(r_val, str) and isinstance(l_val, str):
                         res = l_val.strip().lower() not in r_val.strip().lower()
-                    elif isinstance(r_val, (list, tuple, set)):
+                    elif isinstance(r_val, (list, tuple, set, dict)):
                         res = not any(
                             (l_val.strip().lower() == str(item).strip().lower() if isinstance(l_val, str) else l_val == item)
                             for item in r_val
                         )
                     else:
-                        res = l_val not in r_val
+                        raise ValueError(f"Right-hand side of 'not in' operator must be a string or collection, got {type(r_val).__name__}")
                 else:
                     raise ValueError(f"Unsupported comparator operator: {type(op).__name__}")
 

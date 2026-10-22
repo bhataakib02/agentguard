@@ -112,27 +112,28 @@ class PolicyEngine:
         total_rules_evaluated = 0
 
         # 4. Evaluate Rules for Each Active Policy
-        for policy in active_policies:
-            # Query rules associated with this policy deterministically
-            rules = db.query(models.PolicyRule).filter(
-                models.PolicyRule.policy_id == policy.id
-            ).order_by(models.PolicyRule.id.asc()).all()
+        if db is not None:
+            for policy in active_policies:
+                # Query rules associated with this policy deterministically
+                rules = db.query(models.PolicyRule).filter(
+                    models.PolicyRule.policy_id == policy.id
+                ).order_by(models.PolicyRule.id.asc()).all()
 
-            for rule in rules:
-                total_rules_evaluated += 1
-                matched, is_valid, err = evaluate_condition(rule.condition_expression, context)
-                if matched:
-                    matched_rules.append({
-                        "policy_id": str(policy.id),
-                        "policy_name": policy.name,
-                        "policy_priority": policy.priority,
-                        "policy_category": policy.category,
-                        "rule_id": str(rule.id),
-                        "condition": rule.condition_expression,
-                        "decision_output": (rule.decision_output or "REVIEW").upper(),
-                        "risk_delta": rule.risk_delta or 0,
-                        "description": rule.description or f"Condition '{rule.condition_expression}' matched under policy '{policy.name}'."
-                    })
+                for rule in rules:
+                    total_rules_evaluated += 1
+                    matched, is_valid, err = evaluate_condition(rule.condition_expression, context)
+                    if matched:
+                        matched_rules.append({
+                            "policy_id": str(policy.id),
+                            "policy_name": policy.name,
+                            "policy_priority": policy.priority,
+                            "policy_category": policy.category,
+                            "rule_id": str(rule.id),
+                            "condition": rule.condition_expression,
+                            "decision_output": (rule.decision_output or "REVIEW").upper(),
+                            "risk_delta": rule.risk_delta or 0,
+                            "description": rule.description or f"Condition '{rule.condition_expression}' matched under policy '{policy.name}'."
+                        })
 
         # 5. Deterministic Conflict Resolution (REFUSE > REVIEW > ALLOW)
         if matched_rules:

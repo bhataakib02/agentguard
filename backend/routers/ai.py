@@ -247,15 +247,28 @@ def select_optimal_model(
         rec = "Standard agent actions, summarization, tool parameter verification"
 
     chosen = candidates[0] if candidates else CANONICAL_MODELS[0]
+    if isinstance(chosen, dict):
+        selected_model = str(chosen["model_name"])
+        provider = str(chosen["provider"])
+        avg_latency_ms = int(chosen["avg_latency_ms"])
+        cost_per_1k_tokens = float(chosen["cost_per_1k_tokens"])
+        accuracy_rating = float(chosen["accuracy_rating"])
+    else:
+        selected_model = str(chosen.model_name)
+        provider = str(chosen.provider)
+        avg_latency_ms = int(chosen.avg_latency_ms)
+        cost_per_1k_tokens = float(chosen.cost_per_1k_tokens)
+        accuracy_rating = float(chosen.accuracy_rating or 1.0)
+
     return schemas.ModelSelectResponse(
-        selected_model=chosen.model_name if hasattr(chosen, "model_name") else chosen["model_name"],
-        provider=chosen.provider if hasattr(chosen, "provider") else chosen["provider"],
+        selected_model=selected_model,
+        provider=provider,
         tier=tier,
-        avg_latency_ms=chosen.avg_latency_ms if hasattr(chosen, "avg_latency_ms") else chosen["avg_latency_ms"],
-        cost_per_1k_tokens=chosen.cost_per_1k_tokens if hasattr(chosen, "cost_per_1k_tokens") else chosen["cost_per_1k_tokens"],
-        accuracy_rating=chosen.accuracy_rating if hasattr(chosen, "accuracy_rating") else chosen["accuracy_rating"],
+        avg_latency_ms=avg_latency_ms,
+        cost_per_1k_tokens=cost_per_1k_tokens,
+        accuracy_rating=accuracy_rating,
         recommended_for=rec,
-        selection_reason=f"Selected {tier} model matching complexity {complexity} with {chosen.accuracy_rating if hasattr(chosen, 'accuracy_rating') else chosen['accuracy_rating']} accuracy benchmark."
+        selection_reason=f"Selected {tier} model matching complexity {complexity} with {accuracy_rating} accuracy benchmark."
     )
 
 

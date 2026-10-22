@@ -258,18 +258,6 @@ class AgentGuardClient:
         except requests.RequestException as e:
             raise AgentGuardException(f"Network error during invoke: {e}") from e
 
-    def heartbeat(self) -> Dict[str, Any]:
-        """Sends an active session liveness ping via POST /api/runtime/heartbeat."""
-        url = f"{self.base_url}/api/runtime/heartbeat"
-        try:
-            res = self._session.post(url, headers=self._headers(), json={}, timeout=self.timeout)
-            if res.status_code == 200:
-                return res.json()
-            else:
-                raise AgentGuardException(f"Heartbeat failed [{res.status_code}]: {res.text}")
-        except requests.RequestException as e:
-            raise AgentGuardException(f"Network error during heartbeat: {e}") from e
-
     def scan_pii(
         self,
         text: Optional[str] = None,

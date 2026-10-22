@@ -166,8 +166,8 @@ ROLE_PERMISSIONS = {
 }
 
 def get_current_user(
-    authorization: str = Header(None),
-    x_api_key: str = Header(None, alias="X-API-Key"),
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     db: Session = Depends(get_db)
 ) -> models.User:
     # -------------------------------------------------------------

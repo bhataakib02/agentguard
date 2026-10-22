@@ -1,5 +1,6 @@
 import datetime
 import logging
+from typing import Optional
 from sqlalchemy.orm import Session
 from database import engine, SessionLocal, Base
 import models
@@ -69,7 +70,7 @@ CANONICAL_PLANS = [
     }
 ]
 
-def ensure_canonical_plans(db: Session = None):
+def ensure_canonical_plans(db: Optional[Session] = None):
     """
     Deterministically and idempotently ensures all canonical plans
     (FREE, STARTER, PROFESSIONAL, ENTERPRISE) exist in the database.

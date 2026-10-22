@@ -1,4 +1,5 @@
 import datetime
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
@@ -107,7 +108,7 @@ def update_behavior_profile(
 @router.post("/evaluate/{agent_id}", response_model=schemas.BehaviorEvaluationResponse)
 def evaluate_agent_behavior(
     agent_id: str,
-    tool_name: str = None,
+    tool_name: Optional[str] = None,
     requested_amount: float = 0.0,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)

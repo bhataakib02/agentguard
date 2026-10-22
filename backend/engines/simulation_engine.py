@@ -555,9 +555,9 @@ def eval_record_to_simulation_scenario(
         return None, f"Record '{record_id_str}': ground_truth_label must be 'SAFE' or 'RISKY' (got '{ground_truth_label}')."
 
     # 3. Validate Agent Profile
-    if hasattr(agent_profile_data, "model_dump"):
+    if agent_profile_data is not None and hasattr(agent_profile_data, "model_dump"):
         ap_dict = agent_profile_data.model_dump()
-    elif hasattr(agent_profile_data, "dict"):
+    elif agent_profile_data is not None and hasattr(agent_profile_data, "dict"):
         ap_dict = agent_profile_data.dict()
     elif isinstance(agent_profile_data, dict):
         ap_dict = agent_profile_data
@@ -726,10 +726,10 @@ class SimulationRunner:
 
                 for r in db_records:
                     scenario, err = eval_record_to_simulation_scenario(r, dataset_name=ds.name)
-                    if err:
+                    if err or scenario is None:
                         unsupported_records.append({
                             "record_id": getattr(r, "record_id", "UNKNOWN"),
-                            "error": err
+                            "error": err or "Failed to build simulation scenario."
                         })
                     else:
                         target_scenarios.append(scenario)

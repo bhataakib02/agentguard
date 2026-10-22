@@ -6,14 +6,17 @@ and prevents unauthorized tool actions before they run.
 
 import json
 import logging
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, TYPE_CHECKING
 
-try:
+if TYPE_CHECKING:
     from langchain_core.callbacks import BaseCallbackHandler
-except ImportError:
-    class BaseCallbackHandler:  # type: ignore
-        """Fallback callback handler base class when langchain-core is not installed."""
-        pass
+else:
+    try:
+        from langchain_core.callbacks import BaseCallbackHandler
+    except ImportError:
+        class BaseCallbackHandler:
+            """Fallback callback handler base class when langchain-core is not installed."""
+            pass
 
 from .client import AgentGuardClient
 from .exceptions import AgentGuardGovernanceRefusal
