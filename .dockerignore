@@ -40,3 +40,6 @@ documents/
 .vscode/
 .idea/
 .DS_Store
+
+# Cleanup & Recovery Archives
+cleanup/

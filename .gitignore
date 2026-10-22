@@ -63,4 +63,5 @@ backend/storage/reports/*
 .DS_Store
 *.log
 
-
+# Cleanup & Recovery Archives
+cleanup/
