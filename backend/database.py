@@ -21,6 +21,37 @@ if not settings.DATABASE_URL.startswith("sqlite"):
         "pool_timeout": getattr(settings, "DB_POOL_TIMEOUT", 30)
     })
 
+def validate_test_database_target(db_url: str):
+    """
+    Guarantees test executions only use dedicated disposable test databases.
+    Fails closed immediately if a test environment attempts to connect to
+    production, staging, or remote Supabase hosts.
+    """
+    import os, sys
+    is_test_env = (
+        os.getenv("ENVIRONMENT") in ("testing", "test")
+        or "pytest" in sys.modules
+        or "PYTEST_CURRENT_TEST" in os.environ
+    )
+    if is_test_env:
+        db_url_lower = db_url.lower()
+        forbidden_targets = [
+            "supabase.co",
+            "pooler.supabase.com",
+            "aws-0-",
+            "agentguard-prod",
+            "db.agentguard.io"
+        ]
+        for forbidden in forbidden_targets:
+            if forbidden in db_url_lower and not db_url_lower.startswith("sqlite"):
+                raise RuntimeError(
+                    f"[AgentGuard Test Isolation Guard] Test runner attempted connection to non-test target: '{forbidden}'. "
+                    "Automated tests must run exclusively against isolated, disposable test databases. "
+                    "Halting execution to prevent database pollution."
+                )
+
+validate_test_database_target(settings.DATABASE_URL)
+
 engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
 if settings.DATABASE_URL.startswith("sqlite"):

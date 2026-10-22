@@ -16,8 +16,14 @@ from database import Base, engine
 
 @pytest.fixture(autouse=True)
 def setup_test_database():
-    from database import Base, engine
+    from database import Base, engine, SessionLocal
+    from bootstrap import ensure_canonical_plans
     Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        ensure_canonical_plans(db)
+    finally:
+        db.close()
     yield
 
 @pytest.fixture(autouse=True)

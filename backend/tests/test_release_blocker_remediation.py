@@ -29,6 +29,8 @@ class TestReleaseBlockerRemediation:
     @classmethod
     def setup_class(cls):
         cls.db = SessionLocal()
+        from bootstrap import ensure_canonical_plans
+        ensure_canonical_plans(cls.db)
         cls.suffix = uuid.uuid4().hex[:6]
 
         # 1. Organization Alpha
