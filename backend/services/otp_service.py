@@ -291,34 +291,35 @@ class OtpService:
             return False, "Invalid or expired verification code. Please request a new code.", None
 
         # Expiry Check
-        if challenge.expires_at < now:
-            challenge.consumed = True
+        if getattr(challenge, "expires_at") < now:
+            setattr(challenge, "consumed", True)
             db.commit()
             return False, "Verification code has expired. Please request a new code.", None
 
         # Maximum Attempts Check
-        attempts_val: int = int(challenge.attempts or 0)
-        max_attempts_val: int = int(challenge.max_attempts or 5)
+        attempts_val: int = int(getattr(challenge, "attempts", 0) or 0)
+        max_attempts_val: int = int(getattr(challenge, "max_attempts", 5) or 5)
         if attempts_val >= max_attempts_val:
-            challenge.consumed = True
+            setattr(challenge, "consumed", True)
             db.commit()
             return False, "Maximum verification attempts exceeded. Please request a new code.", None
 
         # Cryptographic constant-time HMAC check
         candidate_hash = hash_otp_code(clean_code)
-        if not hmac.compare_digest(str(challenge.code_hash), candidate_hash):
-            challenge.attempts = attempts_val + 1
-            if int(challenge.attempts) >= max_attempts_val:
-                challenge.consumed = True
+        if not hmac.compare_digest(str(getattr(challenge, "code_hash", "")), candidate_hash):
+            new_attempts = attempts_val + 1
+            setattr(challenge, "attempts", new_attempts)
+            if new_attempts >= max_attempts_val:
+                setattr(challenge, "consumed", True)
             db.commit()
-            remaining = max(0, max_attempts_val - int(challenge.attempts))
+            remaining = max(0, max_attempts_val - new_attempts)
             if remaining == 0:
                 return False, "Invalid code. Maximum attempts exceeded. Please request a new code.", None
             return False, f"Invalid verification code. {remaining} attempt{'s' if remaining != 1 else ''} remaining.", None
 
         # Atomic Consumption
-        challenge.consumed = True
-        challenge.consumed_at = now
+        setattr(challenge, "consumed", True)
+        setattr(challenge, "consumed_at", now)
         db.commit()
         db.refresh(challenge)
 

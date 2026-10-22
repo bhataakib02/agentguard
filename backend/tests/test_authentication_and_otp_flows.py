@@ -32,14 +32,19 @@ from database import SessionLocal
 from config import settings
 from core import security
 import models
+import unittest.mock
+import secrets
 from services.email_service import email_service
 from services.otp_service import (
     otp_service,
     hash_otp_code,
+    encrypt_ephemeral_secret,
+    decrypt_ephemeral_secret,
     PURPOSE_REGISTRATION,
     PURPOSE_PASSWORDLESS_LOGIN,
     PURPOSE_PASSWORD_RESET
 )
+from core.supabase_admin import supabase_admin, SupabaseAdminClient
 
 client = TestClient(app)
 
@@ -548,6 +553,167 @@ class TestAuthenticationAndOtpFlows(unittest.TestCase):
                     if isinstance(val, str):
                         self.assertNotIn("Password123!", val)
                         self.assertNotIn("BrandNewSecurePassword456!", val)
+
+    def test_19_supabase_auth_sync_on_registration_success(self):
+        """OTP-verified registration passes chosen password to Supabase Auth and links auth_user_id."""
+        test_email = f"supabase_sync_{uuid.uuid4().hex[:6]}@enterprise.ai"
+        chosen_pass = "ComplexPassw0rd!#@"
+        mock_auth_id = f"sb-uuid-{uuid.uuid4().hex}"
+
+        with unittest.mock.patch.object(supabase_admin, "service_role_key", "mock_service_key"):
+            with unittest.mock.patch.object(supabase_admin, "create_user", return_value=mock_auth_id) as mock_create:
+                resp = client.post("/api/auth/register/request-otp", json={
+                    "full_name": "Sync User",
+                    "email": test_email,
+                    "password": chosen_pass
+                })
+                self.assertEqual(resp.status_code, 200)
+
+                raw_code = re.search(r'\b(\d{6})\b', email_service.sent_emails_mock[-1]["body_text"]).group(1)
+                verify_resp = client.post("/api/auth/register/verify-otp", json={
+                    "email": test_email,
+                    "otp": raw_code
+                })
+                self.assertEqual(verify_resp.status_code, 200)
+                data = verify_resp.json()
+
+                # Confirm create_user was called with chosen password and email_confirm=True
+                mock_create.assert_called_once_with(
+                    test_email,
+                    password=chosen_pass,
+                    full_name="Sync User",
+                    email_confirm=True
+                )
+                self.assertEqual(data["auth_user_id"], mock_auth_id)
+
+                # Confirm local database record stores linked auth_user_id
+                user = self.db.query(models.User).filter(models.User.email == test_email).first()
+                self.assertIsNotNone(user)
+                self.assertEqual(user.auth_user_id, mock_auth_id)
+
+                # Confirm ephemeral password was scrubbed from challenge metadata
+                challenge = self.db.query(models.OtpChallenge).filter(
+                    models.OtpChallenge.email == test_email,
+                    models.OtpChallenge.purpose == PURPOSE_REGISTRATION
+                ).first()
+                self.assertIsNotNone(challenge)
+                self.assertNotIn("encrypted_password", challenge.metadata_json or {})
+                self.assertNotIn("password_hash", challenge.metadata_json or {})
+
+    def test_20_supabase_auth_sync_existing_user_credential_sync(self):
+        """When Supabase returns 422 because user exists, it updates credentials and links the ID."""
+        test_email = f"existing_sb_{uuid.uuid4().hex[:6]}@enterprise.ai"
+        existing_sb_id = f"existing-uuid-{uuid.uuid4().hex}"
+        chosen_pass = "UpdatePassword123!"
+
+        client_instance = SupabaseAdminClient()
+        client_instance.service_role_key = "test_key"
+
+        with unittest.mock.patch.object(client_instance, "_request", return_value=(422, {"message": "User already registered"})):
+            with unittest.mock.patch.object(client_instance, "_get_existing_user_id", return_value=existing_sb_id):
+                with unittest.mock.patch.object(client_instance, "update_user", return_value=True) as mock_update:
+                    auth_id = client_instance.create_user(test_email, password=chosen_pass, full_name="Existing SB", email_confirm=True)
+                    self.assertEqual(auth_id, existing_sb_id)
+                    mock_update.assert_called_once_with(
+                        existing_sb_id,
+                        password=chosen_pass,
+                        email_confirm=True,
+                        full_name="Existing SB"
+                    )
+
+    def test_21_supabase_auth_validation_failure_graceful_fallback(self):
+        """When Supabase Auth fails unexpectedly, local registration succeeds gracefully."""
+        test_email = f"fallback_{uuid.uuid4().hex[:6]}@enterprise.ai"
+        chosen_pass = "FallbackPass123!"
+
+        with unittest.mock.patch.object(supabase_admin, "service_role_key", "mock_service_key"):
+            with unittest.mock.patch.object(supabase_admin, "create_user", return_value=None):
+                resp = client.post("/api/auth/register/request-otp", json={
+                    "full_name": "Fallback User",
+                    "email": test_email,
+                    "password": chosen_pass
+                })
+                self.assertEqual(resp.status_code, 200)
+
+                raw_code = re.search(r'\b(\d{6})\b', email_service.sent_emails_mock[-1]["body_text"]).group(1)
+                verify_resp = client.post("/api/auth/register/verify-otp", json={
+                    "email": test_email,
+                    "otp": raw_code
+                })
+                self.assertEqual(verify_resp.status_code, 200)
+
+                # Local user created with auth_user_id=None
+                user = self.db.query(models.User).filter(models.User.email == test_email).first()
+                self.assertIsNotNone(user)
+                self.assertIsNone(user.auth_user_id)
+
+                # Local password hash works
+                self.assertTrue(security.verify_password(chosen_pass, str(user.password_hash)))
+
+    def test_22_ephemeral_password_encryption_and_zeroization(self):
+        """AES-256-GCM ephemeral encryption prevents plaintext storage and enforces email binding."""
+        email = "cryptotest@enterprise.ai"
+        wrong_email = "tampered@enterprise.ai"
+        secret = "MySuperSecretPass!"
+
+        ciphertext = encrypt_ephemeral_secret(secret, email)
+        self.assertNotEqual(ciphertext, secret)
+        self.assertNotIn(secret, ciphertext)
+
+        # Successful decryption with matching associated data
+        decrypted = decrypt_ephemeral_secret(ciphertext, email)
+        self.assertEqual(decrypted, secret)
+
+        # Context binding: decryption fails and returns None if email does not match
+        self.assertIsNone(decrypt_ephemeral_secret(ciphertext, wrong_email))
+
+    def test_23_rate_limiting_across_nonexistent_and_probe_accounts(self):
+        """Probes for non-existent accounts record IP attempts and enforce IP-level rate limits."""
+        test_ip = f"198.51.100.{secrets.randbelow(200) + 10}"
+
+        # Submit RATE_LIMIT_IP_MAX_REQUESTS (10) requests for non-existent accounts
+        for i in range(10):
+            fake_email = f"probe_{i}_{uuid.uuid4().hex[:6]}@random-nonexistent-domain.xyz"
+            otp_service.record_ip_probe(self.db, test_ip, fake_email, PURPOSE_PASSWORDLESS_LOGIN)
+
+        # Check rate limits for this IP
+        is_limited, reason = otp_service.check_rate_limits(self.db, "any_new_email@enterprise.ai", test_ip)
+        self.assertTrue(is_limited)
+        self.assertIn("Too many requests from this IP address", reason)
+
+    def test_24_migration_and_bootstrap_idempotent_ordering(self):
+        """Alembic migration 0002 and bootstrap.py can run in any order without conflicts."""
+        from sqlalchemy import create_engine
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "migration_0002",
+            os.path.join(os.path.dirname(__file__), "..", "alembic", "versions", "0002_add_otp_challenges_table.py")
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        mig_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mig_mod)
+
+        # Scenario A: bootstrap runs first, then migration upgrade
+        test_engine_a = create_engine("sqlite:///:memory:")
+        models.Base.metadata.create_all(bind=test_engine_a)
+
+        with test_engine_a.connect() as conn:
+            ctx = MigrationContext.configure(conn)
+            with Operations.context(ctx):
+                mig_mod.upgrade()
+
+        # Scenario B: migration runs first, then downgrade and re-upgrade
+        test_engine_b = create_engine("sqlite:///:memory:")
+        with test_engine_b.connect() as conn:
+            ctx = MigrationContext.configure(conn)
+            with Operations.context(ctx):
+                mig_mod.upgrade()
+                mig_mod.downgrade()
+                mig_mod.upgrade()
 
 
 if __name__ == "__main__":

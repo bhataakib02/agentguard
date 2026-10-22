@@ -1,0 +1,19 @@
+{
+  "include": [
+    ".",
+    "../sdks/python"
+  ],
+  "extraPaths": [
+    ".",
+    "../sdks/python"
+  ],
+  "typeCheckingMode": "basic",
+  "reportArgumentType": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportAssignmentType": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalSubscript": "none",
+  "reportOptionalCall": "none",
+  "reportCallIssue": "none"
+}

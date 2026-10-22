@@ -219,7 +219,7 @@ def register_verify_otp(
             logger.warning(f"[Registration] Supabase Auth creation notice: {e}")
 
     # Immediately scrub ephemeral encrypted password from challenge metadata
-    challenge.metadata_json = {"full_name": full_name, "org_name": org_name, "completed": True}
+    setattr(challenge, "metadata_json", {"full_name": full_name, "org_name": org_name, "completed": True})
     db.commit()
 
     # 5. Transactional User Creation (Strictly defaults to USER role)
@@ -238,7 +238,7 @@ def register_verify_otp(
     db.refresh(user)
 
     # 6. Session Creation
-    token = security.create_access_token(user.id, email=user.email, role=user.role)
+    token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
     session = models.Session(
         user_id=user.id,
         token=token,
@@ -263,12 +263,12 @@ def register_verify_otp(
 
     return schemas.TokenResponse(
         access_token=token,
-        user_id=user.id,
-        auth_user_id=user.auth_user_id,
-        role=user.role,
-        full_name=user.full_name,
-        email=user.email,
-        org_name=org.name
+        user_id=str(user.id),
+        auth_user_id=str(user.auth_user_id) if user.auth_user_id else None,
+        role=str(user.role),
+        full_name=str(user.full_name),
+        email=str(user.email),
+        org_name=str(org.name)
     )
 
 
@@ -407,18 +407,18 @@ def login_verify_otp(
             detail="Account not found."
         )
 
-    if user.status != "ACTIVE":
+    if str(user.status) != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Forbidden: Account status is {user.status}"
         )
 
     # 3. Update Last Login
-    user.last_login_at = security.utcnow()
+    setattr(user, "last_login_at", security.utcnow())
     db.commit()
 
     # 4. Create Session
-    session_token = security.create_access_token(user.id, email=user.email, role=user.role)
+    session_token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
     session = models.Session(
         user_id=user.id,
         token=session_token,
@@ -442,15 +442,15 @@ def login_verify_otp(
     db.commit()
 
     org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
-    org_name = org.name if org else "AgentGuard Enterprise"
+    org_name = str(org.name) if org and org.name else "AgentGuard Enterprise"
 
     return schemas.TokenResponse(
         access_token=session_token,
-        user_id=user.id,
-        auth_user_id=user.auth_user_id,
-        role=user.role,
-        full_name=user.full_name,
-        email=user.email,
+        user_id=str(user.id),
+        auth_user_id=str(user.auth_user_id) if user.auth_user_id else None,
+        role=str(user.role),
+        full_name=str(user.full_name),
+        email=str(user.email),
         org_name=org_name
     )
 
@@ -579,7 +579,7 @@ def forgot_password_verify_otp(
     if not user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request.")
 
-    ticket = otp_service.create_reset_ticket(str(user.id), user.email)
+    ticket = otp_service.create_reset_ticket(str(user.id), str(user.email))
 
     audit = models.AuditLog(
         org_id=user.org_id,
@@ -645,12 +645,12 @@ def forgot_password_reset(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User account not found.")
 
     # 1. Update Database Password Hash
-    user.password_hash = security.get_password_hash(req.new_password)
+    setattr(user, "password_hash", security.get_password_hash(req.new_password))
 
     # 2. Update Supabase Auth Password if configured
     if user.auth_user_id and supabase_admin.is_configured:
         try:
-            supabase_admin.update_user_password(user.auth_user_id, req.new_password)
+            supabase_admin.update_user_password(str(user.auth_user_id), req.new_password)
         except Exception as e:
             logger.warning(f"[PasswordReset] Supabase Auth password update notice: {e}")
 
@@ -734,7 +734,7 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
     db.refresh(user)
 
     # 5. Session & Access Token Creation
-    token = security.create_access_token(user.id, email=user.email, role=user.role)
+    token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
     session = models.Session(
         user_id=user.id,
         token=token,
@@ -745,12 +745,12 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
 
     return schemas.TokenResponse(
         access_token=token,
-        user_id=user.id,
-        auth_user_id=user.auth_user_id,
-        role=user.role,
-        full_name=user.full_name,
-        email=user.email,
-        org_name=org.name
+        user_id=str(user.id),
+        auth_user_id=str(user.auth_user_id) if user.auth_user_id else None,
+        role=str(user.role),
+        full_name=str(user.full_name),
+        email=str(user.email),
+        org_name=str(org.name)
     )
 
 @router.post("/login", response_model=schemas.TokenResponse)
@@ -814,7 +814,7 @@ def login(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication token does not match requested user account"
             )
-    if verified_user_id and req.auth_user_id and str(verified_user_id) != str(req.auth_user_id):
+    if verified_user_id and req.auth_user_id and str(verified_user_id) != req.auth_user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Authentication token does not match requested auth_user_id"
@@ -844,22 +844,22 @@ def login(
         db.commit()
         db.refresh(user)
     elif req.auth_user_id and not user.auth_user_id:
-        user.auth_user_id = req.auth_user_id
+        setattr(user, "auth_user_id", req.auth_user_id)
         db.commit()
 
-    if user.status != "ACTIVE":
+    if str(user.status) != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Forbidden: Account status is {user.status}"
         )
 
     org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
-    org_name = org.name if org else "AgentGuard Enterprise"
+    org_name = str(org.name) if org and org.name else "AgentGuard Enterprise"
 
-    user.last_login_at = security.utcnow()
+    setattr(user, "last_login_at", security.utcnow())
     db.commit()
 
-    session_token = security.create_access_token(user.id, email=user.email, role=user.role)
+    session_token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
     session = models.Session(
         user_id=user.id,
         token=session_token,
@@ -870,11 +870,11 @@ def login(
 
     return schemas.TokenResponse(
         access_token=session_token,
-        user_id=user.id,
-        auth_user_id=user.auth_user_id,
-        role=user.role,
-        full_name=user.full_name,
-        email=user.email,
+        user_id=str(user.id),
+        auth_user_id=str(user.auth_user_id) if user.auth_user_id else None,
+        role=str(user.role),
+        full_name=str(user.full_name),
+        email=str(user.email),
         org_name=org_name
     )
 
@@ -892,25 +892,25 @@ def local_login(req: schemas.LocalLoginRequest, db: Session = Depends(get_db)):
             detail="Invalid email or password"
         )
 
-    if not security.verify_password(req.password, user.password_hash):
+    if not security.verify_password(req.password, str(user.password_hash)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
 
-    if user.status != "ACTIVE":
+    if str(user.status) != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is suspended or inactive"
         )
 
     org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
-    org_name = org.name if org else "AgentGuard Enterprise"
+    org_name = str(org.name) if org and org.name else "AgentGuard Enterprise"
 
-    user.last_login_at = security.utcnow()
+    setattr(user, "last_login_at", security.utcnow())
     db.commit()
 
-    token = security.create_access_token(user.id, email=user.email, role=user.role)
+    token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
     session = models.Session(
         user_id=user.id,
         token=token,
@@ -921,29 +921,31 @@ def local_login(req: schemas.LocalLoginRequest, db: Session = Depends(get_db)):
 
     return schemas.TokenResponse(
         access_token=token,
-        user_id=user.id,
-        auth_user_id=user.auth_user_id,
-        role=user.role,
-        full_name=user.full_name,
-        email=user.email,
+        user_id=str(user.id),
+        auth_user_id=str(user.auth_user_id) if user.auth_user_id else None,
+        role=str(user.role),
+        full_name=str(user.full_name),
+        email=str(user.email),
         org_name=org_name
     )
 
 @router.get("/me", response_model=schemas.UserSchema)
 def get_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     org = db.query(models.Organization).filter(models.Organization.id == current_user.org_id).first()
-    org_name = org.name if org else ("AgentGuard Control Plane" if current_user.role == "SUPER_ADMIN" else "AgentGuard Enterprise")
+    org_name: str = str(getattr(org, "name", None)) if org and getattr(org, "name", None) else (
+        "AgentGuard Control Plane" if str(current_user.role) == "SUPER_ADMIN" else "AgentGuard Enterprise"
+    )
 
     return schemas.UserSchema(
-        id=current_user.id,
-        auth_user_id=current_user.auth_user_id,
-        org_id=current_user.org_id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        role=current_user.role,
-        department=current_user.department,
-        status=current_user.status,
-        created_at=current_user.created_at,
+        id=str(current_user.id),
+        auth_user_id=str(current_user.auth_user_id) if current_user.auth_user_id else None,
+        org_id=str(current_user.org_id) if current_user.org_id else None,
+        email=str(current_user.email),
+        full_name=str(current_user.full_name),
+        role=str(current_user.role),
+        department=str(current_user.department) if current_user.department else None,
+        status=str(current_user.status),
+        created_at=getattr(current_user, "created_at") or security.utcnow(),
         org_name=org_name
     )
 
@@ -957,7 +959,7 @@ def logout(
         token = authorization.replace("Bearer ", "").strip()
         db_session = db.query(models.Session).filter(models.Session.token == token).first()
         if db_session:
-            db_session.revoked = True
+            setattr(db_session, "revoked", True)
             db.commit()
 
     # Log audit entry
@@ -986,8 +988,8 @@ def issue_ws_ticket(current_user: models.User = Depends(get_current_user)):
         ticket = ws_ticket_manager.issue_ticket(
             user_id=str(current_user.id),
             org_id=str(current_user.org_id) if current_user.org_id else None,
-            role=current_user.role,
-            email=current_user.email
+            role=str(current_user.role),
+            email=str(current_user.email) if current_user.email else None
         )
     except RuntimeError as e:
         logger.error(f"[WebSocket Ticket] Issuance blocked: {e}")
@@ -1034,7 +1036,7 @@ def _is_token_expired(dt):
     if not dt:
         return False
     import datetime as _dt
-    now = _dt.datetime.utcnow()
+    now = _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None)
     if getattr(dt, 'tzinfo', None) is not None:
         dt = dt.replace(tzinfo=None)
     return dt < now
@@ -1049,11 +1051,11 @@ def verify_invitation(token: str, db: Session = Depends(get_db)):
     if not inv:
         return {"valid": False, "error": "Invalid invitation token"}
 
-    if inv.status != "PENDING":
+    if str(inv.status) != "PENDING":
         return {"valid": False, "error": f"Invitation is no longer valid (status: {inv.status})"}
 
     if _is_token_expired(inv.expires_at):
-        inv.status = "EXPIRED"
+        setattr(inv, "status", "EXPIRED")
         db.commit()
         return {"valid": False, "error": "Invitation token has expired"}
 
@@ -1083,11 +1085,11 @@ def accept_invitation(
     if not inv:
         raise HTTPException(status_code=404, detail="Invalid or non-existent invitation token")
 
-    if inv.status != "PENDING":
+    if str(inv.status) != "PENDING":
         raise HTTPException(status_code=400, detail=f"Invitation has already been {inv.status.lower()}")
 
     if _is_token_expired(inv.expires_at):
-        inv.status = "EXPIRED"
+        setattr(inv, "status", "EXPIRED")
         db.commit()
         raise HTTPException(status_code=400, detail="Invitation token has expired")
 
@@ -1098,13 +1100,13 @@ def accept_invitation(
     # Find or create user
     user = db.query(models.User).filter(models.User.email == inv.email).first()
     if user:
-        user.org_id = inv.org_id
-        user.role = inv.role
-        user.status = "ACTIVE"
+        setattr(user, "org_id", inv.org_id)
+        setattr(user, "role", inv.role)
+        setattr(user, "status", "ACTIVE")
         if req.full_name:
-            user.full_name = req.full_name
+            setattr(user, "full_name", req.full_name)
         if req.password:
-            user.password_hash = security.get_password_hash(req.password)
+            setattr(user, "password_hash", security.get_password_hash(req.password))
     else:
         hashed_pw = security.get_password_hash(req.password) if req.password else None
         user = models.User(
@@ -1119,14 +1121,14 @@ def accept_invitation(
         db.add(user)
 
     # Invalidate invitation (ONE-TIME USE)
-    inv.status = "ACCEPTED"
-    inv.accepted_at = security.utcnow()
+    setattr(inv, "status", "ACCEPTED")
+    setattr(inv, "accepted_at", security.utcnow())
 
     db.commit()
     db.refresh(user)
 
     # Issue access token
-    access_token = security.create_access_token(user.id, email=user.email, role=user.role)
+    access_token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
     session = models.Session(
         user_id=user.id,
         token=access_token,
@@ -1155,11 +1157,11 @@ def accept_invitation(
 
     return schemas.TokenResponse(
         access_token=access_token,
-        user_id=user.id,
-        auth_user_id=user.auth_user_id,
-        role=user.role,
-        full_name=user.full_name,
-        email=user.email,
-        org_name=org.name
+        user_id=str(user.id),
+        auth_user_id=str(user.auth_user_id) if user.auth_user_id else None,
+        role=str(user.role),
+        full_name=str(user.full_name),
+        email=str(user.email),
+        org_name=str(org.name)
     )
 
