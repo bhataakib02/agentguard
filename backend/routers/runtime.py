@@ -692,7 +692,8 @@ async def runtime_invoke_action(
             tool_name=req.tool_name or req.resource,
             parameters=req.parameters
         )
-        execution_res = exec_payload
+        if exec_payload:
+            execution_res = schemas.RuntimeExecuteResponse(**exec_payload)
 
     return schemas.RuntimeInvokeResponse(
         authorized=(auth_res.decision == "ALLOW"),

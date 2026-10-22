@@ -71,6 +71,10 @@ class PassportSigningService:
         return self._key_id
 
     def get_public_key_bytes(self) -> bytes:
+        if self._public_key is None:
+            self._initialize_keys()
+        if self._public_key is None:
+            raise RuntimeError("Platform public key is uninitialized")
         return self._public_key.public_bytes_raw()
 
     def get_public_key_b64(self) -> str:
@@ -128,6 +132,10 @@ class PassportSigningService:
         Returns the formatted signature: 'ed25519:<base64-signature>'.
         """
         canonical_bytes = self.canonicalize_passport_data(agent, passport, capabilities)
+        if self._private_key is None:
+            self._initialize_keys()
+        if self._private_key is None:
+            raise RuntimeError("Platform private key is uninitialized")
         signature = self._private_key.sign(canonical_bytes)
         sig_str = f"ed25519:{base64.b64encode(signature).decode('utf-8')}"
         

@@ -405,7 +405,10 @@ def generate_report(
     elif fmt_clean in ["EXCEL", "XLSX"]:
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Report Summary"
+        if ws is None:
+            ws = wb.create_sheet("Report Summary")
+        else:
+            ws.title = "Report Summary"
 
         ws.append(["AGENTGUARD CONTROL PLANE — ENTERPRISE REPORT"])
         ws.append(["Organization:", org.name, "Plan:", lic.plan_id if lic else "STARTER"])
@@ -543,10 +546,11 @@ def export_report_direct(
         "EXCEL": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "CSV": "text/csv"
     }
+    file_path = str(rec.file_path)
     return FileResponse(
-        rec.file_path,
+        file_path,
         media_type=media_types.get(fmt, "application/octet-stream"),
-        filename=os.path.basename(rec.file_path)
+        filename=os.path.basename(file_path)
     )
 
 @router.get("/download/{report_id}")
@@ -561,7 +565,8 @@ def download_report(
 
     check_org_isolation(current_user, str(rec.org_id))
 
-    if not os.path.exists(rec.file_path):
+    file_path = str(rec.file_path)
+    if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Report file not found on disk")
 
     audit = models.AuditLog(
@@ -576,7 +581,7 @@ def download_report(
     db.add(audit)
     db.commit()
 
-    return FileResponse(rec.file_path, filename=os.path.basename(rec.file_path))
+    return FileResponse(file_path, filename=os.path.basename(file_path))
 
 
 @router.post("/scheduled/{schedule_id}/run")

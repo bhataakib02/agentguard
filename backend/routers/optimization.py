@@ -77,9 +77,9 @@ def get_cost_recommendations(
         if any(m in (e.model_name or "").lower() for m in ["gpt-4", "opus", "claude-3-opus"])
     ]
     if len(high_cost_execs) >= 3:
-        total_high_cost = sum(e.estimated_cost or 0.0 for e in high_cost_execs)
-        total_tokens = sum(e.total_token_count or 0 for e in high_cost_execs)
-        avg_tokens = total_tokens / len(high_cost_execs)
+        total_high_cost: float = float(sum(float(getattr(e, "estimated_cost", 0.0) or 0.0) for e in high_cost_execs))
+        total_tokens = sum(int(getattr(e, "total_token_count", 0) or 0) for e in high_cost_execs)
+        avg_tokens = float(total_tokens) / float(len(high_cost_execs))
         
         # If tasks have relatively modest token requirements, recommend tier-2 model
         if avg_tokens < 1500:
@@ -189,11 +189,11 @@ def get_compute_usage(
         func.count(func.distinct(models.AgentExecution.agent_id))
     ).first()
 
-    exec_count = int(stats[0] or 0)
-    total_tokens = int(stats[1] or 0)
-    total_cost = round(float(stats[2] or 0.0), 4)
-    avg_latency = round(float(stats[3] or 0.0), 1) if stats[3] is not None else None
-    active_agents = int(stats[4] or 0)
+    exec_count = int(stats[0] or 0) if stats else 0
+    total_tokens = int(stats[1] or 0) if stats else 0
+    total_cost = round(float(stats[2] or 0.0), 4) if (stats and stats[2] is not None) else 0.0
+    avg_latency = round(float(stats[3] or 0.0), 1) if (stats and stats[3] is not None) else None
+    active_agents = int(stats[4] or 0) if stats else 0
 
     return {
         "status": "REAL_OBSERVED",

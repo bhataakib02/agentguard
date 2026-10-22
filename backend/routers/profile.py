@@ -50,7 +50,7 @@ def build_profile_response(user: models.User, db: Session) -> Dict[str, Any]:
     org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
     org_name = org.name if org else "AgentGuard Enterprise"
 
-    role_code = user.role or "USER"
+    role_code = str(user.role or "USER")
     role_level = HUMAN_ROLE_LEVELS.get(role_code, 1)
     role_desc = ROLE_DESCRIPTIONS.get(role_code, "Standard User")
     permissions = ROLE_PERMISSIONS.get(role_code, ["dashboard:read", "profile:read"])

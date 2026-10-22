@@ -98,7 +98,10 @@ def _generate_report_content(db, org_id: str, report_type: str, file_format: str
         import openpyxl
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Report Summary"
+        if ws is None:
+            ws = wb.create_sheet("Report Summary")
+        else:
+            ws.title = "Report Summary"
         ws.append(["AGENTGUARD AUTOMATED SCHEDULED REPORT"])
         ws.append(["Organization", org_name])
         ws.append(["Generated At", datetime.datetime.utcnow().isoformat()])

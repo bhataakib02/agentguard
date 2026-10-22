@@ -63,8 +63,8 @@ class DigitalTwinEngine:
                 models.AgentBudgetConfig.agent_id == agent.id
             ).first()
             if b_cfg:
-                daily_budget_tokens = b_cfg.daily_token_limit
-                daily_cost_limit = b_cfg.daily_cost_limit
+                daily_budget_tokens = getattr(b_cfg, "daily_token_limit", None)
+                daily_cost_limit = getattr(b_cfg, "daily_cost_limit", None)
 
         # 3. Fetch Real Active Policies Count
         active_policies_count = 0
@@ -91,7 +91,7 @@ class DigitalTwinEngine:
             if daily_budget_tokens and float(daily_budget_tokens) > 0:
                 limit_tokens = float(daily_budget_tokens)
                 budget_headroom_pct = max(0.0, round(((limit_tokens - float(total_projected_tokens)) / limit_tokens) * 100.0, 1))
-                if total_projected_tokens > daily_budget_tokens:
+                if float(total_projected_tokens) > limit_tokens:
                     circuit_breaker_tripped = True
 
             # Calculate readiness score deterministically

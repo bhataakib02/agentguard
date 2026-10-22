@@ -123,12 +123,12 @@ def get_token_usage(
 
     return {
         "range": range,
-        "input_tokens": int(stats[0] or 0),
-        "output_tokens": int(stats[1] or 0),
-        "total_tokens": int(stats[2] or 0),
-        "total_cost": round(float(stats[3] or 0.0), 6),
-        "execution_count": int(stats[4] or 0),
-        "avg_latency_ms": round(float(stats[5] or 0.0), 1)
+        "input_tokens": int(stats[0] or 0) if stats else 0,
+        "output_tokens": int(stats[1] or 0) if stats else 0,
+        "total_tokens": int(stats[2] or 0) if stats else 0,
+        "total_cost": round(float(stats[3] or 0.0), 6) if (stats and stats[3] is not None) else 0.0,
+        "execution_count": int(stats[4] or 0) if stats else 0,
+        "avg_latency_ms": round(float(stats[5] or 0.0), 1) if (stats and stats[5] is not None) else 0.0
     }
 
 
@@ -646,11 +646,11 @@ def get_agent_runtime_summary(
         "name": agent.name,
         "status": agent.status,
         "range": range,
-        "executions": int(stats[0] or 0),
-        "total_tokens": int(stats[1] or 0),
-        "total_cost": round(float(stats[2] or 0.0), 6),
-        "avg_risk_score": round(float(stats[3] or 0.0), 1),
-        "avg_latency_ms": round(float(stats[4] or 0.0), 1),
+        "executions": int(stats[0] or 0) if stats else 0,
+        "total_tokens": int(stats[1] or 0) if stats else 0,
+        "total_cost": round(float(stats[2] or 0.0), 6) if (stats and stats[2] is not None) else 0.0,
+        "avg_risk_score": round(float(stats[3] or 0.0), 1) if (stats and stats[3] is not None) else 0.0,
+        "avg_latency_ms": round(float(stats[4] or 0.0), 1) if (stats and stats[4] is not None) else 0.0,
         "allowed": allowed,
         "refused": refused,
         "review": review,
