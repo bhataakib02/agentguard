@@ -15,6 +15,7 @@ from celery_app import celery_app
 from database import SessionLocal
 import models
 from services.notification_service import validate_webhook_url
+from services.tool_proxy_service import tool_proxy_service
 from services.siem_forwarder_service import (
     resolve_siem_config,
     get_adapter,
@@ -149,54 +150,64 @@ def forward_siem_batch_task(self, delivery_id: str, max_attempts: int = MAX_SIEM
         delivery.status = "DELIVERING"
         db.commit()
 
-        # 5. Dispatch HTTP POST to external collector with bounded timeouts
+        # 5. Dispatch HTTP POST to external collector with bounded timeouts and pinned IP
         last_err = None
-        try:
-            resp = requests.post(
-                target_url,
-                data=body_bytes,
-                headers=headers,
-                timeout=(SIEM_CONNECT_TIMEOUT_SECONDS, SIEM_READ_TIMEOUT_SECONDS)
-            )
-            delivery.response_code = resp.status_code
-            if 200 <= resp.status_code < 300:
-                delivery.status = "DELIVERED"
-                delivery.delivered_at = datetime.datetime.utcnow()
-                delivery.error_message = None
-                delivery.next_attempt_at = None
-                db.commit()
+        dispatch_result = tool_proxy_service.safe_dispatch_request(
+            url=target_url,
+            method="POST",
+            data=body_bytes,
+            headers=headers,
+            timeout=(SIEM_CONNECT_TIMEOUT_SECONDS, SIEM_READ_TIMEOUT_SECONDS),
+        )
 
-                # Record immutable audit log for delivery provenance
-                audit = models.AuditLog(
-                    org_id=delivery.org_id,
-                    event_type="SIEM_BATCH_DELIVERED",
-                    actor_type="SYSTEM",
-                    actor_id="SIEM_WORKER",
-                    action=f"SIEM batch delivered ({delivery.format}): {delivery.batch_id}",
-                    resource=f"siem_delivery:{delivery.id}",
-                    result="DELIVERED",
-                    metadata_json={
-                        "delivery_id": str(delivery.id),
-                        "batch_id": delivery.batch_id,
-                        "provider": cfg.provider,
-                        "event_count": len(events),
-                        "response_code": resp.status_code
-                    }
-                )
-                db.add(audit)
-                db.commit()
+        delivery.response_code = dispatch_result.get("status_code")
+        if dispatch_result["success"]:
+            delivery.status = "DELIVERED"
+            delivery.delivered_at = datetime.datetime.utcnow()
+            delivery.error_message = None
+            delivery.next_attempt_at = None
+            db.commit()
 
-                return {
-                    "status": "DELIVERED",
+            # Record immutable audit log for delivery provenance
+            audit = models.AuditLog(
+                org_id=delivery.org_id,
+                event_type="SIEM_BATCH_DELIVERED",
+                actor_type="SYSTEM",
+                actor_id="SIEM_WORKER",
+                action=f"SIEM batch delivered ({delivery.format}): {delivery.batch_id}",
+                resource=f"siem_delivery:{delivery.id}",
+                result="DELIVERED",
+                metadata_json={
                     "delivery_id": str(delivery.id),
-                    "response_code": resp.status_code,
-                    "events_forwarded": len(events)
+                    "batch_id": delivery.batch_id,
+                    "provider": cfg.provider,
+                    "event_count": len(events),
+                    "response_code": delivery.response_code,
                 }
-            else:
-                last_err = f"HTTP {resp.status_code}: {resp.text[:200]}"
-        except Exception as e:
-            last_err = f"{type(e).__name__}: {str(e)}"
-            delivery.response_code = None
+            )
+            db.add(audit)
+            db.commit()
+
+            return {
+                "status": "DELIVERED",
+                "delivery_id": str(delivery.id),
+                "response_code": delivery.response_code,
+                "events_forwarded": len(events),
+            }
+        elif dispatch_result.get("ssrf_blocked"):
+            # Fatal error, do not retry unsafe destinations
+            delivery.status = "DEAD_LETTER"
+            delivery.error_message = f"SSRF Protection: {dispatch_result.get('error')}"
+            db.commit()
+            return {"status": "SSRF_BLOCKED", "reason": dispatch_result.get("error")}
+        elif dispatch_result.get("is_redirect"):
+            # Redirects to unvalidated destinations strictly prohibited
+            delivery.status = "DEAD_LETTER"
+            delivery.error_message = f"SSRF Protection: Redirect detected and blocked ({dispatch_result.get('error')})"
+            db.commit()
+            return {"status": "SSRF_REDIRECT_BLOCKED", "reason": dispatch_result.get("error")}
+        else:
+            last_err = dispatch_result.get("error") or f"HTTP {dispatch_result.get('status_code')}: {dispatch_result.get('response_text')}"
 
         # 6. Retry & Dead-Letter handling with sanitized error messages
         sanitized_err = sanitize_error(last_err)

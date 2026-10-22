@@ -1,15 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
-from core.deps import get_current_user
+from core.deps import get_current_user, require_permission, require_role
+from core.permissions import PERM_SECURITY_VIEW
 import models, schemas
 from engines.red_team_engine import red_team_engine
 
 router = APIRouter(prefix="/red-team", tags=["AgentGuard Red-Team Lab"])
 
+RED_TEAM_OPERATOR_ROLES = ["ADMIN", "SECURITY_OFFICER", "SECURITY_ANALYST"]
+
 @router.get("/tests")
 def list_security_tests(
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_SECURITY_VIEW)),
     db: Session = Depends(get_db)
 ):
     query = db.query(models.SecurityTest)
@@ -20,7 +23,7 @@ def list_security_tests(
 @router.post("/run")
 def run_security_test(
     req: schemas.RedTeamRunRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(RED_TEAM_OPERATOR_ROLES)),
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Agent).filter((models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id))
@@ -91,7 +94,7 @@ def run_security_test(
 @router.post("/fuzz", response_model=schemas.RedTeamFuzzResponse)
 def fuzz_agent_policies(
     req: schemas.RedTeamFuzzRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(RED_TEAM_OPERATOR_ROLES)),
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Agent).filter((models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id))

@@ -413,7 +413,7 @@ class TestPhase4ProductIntegrationSuite:
         assert dec_detail_res.status_code == 200
         dec_detail = dec_detail_res.json()
         assert dec_detail["decision"]["id"] == decision_id
-        assert dec_detail["decision"]["execution_status"] == "EXECUTED"
+        assert dec_detail["decision"]["execution_status"] in ("APPROVED", "APPROVED_PENDING_EXECUTION")
         assert dec_detail["approval_request"]["status"] == "APPROVED"
 
     def test_06_tenant_isolation_boundary_enforced(self):

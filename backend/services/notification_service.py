@@ -45,45 +45,21 @@ def validate_webhook_url(url: str, allow_test_local: bool = False) -> Tuple[bool
     if not url or not url.strip():
         return False, "Webhook URL cannot be empty."
 
-    try:
-        parsed = urllib.parse.urlparse(url.strip())
-    except Exception as e:
-        return False, f"Invalid URL format: {str(e)}"
-
-    if parsed.scheme not in ("http", "https"):
-        return False, "Webhook URL must use http or https scheme."
-
-    hostname = parsed.hostname
-    if not hostname:
-        return False, "Webhook URL must specify a valid hostname."
-
-    lower_host = hostname.lower()
-
-    if not allow_test_local:
-        if lower_host in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "metadata.google.internal"):
-            return False, "Webhook URL cannot target internal loopback or metadata endpoints."
-
-        # Check IP or resolve hostname
-        try:
-            ip = ipaddress.ip_address(lower_host)
-            for net in BLOCKED_NETWORKS:
-                if ip in net:
-                    return False, f"Webhook URL cannot target private/reserved IP network: {net}"
-        except ValueError:
-            # Hostname is a domain name, resolve it
-            try:
-                addr_info = socket.getaddrinfo(lower_host, None)
-                for item in addr_info:
-                    resolved_ip_str = item[4][0]
-                    resolved_ip = ipaddress.ip_address(resolved_ip_str)
-                    for net in BLOCKED_NETWORKS:
-                        if resolved_ip in net:
-                            return False, f"Webhook domain resolves to private/reserved IP address: {resolved_ip_str}"
-            except socket.gaierror:
-                # If cannot resolve in offline test/mock, allow only if standard public FQDN pattern
-                if lower_host.endswith(".local") or lower_host.endswith(".internal"):
-                    return False, "Internal .local or .internal domains are not permitted."
-
+    from services.tool_proxy_service import tool_proxy_service
+    res = tool_proxy_service._validate_ssrf_safety(url.strip(), allow_local=allow_test_local)
+    if not res["safe"]:
+        if res.get("dns_error"):
+            import urllib.parse
+            parsed = urllib.parse.urlsplit(url.strip())
+            h = (parsed.hostname or "").lower()
+            if not (h.endswith(".local") or h.endswith(".internal") or h in ("localhost", "127.0.0.1", "::1")):
+                return True, None
+        if allow_test_local and ("loopback" in res["reason"].lower() or "127.0.0.1" in url):
+            return True, None
+        reason = res["reason"]
+        if "loopback" in reason.lower() and "internal loopback" not in reason.lower():
+            reason = f"Internal loopback endpoint is blocked: {reason}"
+        return False, reason
     return True, None
 
 

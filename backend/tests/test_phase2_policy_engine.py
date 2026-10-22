@@ -63,14 +63,14 @@ class TestPhase2PolicyEngine(unittest.TestCase):
             org_id=cls.org_a.id,
             email=cls.user_a_email,
             full_name="Alpha Officer",
-            role="USER",
+            role="ADMIN",
             status="ACTIVE"
         )
         cls.db.add(cls.user_a)
         cls.db.commit()
         cls.db.refresh(cls.user_a)
         cls.user_a_token = security.create_access_token(
-            cls.user_a.id, email=cls.user_a.email, role="USER"
+            cls.user_a.id, email=cls.user_a.email, role="ADMIN"
         )
 
         cls.agent_a = models.Agent(

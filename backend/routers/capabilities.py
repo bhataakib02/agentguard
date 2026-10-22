@@ -4,10 +4,12 @@ from database import get_db
 import models, schemas
 from engines.capability_engine import capability_engine
 from ws_manager import manager as ws_manager
-from core.deps import get_current_user
+from core.deps import get_current_user, require_role
 import datetime
 
 router = APIRouter(prefix="/capabilities", tags=["Dynamic Capabilities"])
+
+CAPABILITY_ADMIN_ROLES = ["ADMIN", "MANAGER", "SECURITY_OFFICER"]
 
 @router.get("", response_model=list[schemas.CapabilityTokenSchema])
 def list_capability_tokens(
@@ -22,7 +24,7 @@ def list_capability_tokens(
 @router.post("/issue", response_model=schemas.CapabilityTokenSchema)
 async def issue_capability_token(
     req: schemas.CapabilityTokenRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(CAPABILITY_ADMIN_ROLES)),
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Agent).filter((models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id))
@@ -32,6 +34,21 @@ async def issue_capability_token(
 
     if not agent:
         raise HTTPException(status_code=404, detail="No authorized registered agent found to issue capability token")
+
+    if agent.status in ("SUSPENDED", "CIRCUIT_BREAK"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot issue capability token: Agent is currently in '{agent.status}' status"
+        )
+
+    if req.amount_limit < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Capability amount limit cannot be negative")
+
+    if agent.daily_budget and req.amount_limit > agent.daily_budget and current_user.role not in ("ADMIN", "SUPER_ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Requested capability amount limit ({req.amount_limit}) exceeds agent daily budget ({agent.daily_budget})"
+        )
 
     tok_dict = capability_engine.issue_token(
         agent_id=agent.id,
@@ -52,6 +69,24 @@ async def issue_capability_token(
         status="ACTIVE"
     )
     db.add(db_token)
+
+    audit = models.AuditLog(
+        org_id=agent.org_id,
+        event_type="CAPABILITY_TOKEN_ISSUED",
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action="ISSUE_CAPABILITY",
+        resource=f"agent:{agent.agent_code}",
+        result="SUCCESS",
+        metadata_json={
+            "token_code": db_token.token_code,
+            "capability_name": db_token.capability_name,
+            "scope": db_token.scope,
+            "amount_limit": db_token.amount_limit,
+            "issuer_email": current_user.email
+        }
+    )
+    db.add(audit)
     db.commit()
     db.refresh(db_token)
 
@@ -69,7 +104,7 @@ async def issue_capability_token(
 @router.post("/revoke/{token_code}")
 async def revoke_capability_token(
     token_code: str,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(CAPABILITY_ADMIN_ROLES)),
     db: Session = Depends(get_db)
 ):
     token = db.query(models.CapabilityToken).filter(models.CapabilityToken.token_code == token_code).first()
@@ -81,6 +116,21 @@ async def revoke_capability_token(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Token belongs to another organization")
 
     token.status = "REVOKED"
+
+    audit = models.AuditLog(
+        org_id=agent.org_id if agent else current_user.org_id,
+        event_type="CAPABILITY_TOKEN_REVOKED",
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action="REVOKE_CAPABILITY",
+        resource=f"capability_token:{token_code}",
+        result="SUCCESS",
+        metadata_json={
+            "token_code": token_code,
+            "revoker_email": current_user.email
+        }
+    )
+    db.add(audit)
     db.commit()
 
     return {"status": "SUCCESS", "message": f"Capability token {token_code} has been revoked."}

@@ -79,12 +79,12 @@ def test_context(request, db_session):
     db_session.commit()
     db_session.refresh(org)
 
-    # Human Operator User
+    # Human Admin User
     user = models.User(
-        email=f"operator-{suffix}@egress.com",
-        password_hash=get_password_hash("OperatorPass123!"),
-        full_name="Operator User",
-        role="OPERATOR",
+        email=f"admin-{suffix}@egress.com",
+        password_hash=get_password_hash("AdminPass123!"),
+        full_name="Admin User",
+        role="ADMIN",
         org_id=org.id,
         status="ACTIVE"
     )

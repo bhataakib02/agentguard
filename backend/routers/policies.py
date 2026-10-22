@@ -2,7 +2,15 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from database import get_db
-from core.deps import get_current_user
+from core.deps import get_current_user, require_permission
+from core.permissions import (
+    PERM_POLICY_VIEW,
+    PERM_POLICY_CREATE,
+    PERM_POLICY_UPDATE,
+    PERM_POLICY_DELETE,
+    PERM_POLICY_ENABLE,
+    PERM_POLICY_DISABLE,
+)
 import models
 import schemas
 from engines.policy_engine import policy_engine
@@ -22,7 +30,7 @@ def _check_policy_tenant_access(policy: models.Policy, current_user: models.User
 @router.get("", response_model=List[schemas.PolicySchema])
 def list_policies(
     status_filter: Optional[str] = Query(None, alias="status"),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_VIEW)),
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Policy)
@@ -55,7 +63,7 @@ def list_policies(
 @router.get("/{policy_id}", response_model=schemas.PolicySchema)
 def get_policy(
     policy_id: str,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_VIEW)),
     db: Session = Depends(get_db)
 ):
     policy = db.query(models.Policy).filter(models.Policy.id == policy_id).first()
@@ -82,7 +90,7 @@ def get_policy(
 def create_policy(
     req: schemas.PolicyCreateRequest,
     target_org_id: Optional[str] = Query(None),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_CREATE)),
     db: Session = Depends(get_db)
 ):
     org_id = current_user.org_id
@@ -159,7 +167,7 @@ def create_policy(
 def update_policy(
     policy_id: str,
     req: schemas.PolicyUpdateRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_UPDATE)),
     db: Session = Depends(get_db)
 ):
     policy = db.query(models.Policy).filter(models.Policy.id == policy_id).first()
@@ -212,7 +220,7 @@ def update_policy(
 @router.post("/{policy_id}/toggle", response_model=schemas.PolicySchema)
 def toggle_policy_status(
     policy_id: str,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_UPDATE)),
     db: Session = Depends(get_db)
 ):
     policy = db.query(models.Policy).filter(models.Policy.id == policy_id).first()
@@ -242,7 +250,7 @@ def toggle_policy_status(
 @router.delete("/{policy_id}")
 def delete_policy(
     policy_id: str,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_DELETE)),
     db: Session = Depends(get_db)
 ):
     policy = db.query(models.Policy).filter(models.Policy.id == policy_id).first()
@@ -264,7 +272,7 @@ def delete_policy(
 def add_policy_rule(
     policy_id: str,
     req: schemas.PolicyRuleCreateRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_UPDATE)),
     db: Session = Depends(get_db)
 ):
     policy = db.query(models.Policy).filter(models.Policy.id == policy_id).first()
@@ -299,7 +307,7 @@ def update_policy_rule(
     policy_id: str,
     rule_id: str,
     req: schemas.PolicyRuleUpdateRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_UPDATE)),
     db: Session = Depends(get_db)
 ):
     policy = db.query(models.Policy).filter(models.Policy.id == policy_id).first()
@@ -340,7 +348,7 @@ def update_policy_rule(
 def delete_policy_rule(
     policy_id: str,
     rule_id: str,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_POLICY_DELETE)),
     db: Session = Depends(get_db)
 ):
     policy = db.query(models.Policy).filter(models.Policy.id == policy_id).first()

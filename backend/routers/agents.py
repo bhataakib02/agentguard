@@ -4,8 +4,17 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
 from ws_manager import manager as ws_manager
-from core.deps import get_current_user, check_license_limit
-from core.permissions import has_permission, PERM_AGENT_SUSPEND, PERM_AGENT_RESUME
+from core.deps import get_current_user, check_license_limit, require_permission
+from core.permissions import (
+    has_permission,
+    PERM_AGENT_VIEW,
+    PERM_AGENT_CREATE,
+    PERM_AGENT_UPDATE,
+    PERM_AGENT_SUSPEND,
+    PERM_AGENT_RESUME,
+    PERM_AGENT_BUDGET_UPDATE,
+    PERM_USER_ROLE_ASSIGN,
+)
 
 router = APIRouter(prefix="/agents", tags=["Agent Management"])
 
@@ -16,7 +25,11 @@ def list_agents(current_user: models.User = Depends(get_current_user), db: Sessi
     return db.query(models.Agent).filter(models.Agent.org_id == current_user.org_id).all()
 
 @router.post("", response_model=schemas.AgentSchema)
-async def create_agent(req: schemas.AgentCreateRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def create_agent(
+    req: schemas.AgentCreateRequest,
+    current_user: models.User = Depends(require_permission(PERM_AGENT_CREATE)),
+    db: Session = Depends(get_db)
+):
     # 1. Reject attempts to create agents under another organization
     if req.org_id and current_user.role != "SUPER_ADMIN" and str(req.org_id) != str(current_user.org_id):
         raise HTTPException(
@@ -161,7 +174,7 @@ def get_agent_passport(
 async def update_agent(
     id: str,
     req: schemas.AgentUpdateRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_permission(PERM_AGENT_UPDATE)),
     db: Session = Depends(get_db)
 ):
     agent = db.query(models.Agent).filter((models.Agent.id == id) | (models.Agent.agent_code == id)).first()
@@ -194,25 +207,30 @@ async def update_agent(
             )
 
         if req.owner_id != agent.owner_id:
+            if not has_permission(current_user.role, PERM_USER_ROLE_ASSIGN) and current_user.role != "SUPER_ADMIN":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Insufficient privileges to reassign agent ownership"
+                )
             old_owner_id = agent.owner_id
             agent.owner_id = target_owner.id
             audit_owner = models.AuditLog(
                 org_id=agent.org_id,
-            event_type="AGENT_OWNER_CHANGE",
-            actor_type="USER",
-            actor_id=str(current_user.id),
-            action="CHANGE_OWNER",
-            resource=f"agent:{agent.agent_code}",
-            result="SUCCESS",
-            metadata_json={
-                "agent_id": str(agent.id),
-                "agent_code": agent.agent_code,
-                "old_owner_id": str(old_owner_id),
-                "new_owner_id": str(target_owner.id),
-                "actor_email": current_user.email
-            }
-        )
-        db.add(audit_owner)
+                event_type="AGENT_OWNER_CHANGE",
+                actor_type="USER",
+                actor_id=str(current_user.id),
+                action="CHANGE_OWNER",
+                resource=f"agent:{agent.agent_code}",
+                result="SUCCESS",
+                metadata_json={
+                    "agent_id": str(agent.id),
+                    "agent_code": agent.agent_code,
+                    "old_owner_id": str(old_owner_id),
+                    "new_owner_id": str(target_owner.id),
+                    "actor_email": current_user.email
+                }
+            )
+            db.add(audit_owner)
 
     if req.name is not None:
         agent.name = req.name
@@ -227,9 +245,20 @@ async def update_agent(
     if req.environment is not None:
         agent.environment = req.environment
     if req.autonomy_level is not None:
+        if req.autonomy_level != agent.autonomy_level:
+            if current_user.role not in ("ADMIN", "SECURITY_OFFICER", "SUPER_ADMIN"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Only administrators or security officers can modify agent autonomy levels"
+                )
         agent.autonomy_level = req.autonomy_level
 
     if req.daily_budget is not None:
+        if not has_permission(current_user.role, PERM_AGENT_BUDGET_UPDATE) and current_user.role != "SUPER_ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Insufficient privileges to update agent budget"
+            )
         agent.daily_budget = req.daily_budget
         budget = db.query(models.Budget).filter(models.Budget.agent_id == agent.id).first()
         if budget:

@@ -71,10 +71,15 @@ def get_organization_dashboard(
     api_pct = round((api_count / max_api_requests) * 100, 1) if max_api_requests > 0 else 0.0
 
     alerts_count = db.query(models.SecurityIncident).filter(
-        models.SecurityIncident.org_id == current_user.org_id if hasattr(models.SecurityIncident, 'org_id') else True
-    ).count()
+        models.SecurityIncident.org_id == target_org_id
+    ).count() if hasattr(models.SecurityIncident, 'org_id') else 0
 
-    pending_approvals = db.query(models.ApprovalRequest).count()
+    pending_approvals = db.query(models.ApprovalRequest).join(
+        models.Agent, models.ApprovalRequest.agent_id == models.Agent.id
+    ).filter(
+        models.Agent.org_id == target_org_id,
+        models.ApprovalRequest.status == "PENDING"
+    ).count()
 
     return {
         "org_id": str(org.id),

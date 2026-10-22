@@ -14,6 +14,7 @@ import requests
 from celery_app import celery_app
 from database import SessionLocal
 import models
+from services.tool_proxy_service import tool_proxy_service
 from services.notification_service import (
     validate_webhook_url,
     compute_webhook_signature,
@@ -121,46 +122,64 @@ def dispatch_webhook_task(self, delivery_id: str, max_attempts: int = MAX_WEBHOO
         delivery.attempt_count = (delivery.attempt_count or 0) + 1
         db.commit()
 
-        # Execute HTTP POST
-        try:
-            resp = requests.post(
-                endpoint.url,
-                data=payload_bytes,
-                headers=headers,
-                timeout=WEBHOOK_TIMEOUT_SECONDS
+        # Execute HTTP POST with DNS rebinding and redirect protection
+        dispatch_res = tool_proxy_service.safe_dispatch_request(
+            endpoint.url,
+            method="POST",
+            data=payload_bytes,
+            headers=headers,
+            timeout=WEBHOOK_TIMEOUT_SECONDS
+        )
+
+        if dispatch_res.get("ssrf_blocked"):
+            delivery.status = "DEAD_LETTER"
+            delivery.error_message = f"SSRF Protection: {dispatch_res.get('reason') or dispatch_res.get('error')}"
+            db.commit()
+
+            audit = models.AuditLog(
+                event_type="WEBHOOK_SSRF_BLOCKED",
+                actor_type="SYSTEM",
+                actor_id="WEBHOOK_WORKER",
+                action=f"Blocked webhook dispatch to prohibited destination: {endpoint.url}",
+                resource=f"webhook:{endpoint.id}",
+                result="BLOCKED",
+                metadata_json={"delivery_id": str(delivery.id), "reason": dispatch_res.get("reason")}
             )
-            delivery.response_code = resp.status_code
-            delivery.response_body_preview = resp.text[:500] if resp.text else None
+            db.add(audit)
+            db.commit()
+            return {"status": "SSRF_BLOCKED", "reason": dispatch_res.get("reason")}
 
-            if 200 <= resp.status_code < 300:
-                delivery.status = "DELIVERED"
-                delivery.delivered_at = datetime.datetime.utcnow()
-                delivery.error_message = None
-                delivery.next_attempt_at = None
-                db.commit()
+        delivery.response_code = dispatch_res.get("status_code")
+        delivery.response_body_preview = (dispatch_res.get("response_text") or "")[:500] if dispatch_res.get("response_text") else None
 
-                audit = models.AuditLog(
-                    event_type="WEBHOOK_DELIVERED",
-                    actor_type="SYSTEM",
-                    actor_id="WEBHOOK_WORKER",
-                    action=f"Webhook delivered: {delivery.event_type}",
-                    resource=f"webhook:{endpoint.id}",
-                    result="DELIVERED",
-                    metadata_json={
-                        "webhook_id": str(endpoint.id),
-                        "delivery_id": str(delivery.id),
-                        "response_code": resp.status_code,
-                        "attempt_count": delivery.attempt_count
-                    }
-                )
-                db.add(audit)
-                db.commit()
-                return {"status": "DELIVERED", "response_code": resp.status_code}
-            else:
-                last_err = f"HTTP {resp.status_code}"
-        except Exception as e:
-            last_err = f"{type(e).__name__}: {str(e)}"
-            delivery.response_code = None
+        if dispatch_res.get("is_redirect"):
+            last_err = dispatch_res.get("error", "Automatic redirects are blocked for SSRF protection")
+        elif dispatch_res.get("success"):
+            delivery.status = "DELIVERED"
+            delivery.delivered_at = datetime.datetime.utcnow()
+            delivery.error_message = None
+            delivery.next_attempt_at = None
+            db.commit()
+
+            audit = models.AuditLog(
+                event_type="WEBHOOK_DELIVERED",
+                actor_type="SYSTEM",
+                actor_id="WEBHOOK_WORKER",
+                action=f"Webhook delivered: {delivery.event_type}",
+                resource=f"webhook:{endpoint.id}",
+                result="DELIVERED",
+                metadata_json={
+                    "webhook_id": str(endpoint.id),
+                    "delivery_id": str(delivery.id),
+                    "response_code": dispatch_res.get("status_code"),
+                    "attempt_count": delivery.attempt_count
+                }
+            )
+            db.add(audit)
+            db.commit()
+            return {"status": "DELIVERED", "response_code": dispatch_res.get("status_code")}
+        else:
+            last_err = dispatch_res.get("error") or "Outbound delivery failed"
 
         # Failure / Retry logic
         delivery.error_message = last_err

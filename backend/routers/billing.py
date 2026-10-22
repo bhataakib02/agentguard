@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Header, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from core.deps import get_current_user
+from core.deps import get_current_user, require_admin
 import models
 from config import settings
 
@@ -357,7 +357,7 @@ async def razorpay_webhook(
 @router.post("/simulate-payment")
 def simulate_sandbox_payment(
     req: SimulatePaymentRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """

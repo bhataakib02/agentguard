@@ -15,11 +15,31 @@ import schemas
 
 router = APIRouter(prefix="/tools", tags=["Tools & Schemas"])
 
+UNAUTHORIZED_TOOL_ROLES = {"VIEWER", "AUDITOR", "ANALYST"}
+
+
+def require_tool_write_access(current_user: models.User = Depends(get_current_user)) -> models.User:
+    if current_user.role in UNAUTHORIZED_TOOL_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Role '{current_user.role}' is not authorized to register or update tool definitions."
+        )
+    return current_user
+
+
+def require_tool_delete_access(current_user: models.User = Depends(get_current_user)) -> models.User:
+    if current_user.role in UNAUTHORIZED_TOOL_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: Role '{current_user.role}' is not authorized to delete tool definitions."
+        )
+    return current_user
+
 
 @router.post("", response_model=schemas.ToolResponse, status_code=status.HTTP_201_CREATED)
 def create_tool(
     req: schemas.ToolCreateRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_tool_write_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -113,7 +133,7 @@ def get_tool(
 def update_tool(
     tool_id: str,
     req: schemas.ToolUpdateRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_tool_write_access),
     db: Session = Depends(get_db)
 ):
     """
@@ -157,7 +177,7 @@ def update_tool(
 @router.delete("/{tool_id}")
 def delete_tool(
     tool_id: str,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_tool_delete_access),
     db: Session = Depends(get_db)
 ):
     """

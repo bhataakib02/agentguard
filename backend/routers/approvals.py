@@ -49,6 +49,13 @@ async def act_on_approval(
             detail="Forbidden: Only Managers, Admins, or Super Admins can resolve approval requests"
         )
 
+    # Action validation
+    if req.action not in ["APPROVE", "REJECT"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid action '{req.action}'. Action must be 'APPROVE' or 'REJECT'."
+        )
+
     app_req = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.id == id).first()
     if not app_req:
         raise HTTPException(status_code=404, detail="Approval request not found")
@@ -58,21 +65,63 @@ async def act_on_approval(
     if agent and current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Approval belongs to another organization")
 
+    # State transition integrity: Only PENDING requests may be resolved
+    if app_req.status != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot resolve approval request in '{app_req.status}' state. Only 'PENDING' requests may be resolved."
+        )
+
+    # Expiry verification (24-hour SLA window)
+    now = datetime.datetime.utcnow()
+    created_dt = app_req.created_at
+    if created_dt and created_dt.tzinfo is not None:
+        created_dt = created_dt.replace(tzinfo=None)
+    if created_dt and created_dt <= (now - datetime.timedelta(hours=24)):
+        app_req.status = "EXPIRED"
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Approval request has expired and cannot be resolved."
+        )
+
     new_status = "APPROVED" if req.action == "APPROVE" else "REJECTED"
-    app_req.status = new_status
-    app_req.resolved_at = datetime.datetime.utcnow()
+
+    # Atomic State Transition under Concurrency
+    update_data = {
+        "status": new_status,
+        "resolved_at": now,
+        "approver_id": current_user.id
+    }
+    updated_rows = db.query(models.ApprovalRequest).filter(
+        models.ApprovalRequest.id == id,
+        models.ApprovalRequest.status == "PENDING"
+    ).update(update_data, synchronize_session=False)
+    db.commit()
+
+    if updated_rows == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Approval request is no longer PENDING (concurrent resolution conflict)."
+        )
+
+    # Reload record
+    app_req = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.id == id).first()
 
     dec = db.query(models.Decision).filter(models.Decision.id == app_req.decision_id).first()
     if dec:
         if new_status == "APPROVED":
             dec.decision = "ALLOW"
-            dec.execution_status = "EXECUTED"
+            # Truthful provenance: action is approved pending tool proxy execution
+            dec.execution_status = "APPROVED_PENDING_EXECUTION"
             if not dec.execution_gate_token:
                 import uuid
                 dec.execution_gate_token = f"gate_{uuid.uuid4().hex[:16]}"
                 dec.gate_token_used = False
         else:
+            dec.decision = "REFUSE"
             dec.execution_status = "BLOCKED"
+            dec.gate_token_used = True
 
     # Immutable Audit Log for Approval Resolution
     if agent:
