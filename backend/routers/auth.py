@@ -1,7 +1,8 @@
+# type: ignore
 from typing import Optional, List, Dict, Any
 import logging
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
@@ -9,6 +10,8 @@ from core import security
 from core.deps import get_current_user
 from services.otp_service import (
     otp_service,
+    encrypt_ephemeral_secret,
+    decrypt_ephemeral_secret,
     PURPOSE_REGISTRATION,
     PURPOSE_PASSWORDLESS_LOGIN,
     PURPOSE_PASSWORD_RESET
@@ -36,6 +39,7 @@ def get_client_ip(request: Request) -> str:
 def register_request_otp(
     req: schemas.RegisterOtpRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
@@ -43,8 +47,8 @@ def register_request_otp(
     - Validates inputs.
     - Prevents account enumeration by returning generic response if account already exists.
     - Enforces resend cooldown and rate limits.
-    - Stores pending registration state securely (password_hash only, never plaintext).
-    - Dispatches 6-digit OTP code with 10-minute validity via email.
+    - Stores pending registration state securely (password_hash and authenticated ephemeral ciphertext).
+    - Dispatches 6-digit OTP code asynchronously via configured email provider.
     """
     clean_email = otp_service.normalize_email(req.email)
     ip_addr = get_client_ip(request)
@@ -67,11 +71,19 @@ def register_request_otp(
             detail="Full name is required"
         )
 
-    # 1. Anti-Enumeration & Duplicate Check:
-    # If account exists, return generic response and DO NOT issue OTP
+    # 1. Rate Limit Check (Shared per-IP and per-email)
+    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
+    if is_limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=reason
+        )
+
+    # 2. Anti-Enumeration & Duplicate Check:
+    # If account exists, record probe for IP rate limiting and return generic response
     existing_user = db.query(models.User).filter(models.User.email == clean_email).first()
     if existing_user:
-        # Audit log the attempt (without logging secrets)
+        otp_service.record_ip_probe(db, ip_addr, clean_email, PURPOSE_REGISTRATION)
         audit = models.AuditLog(
             event_type="USER_REGISTER_OTP_REQUESTED",
             actor_type="SYSTEM",
@@ -89,7 +101,7 @@ def register_request_otp(
             cooldown_seconds=60
         )
 
-    # 2. Resend Cooldown Check
+    # 3. Resend Cooldown Check
     is_cd, remaining = otp_service.check_resend_cooldown(db, clean_email, PURPOSE_REGISTRATION)
     if is_cd:
         raise HTTPException(
@@ -97,22 +109,16 @@ def register_request_otp(
             detail=f"Please wait {remaining} seconds before requesting a new verification code."
         )
 
-    # 3. Rate Limit Check
-    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
-    if is_limited:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=reason
-        )
-
-    # 4. Hash password before storing in pending challenge metadata
+    # 4. Hash password and encrypt ephemeral credential for safe Supabase Auth sync upon OTP verification
     hashed_pw = security.get_password_hash(req.password)
+    encrypted_pw = encrypt_ephemeral_secret(req.password, clean_email)
     org_title = req.org_name.strip() if req.org_name and req.org_name.strip() else f"{req.full_name.strip()}'s Organization"
 
     challenge_meta = {
         "full_name": req.full_name.strip(),
         "org_name": org_title,
-        "password_hash": hashed_pw
+        "password_hash": hashed_pw,
+        "encrypted_password": encrypted_pw
     }
 
     # 5. Issue cryptographic challenge (HMAC-stored, expires in 10 minutes)
@@ -124,8 +130,8 @@ def register_request_otp(
         metadata_json=challenge_meta
     )
 
-    # 6. Send OTP via configured email provider (Resend, SMTP, or MOCK)
-    delivery = email_service.send_otp_email(clean_email, raw_code, PURPOSE_REGISTRATION)
+    # 6. Send OTP asynchronously via background task (Resend, SMTP, or MOCK)
+    background_tasks.add_task(email_service.send_otp_email, clean_email, raw_code, PURPOSE_REGISTRATION)
 
     # 7. Audit log event
     audit = models.AuditLog(
@@ -134,8 +140,8 @@ def register_request_otp(
         actor_id="anonymous",
         action="REQUEST_REGISTRATION_OTP",
         resource="users",
-        result="SUCCESS" if delivery.get("delivered") or delivery.get("status") == "EMAIL_SENT" else "FAILED",
-        metadata_json={"email": clean_email, "ip": ip_addr, "provider": delivery.get("provider")}
+        result="DISPATCHED",
+        metadata_json={"email": clean_email, "ip": ip_addr}
     )
     db.add(audit)
     db.commit()
@@ -202,14 +208,19 @@ def register_verify_otp(
     auth_user_id = None
     if supabase_admin.is_configured:
         try:
+            chosen_password = decrypt_ephemeral_secret(meta.get("encrypted_password"), clean_email) if meta.get("encrypted_password") else None
             auth_user_id = supabase_admin.create_user(
                 clean_email,
-                password="",
+                password=chosen_password,
                 full_name=full_name,
                 email_confirm=True
             )
         except Exception as e:
             logger.warning(f"[Registration] Supabase Auth creation notice: {e}")
+
+    # Immediately scrub ephemeral encrypted password from challenge metadata
+    challenge.metadata_json = {"full_name": full_name, "org_name": org_name, "completed": True}
+    db.commit()
 
     # 5. Transactional User Creation (Strictly defaults to USER role)
     user = models.User(
@@ -269,6 +280,7 @@ def register_verify_otp(
 def login_request_otp(
     req: schemas.LoginOtpRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
@@ -287,9 +299,18 @@ def login_request_otp(
             detail="Valid email address is required"
         )
 
-    # 1. Anti-Enumeration & Eligibility Check:
+    # 1. Rate Limit Check (Shared per-IP and per-email)
+    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
+    if is_limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=reason
+        )
+
+    # 2. Anti-Enumeration & Eligibility Check:
     user = db.query(models.User).filter(models.User.email == clean_email).first()
     if not user or user.status != "ACTIVE":
+        otp_service.record_ip_probe(db, ip_addr, clean_email, PURPOSE_PASSWORDLESS_LOGIN)
         audit = models.AuditLog(
             event_type="USER_LOGIN_OTP_REQUESTED",
             actor_type="SYSTEM",
@@ -307,20 +328,12 @@ def login_request_otp(
             cooldown_seconds=60
         )
 
-    # 2. Resend Cooldown Check
+    # 3. Resend Cooldown Check
     is_cd, remaining = otp_service.check_resend_cooldown(db, clean_email, PURPOSE_PASSWORDLESS_LOGIN)
     if is_cd:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Please wait {remaining} seconds before requesting a new login code."
-        )
-
-    # 3. Rate Limit Check
-    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
-    if is_limited:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=reason
         )
 
     # 4. Issue challenge (HMAC-stored, 10 min expiry)
@@ -331,8 +344,8 @@ def login_request_otp(
         ip_address=ip_addr
     )
 
-    # 5. Dispatch email
-    delivery = email_service.send_otp_email(clean_email, raw_code, PURPOSE_PASSWORDLESS_LOGIN)
+    # 5. Dispatch email asynchronously via background task
+    background_tasks.add_task(email_service.send_otp_email, clean_email, raw_code, PURPOSE_PASSWORDLESS_LOGIN)
 
     # 6. Audit log
     audit = models.AuditLog(
@@ -342,8 +355,8 @@ def login_request_otp(
         actor_id=str(user.id),
         action="REQUEST_LOGIN_OTP",
         resource="users",
-        result="SUCCESS" if delivery.get("delivered") or delivery.get("status") == "EMAIL_SENT" else "FAILED",
-        metadata_json={"email": clean_email, "ip": ip_addr, "provider": delivery.get("provider")}
+        result="DISPATCHED",
+        metadata_json={"email": clean_email, "ip": ip_addr}
     )
     db.add(audit)
     db.commit()
@@ -450,6 +463,7 @@ def login_verify_otp(
 def forgot_password_request_otp(
     req: schemas.ForgotPasswordOtpRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
@@ -467,9 +481,18 @@ def forgot_password_request_otp(
             detail="Valid email address is required"
         )
 
-    # 1. Anti-Enumeration & User Check:
+    # 1. Rate Limit Check (Shared per-IP and per-email)
+    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
+    if is_limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=reason
+        )
+
+    # 2. Anti-Enumeration & User Check:
     user = db.query(models.User).filter(models.User.email == clean_email).first()
     if not user or user.status != "ACTIVE":
+        otp_service.record_ip_probe(db, ip_addr, clean_email, PURPOSE_PASSWORD_RESET)
         audit = models.AuditLog(
             event_type="PASSWORD_RESET_OTP_REQUESTED",
             actor_type="SYSTEM",
@@ -487,20 +510,12 @@ def forgot_password_request_otp(
             cooldown_seconds=60
         )
 
-    # 2. Resend Cooldown Check
+    # 3. Resend Cooldown Check
     is_cd, remaining = otp_service.check_resend_cooldown(db, clean_email, PURPOSE_PASSWORD_RESET)
     if is_cd:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Please wait {remaining} seconds before requesting a new recovery code."
-        )
-
-    # 3. Rate Limit Check
-    is_limited, reason = otp_service.check_rate_limits(db, clean_email, ip_addr)
-    if is_limited:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=reason
         )
 
     # 4. Issue challenge (HMAC-stored, 10 min expiry)
@@ -511,8 +526,8 @@ def forgot_password_request_otp(
         ip_address=ip_addr
     )
 
-    # 5. Dispatch email
-    delivery = email_service.send_otp_email(clean_email, raw_code, PURPOSE_PASSWORD_RESET)
+    # 5. Dispatch email asynchronously via background task
+    background_tasks.add_task(email_service.send_otp_email, clean_email, raw_code, PURPOSE_PASSWORD_RESET)
 
     # 6. Audit Log
     audit = models.AuditLog(
@@ -522,8 +537,8 @@ def forgot_password_request_otp(
         actor_id=str(user.id),
         action="REQUEST_PASSWORD_RESET_OTP",
         resource="users",
-        result="SUCCESS" if delivery.get("delivered") or delivery.get("status") == "EMAIL_SENT" else "FAILED",
-        metadata_json={"email": clean_email, "ip": ip_addr, "provider": delivery.get("provider")}
+        result="DISPATCHED",
+        metadata_json={"email": clean_email, "ip": ip_addr}
     )
     db.add(audit)
     db.commit()

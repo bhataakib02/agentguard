@@ -35,14 +35,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchUserProfile = async (authUserId?: string, userEmail?: string) => {
+  const clearSession = () => {
+    document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    localStorage.removeItem("agentguard_token");
+    localStorage.removeItem("agentguard_user");
+    localStorage.removeItem("agentguard_selected_org_id");
+    setUser(null);
+    setSession(null);
+    setLoading(false);
+  };
+
+  const validateAndApplyBackendSession = async (token: string): Promise<boolean> => {
     try {
       const profile = await fetchApi("/auth/me");
-      if (profile && profile.email) {
+      if (profile && profile.id && profile.email) {
         const authoritativeRole = profile.role || "USER";
         const fullProfile: UserProfile = {
           id: profile.id,
-          auth_user_id: profile.auth_user_id || authUserId,
+          auth_user_id: profile.auth_user_id,
           email: profile.email,
           full_name: profile.full_name,
           role: authoritativeRole,
@@ -50,59 +60,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           org_name: profile.org_name || (authoritativeRole === "SUPER_ADMIN" ? "Platform Admin Control" : "AgentGuard Enterprise"),
         };
         setUser(fullProfile);
-        return;
+        setSession({
+          access_token: token,
+          user: {
+            id: profile.id,
+            email: profile.email,
+            user_metadata: { full_name: profile.full_name },
+            app_metadata: { role: authoritativeRole },
+          },
+        });
+        document.cookie = `agentguard_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+        localStorage.setItem("agentguard_token", token);
+        setLoading(false);
+        return true;
       }
-    } catch (e) {
-      console.warn("Backend profile sync notice:", e);
+    } catch (err) {
+      console.warn("Backend session validation notice:", err);
     }
+    clearSession();
+    return false;
   };
 
   useEffect(() => {
     let mounted = true;
 
-    const applySession = async (currentSession: any) => {
-      if (!mounted) return;
-      setSession(currentSession);
-      if (currentSession?.user) {
-        document.cookie = `agentguard_token=${currentSession.access_token}; path=/; max-age=86400; SameSite=Lax`;
-        localStorage.setItem("agentguard_token", currentSession.access_token);
+    const initializeAuth = async () => {
+      try {
+        // 1. Check Supabase session first
+        const { data: { session: sbSession } } = await supabase.auth.getSession();
+        if (!mounted) return;
 
-        // Only server-controlled app_metadata is trusted before authoritative profile fetch
-        const initialRole = currentSession.user.app_metadata?.role || "USER";
+        if (sbSession?.user) {
+          setSession(sbSession);
+          document.cookie = `agentguard_token=${sbSession.access_token}; path=/; max-age=86400; SameSite=Lax`;
+          localStorage.setItem("agentguard_token", sbSession.access_token);
+          await validateAndApplyBackendSession(sbSession.access_token);
+          return;
+        }
 
-        setUser((prev) => prev || {
-          id: currentSession.user.id,
-          auth_user_id: currentSession.user.id,
-          email: currentSession.user.email || "",
-          full_name: currentSession.user.user_metadata?.full_name || (initialRole === "SUPER_ADMIN" ? "Platform Super Admin" : "User"),
-          role: initialRole,
-          department: "General",
-          org_name: initialRole === "SUPER_ADMIN" ? "Platform Admin Control" : "AgentGuard Enterprise",
-        });
-
-        await fetchUserProfile(currentSession.user.id, currentSession.user.email);
-      } else {
-        document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        localStorage.removeItem("agentguard_token");
-        localStorage.removeItem("agentguard_user");
-        setUser(null);
+        // 2. If no Supabase session, check AGENTGUARD token (e.g. from passwordless OTP login)
+        const localToken = typeof window !== "undefined" ? localStorage.getItem("agentguard_token") : null;
+        if (localToken) {
+          const isValid = await validateAndApplyBackendSession(localToken);
+          if (!isValid && mounted) {
+            clearSession();
+          }
+        } else {
+          if (mounted) clearSession();
+        }
+      } catch (e) {
+        console.warn("Auth initialization notice:", e);
+        if (mounted) clearSession();
       }
-      setLoading(false);
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      applySession(session);
-    });
+    initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
-        applySession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, sbSession) => {
+      if (!mounted) return;
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (sbSession?.user) {
+          setSession(sbSession);
+          document.cookie = `agentguard_token=${sbSession.access_token}; path=/; max-age=86400; SameSite=Lax`;
+          localStorage.setItem("agentguard_token", sbSession.access_token);
+          await validateAndApplyBackendSession(sbSession.access_token);
+        }
       } else if (event === "SIGNED_OUT") {
-        document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        localStorage.removeItem("agentguard_token");
-        localStorage.removeItem("agentguard_user");
-        setUser(null);
-        setLoading(false);
+        // Check if an independent AGENTGUARD token exists before wiping
+        const localToken = typeof window !== "undefined" ? localStorage.getItem("agentguard_token") : null;
+        if (localToken) {
+          const valid = await validateAndApplyBackendSession(localToken);
+          if (!valid && mounted) clearSession();
+        } else {
+          if (mounted) clearSession();
+        }
       }
     });
 
@@ -120,14 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.warn("Sign out notice:", e);
     } finally {
-      document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-      localStorage.removeItem("agentguard_token");
-      localStorage.removeItem("agentguard_user");
-      localStorage.removeItem("agentguard_selected_org_id");
-      setUser(null);
-      setSession(null);
-      setLoading(false);
-
+      clearSession();
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
@@ -135,8 +159,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshProfile = async () => {
-    if (session?.user) {
-      await fetchUserProfile(session.user.id, session.user.email);
+    const localToken = typeof window !== "undefined" ? localStorage.getItem("agentguard_token") : null;
+    if (localToken) {
+      await validateAndApplyBackendSession(localToken);
     }
   };
 

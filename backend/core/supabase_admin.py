@@ -102,13 +102,14 @@ class SupabaseAdminClient:
     def create_user(
         self,
         email: str,
-        password: str,
+        password: Optional[str] = None,
         full_name: Optional[str] = None,
         email_confirm: bool = True,
     ) -> Optional[str]:
         """
         Create a user in Supabase Auth and return their auth_user_id (UUID).
-        Returns None if the service role key is not configured or if the call fails.
+        If user already exists in Supabase Auth, updates credentials/confirmation and returns their ID.
+        Returns None if the service role key is not configured or if creation fails.
         """
         if not self.is_configured:
             logger.debug(
@@ -118,9 +119,10 @@ class SupabaseAdminClient:
 
         payload: Dict[str, Any] = {
             "email": email,
-            "password": password,
             "email_confirm": email_confirm,
         }
+        if password:
+            payload["password"] = password
         if full_name:
             payload["user_metadata"] = {"full_name": full_name}
 
@@ -133,13 +135,19 @@ class SupabaseAdminClient:
             )
             return auth_id
 
-        # 422 = user already exists in Supabase Auth
+        # 422: user already exists in Supabase Auth OR validation failure
         if status_code == 422:
             existing_id = self._get_existing_user_id(email)
             if existing_id:
                 logger.info(
-                    "[SupabaseAdmin] Supabase Auth user already exists for %s (id=%s)",
+                    "[SupabaseAdmin] Supabase Auth user already exists for %s (id=%s); synchronizing credentials",
                     email, existing_id
+                )
+                self.update_user(
+                    existing_id,
+                    password=password,
+                    email_confirm=email_confirm,
+                    full_name=full_name
                 )
                 return existing_id
 
@@ -167,17 +175,41 @@ class SupabaseAdminClient:
                     return u.get("id")
         return None
 
-    def update_user_password(self, auth_user_id: str, new_password: str) -> bool:
+    def update_user(
+        self,
+        auth_user_id: str,
+        password: Optional[str] = None,
+        email_confirm: Optional[bool] = None,
+        full_name: Optional[str] = None,
+    ) -> bool:
         """
-        Update the password of an existing Supabase Auth user.
+        Update the password, confirmation status, or metadata of an existing Supabase Auth user.
         Returns True on success, False on failure.
         """
         if not self.is_configured:
             return False
 
+        payload: Dict[str, Any] = {}
+        if password:
+            payload["password"] = password
+        if email_confirm is not None:
+            payload["email_confirm"] = email_confirm
+        if full_name:
+            payload["user_metadata"] = {"full_name": full_name}
+
+        if not payload:
+            return True
+
         url = f"{self.admin_api}/{auth_user_id}"
-        status_code, _ = self._request("PUT", url, {"password": new_password})
+        status_code, _ = self._request("PUT", url, payload)
         return status_code == 200
+
+    def update_user_password(self, auth_user_id: str, new_password: str) -> bool:
+        """
+        Update the password of an existing Supabase Auth user.
+        Returns True on success, False on failure.
+        """
+        return self.update_user(auth_user_id, password=new_password)
 
     def delete_user(self, auth_user_id: str) -> bool:
         """
