@@ -24,6 +24,12 @@ def upgrade() -> None:
     inspector = sa.inspect(bind)
     tables = inspector.get_table_names()
 
+    required_columns = {
+        'id', 'email', 'purpose', 'code_hash', 'attempts', 'max_attempts',
+        'consumed', 'consumed_at', 'expires_at', 'resend_available_at',
+        'ip_address', 'metadata_json', 'created_at'
+    }
+
     if 'otp_challenges' not in tables:
         op.create_table(
             'otp_challenges',
@@ -42,6 +48,21 @@ def upgrade() -> None:
             sa.Column('created_at', sa.DateTime(), nullable=True),
             sa.PrimaryKeyConstraint('id')
         )
+    else:
+        # Pre-existing table validation: fail safely if existing table has incompatible structure
+        existing_cols = {c['name']: c for c in inspector.get_columns('otp_challenges')}
+        missing_cols = required_columns - set(existing_cols.keys())
+        if missing_cols:
+            raise RuntimeError(
+                f"[Migration 0002 Validation Error] Pre-existing 'otp_challenges' table is missing required columns: {sorted(missing_cols)}. "
+                "Automatic adoption aborted to prevent schema corruption."
+            )
+        pk_info = inspector.get_pk_constraint('otp_challenges')
+        if not pk_info or 'id' not in pk_info.get('constrained_columns', []):
+            raise RuntimeError(
+                "[Migration 0002 Validation Error] Pre-existing 'otp_challenges' table does not have 'id' as primary key. "
+                "Automatic adoption aborted to prevent schema corruption."
+            )
 
     # Ensure all required indexes exist idempotently
     existing_indexes = {ix['name'] for ix in inspector.get_indexes('otp_challenges')} if 'otp_challenges' in inspector.get_table_names() else set()

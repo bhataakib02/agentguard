@@ -14,7 +14,8 @@ from services.otp_service import (
     decrypt_ephemeral_secret,
     PURPOSE_REGISTRATION,
     PURPOSE_PASSWORDLESS_LOGIN,
-    PURPOSE_PASSWORD_RESET
+    PURPOSE_PASSWORD_RESET,
+    RESEND_COOLDOWN_SECONDS
 )
 from services.email_service import email_service
 from core.supabase_admin import supabase_admin
@@ -99,7 +100,7 @@ def register_request_otp(
         return schemas.OtpActionResponse(
             status="SUCCESS",
             message="If this email address is eligible, a 6-digit verification code has been sent.",
-            cooldown_seconds=60
+            cooldown_seconds=RESEND_COOLDOWN_SECONDS
         )
 
     # 3. Resend Cooldown Check
@@ -150,7 +151,7 @@ def register_request_otp(
     return schemas.OtpActionResponse(
         status="SUCCESS",
         message="If this email address is eligible, a 6-digit verification code has been sent.",
-        cooldown_seconds=60
+        cooldown_seconds=RESEND_COOLDOWN_SECONDS
     )
 
 
@@ -353,7 +354,7 @@ def login_request_otp(
         return schemas.OtpActionResponse(
             status="SUCCESS",
             message="If the account exists and is eligible, a 6-digit verification code has been sent.",
-            cooldown_seconds=60
+            cooldown_seconds=RESEND_COOLDOWN_SECONDS
         )
 
     # 3. Resend Cooldown Check
@@ -392,7 +393,7 @@ def login_request_otp(
     return schemas.OtpActionResponse(
         status="SUCCESS",
         message="If the account exists and is eligible, a 6-digit verification code has been sent.",
-        cooldown_seconds=60
+        cooldown_seconds=RESEND_COOLDOWN_SECONDS
     )
 
 
@@ -535,7 +536,7 @@ def forgot_password_request_otp(
         return schemas.OtpActionResponse(
             status="SUCCESS",
             message="If the account exists and is eligible, a 6-digit recovery code has been sent.",
-            cooldown_seconds=60
+            cooldown_seconds=RESEND_COOLDOWN_SECONDS
         )
 
     # 3. Resend Cooldown Check
@@ -574,7 +575,7 @@ def forgot_password_request_otp(
     return schemas.OtpActionResponse(
         status="SUCCESS",
         message="If the account exists and is eligible, a 6-digit recovery code has been sent.",
-        cooldown_seconds=60
+        cooldown_seconds=RESEND_COOLDOWN_SECONDS
     )
 
 

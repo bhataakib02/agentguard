@@ -134,14 +134,26 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_[KEY]
 
 ## 4. Production Deployment Procedures
 
-### Step 1: PostgreSQL Provisioning & Migrations
+### Step 1: PostgreSQL Provisioning & Alembic Migrations
 1. Ensure the PostgreSQL database instance is accessible and healthy.
-2. In production, run the canonical migration scripts:
+2. **Migration Ownership Model**:
+   - **Alembic (`backend/alembic/versions/`)**: Authoritative owner of all application tables, columns, constraints, foreign keys, and indexes.
+   - **Supabase (`supabase/migrations/`)**: Authoritative owner of PostgreSQL extensions, Row-Level Security (RLS) policies, and role grants.
+3. **Fresh Database Provisioning**:
    ```bash
-   psql -h <HOST> -U <USER> -d <DATABASE> -f supabase/migrations/20260831000000_agentguard_schema.sql
-   psql -h <HOST> -U <USER> -d <DATABASE> -f supabase/migrations/20260929000000_seed_canonical_plans.sql
+   alembic upgrade head
    ```
-3. Alternatively, when `AUTO_BOOTSTRAP_DB=true`, the backend automatically runs `Base.metadata.create_all()` and idempotently seeds the canonical plans (`FREE`, `STARTER`, `PROFESSIONAL`, `ENTERPRISE`).
+4. **Existing Baseline Database Adoption**:
+   For existing databases provisioned before Alembic version tracking:
+   ```bash
+   # Run preflight audit (read-only)
+   python backend/scripts/reconcile_alembic_baseline.py --preflight
+   # Adopt 0001 baseline once verified
+   python backend/scripts/reconcile_alembic_baseline.py --adopt --confirm
+   # Apply forward migrations (0002_add_otp_challenges)
+   alembic upgrade head
+   ```
+   *Detailed guide available in `backend/DEPLOYMENT_RUNBOOK.md`.*
 
 ### Step 2: Containerized Stack Startup via Docker Compose
 To deploy the entire validated production stack:
