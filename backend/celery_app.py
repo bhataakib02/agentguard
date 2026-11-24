@@ -34,6 +34,7 @@ celery_app = Celery(
         "tasks.retention_tasks",
         "tasks.siem_tasks",
         "tasks.sandbox_tasks",
+        "tasks.auth_tasks",
     ]
 )
 
@@ -50,6 +51,10 @@ celery_app.conf.update(
 
     # Periodic Beat Schedule
     beat_schedule={
+        "cleanup-expired-otp-challenges": {
+            "task": "tasks.auth_tasks.cleanup_expired_otp_challenges_task",
+            "schedule": 3600.0,  # Every hour
+        },
         "execute-scheduled-reports": {
             "task": "tasks.report_tasks.execute_scheduled_reports_task",
             "schedule": 900.0,  # Every 15 minutes

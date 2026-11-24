@@ -22,7 +22,7 @@ import datetime
 import logging
 from typing import Optional, Tuple, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, cast, String
 from config import settings
 import models
 
@@ -68,9 +68,24 @@ def hash_otp_code(code: str) -> str:
     return hmac.new(key, msg, hashlib.sha256).hexdigest()
 
 
+SENSITIVE_METADATA_KEYS = {"encrypted_password", "password_hash"}
+
+
+def scrub_sensitive_metadata(metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Returns a sanitized copy of metadata_json with ephemeral passwords and hashes scrubbed."""
+    if not metadata or not isinstance(metadata, dict):
+        return {}
+    return {k: v for k, v in metadata.items() if k not in SENSITIVE_METADATA_KEYS}
+
+
 def _get_encryption_key() -> bytes:
-    """Derives a 32-byte key from settings.SECRET_KEY for AES-256-GCM."""
-    return hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
+    """
+    Derives a stable, domain-separated 32-byte key from settings.SECRET_KEY for AES-256-GCM.
+    Guarantees stability across restarts and cryptographic separation from signing keys.
+    """
+    raw_secret = getattr(settings, "OTP_ENCRYPTION_KEY", None) or settings.SECRET_KEY
+    salt = b"agentguard-otp-ephemeral-v1:"
+    return hashlib.sha256(salt + raw_secret.encode("utf-8")).digest()
 
 
 def encrypt_ephemeral_secret(secret: str, context: str) -> str:
@@ -226,12 +241,18 @@ class OtpService:
         norm_email = OtpService.normalize_email(email)
         now = utc_now()
 
-        # Invalidate superseded challenges for the same email and purpose
-        db.query(models.OtpChallenge).filter(
+        # Invalidate and scrub superseded challenges for the same email and purpose
+        superseded = db.query(models.OtpChallenge).filter(
             models.OtpChallenge.email == norm_email,
             models.OtpChallenge.purpose == purpose,
             models.OtpChallenge.consumed == False
-        ).update({"consumed": True, "consumed_at": now}, synchronize_session=False)
+        ).all()
+        for sc in superseded:
+            setattr(sc, "consumed", True)
+            setattr(sc, "consumed_at", now)
+            if getattr(sc, "metadata_json", None):
+                setattr(sc, "metadata_json", scrub_sensitive_metadata(sc.metadata_json))
+        db.commit()
 
         raw_code = generate_secure_otp()
         code_hash = hash_otp_code(raw_code)
@@ -260,13 +281,16 @@ class OtpService:
         db: Session,
         email: str,
         purpose: str,
-        code: str
+        code: str,
+        consume: bool = True
     ) -> Tuple[bool, Optional[str], Optional[models.OtpChallenge]]:
         """
         Atomically verifies an OTP challenge using constant-time comparison.
         - Enforces maximum 5 attempts.
         - Enforces 10-minute expiry window.
-        - Atomically marks consumed upon success to prevent replay or concurrent reuse.
+        - Scrubs temporary credentials on terminal failure paths (expiry, attempt exhaustion).
+        - Optionally marks consumed upon success (consume=True). When consume=False, challenge
+          remains valid until downstream operations succeed and consume_challenge is invoked.
         Returns (is_valid, error_message, challenge_instance).
         """
         norm_email = OtpService.normalize_email(email)
@@ -290,17 +314,21 @@ class OtpService:
         if not challenge:
             return False, "Invalid or expired verification code. Please request a new code.", None
 
-        # Expiry Check
+        # Expiry Check — terminal failure scrubs sensitive metadata
         if getattr(challenge, "expires_at") < now:
             setattr(challenge, "consumed", True)
+            if getattr(challenge, "metadata_json", None):
+                setattr(challenge, "metadata_json", scrub_sensitive_metadata(challenge.metadata_json))
             db.commit()
             return False, "Verification code has expired. Please request a new code.", None
 
-        # Maximum Attempts Check
+        # Maximum Attempts Check — terminal failure scrubs sensitive metadata
         attempts_val: int = int(getattr(challenge, "attempts", 0) or 0)
         max_attempts_val: int = int(getattr(challenge, "max_attempts", 5) or 5)
         if attempts_val >= max_attempts_val:
             setattr(challenge, "consumed", True)
+            if getattr(challenge, "metadata_json", None):
+                setattr(challenge, "metadata_json", scrub_sensitive_metadata(challenge.metadata_json))
             db.commit()
             return False, "Maximum verification attempts exceeded. Please request a new code.", None
 
@@ -311,19 +339,118 @@ class OtpService:
             setattr(challenge, "attempts", new_attempts)
             if new_attempts >= max_attempts_val:
                 setattr(challenge, "consumed", True)
+                if getattr(challenge, "metadata_json", None):
+                    setattr(challenge, "metadata_json", scrub_sensitive_metadata(challenge.metadata_json))
             db.commit()
             remaining = max(0, max_attempts_val - new_attempts)
             if remaining == 0:
                 return False, "Invalid code. Maximum attempts exceeded. Please request a new code.", None
             return False, f"Invalid verification code. {remaining} attempt{'s' if remaining != 1 else ''} remaining.", None
 
-        # Atomic Consumption
+        # Successful code verification
+        if consume:
+            setattr(challenge, "consumed", True)
+            setattr(challenge, "consumed_at", now)
+            if getattr(challenge, "metadata_json", None):
+                setattr(challenge, "metadata_json", scrub_sensitive_metadata(challenge.metadata_json))
+            db.commit()
+            db.refresh(challenge)
+
+        return True, None, challenge
+
+    @staticmethod
+    def consume_challenge(db: Session, challenge: models.OtpChallenge, scrub: bool = True) -> None:
+        """
+        Explicitly marks a challenge as consumed and scrubs temporary credentials from metadata.
+        Used when a completion strategy succeeds after non-destructive verification.
+        """
+        now = utc_now()
         setattr(challenge, "consumed", True)
         setattr(challenge, "consumed_at", now)
+        if scrub and getattr(challenge, "metadata_json", None):
+            setattr(challenge, "metadata_json", scrub_sensitive_metadata(challenge.metadata_json))
         db.commit()
         db.refresh(challenge)
 
-        return True, None, challenge
+    @staticmethod
+    def cleanup_expired_challenges(
+        db: Session,
+        max_age_hours: Optional[int] = None,
+        batch_size: int = 500,
+        max_batches: Optional[int] = None
+    ) -> int:
+        """
+        Safely and idempotently scrubs temporary credentials and marks expired/abandoned challenges as consumed.
+        Processes rows in bounded batches to avoid long-running database locks and high memory usage.
+        Can be run repeatedly against existing database rows without unintended side-effects or corrupting challenge state.
+        Zero secrets or credentials are logged.
+        """
+        now = utc_now()
+        total_cleaned = 0
+        batches_processed = 0
+
+        # Phase 1: Expired unconsumed challenges (abandoned registration, login, or reset challenges)
+        while True:
+            if max_batches is not None and batches_processed >= max_batches:
+                break
+
+            query = db.query(models.OtpChallenge).filter(
+                models.OtpChallenge.consumed == False,
+                models.OtpChallenge.expires_at < now
+            ).order_by(models.OtpChallenge.created_at.asc()).limit(batch_size)
+
+            batch = query.all()
+            if not batch:
+                break
+
+            for ch in batch:
+                setattr(ch, "consumed", True)
+                setattr(ch, "consumed_at", getattr(ch, "consumed_at", None) or now)
+                meta = getattr(ch, "metadata_json", None) or {}
+                if any(k in meta for k in SENSITIVE_METADATA_KEYS):
+                    setattr(ch, "metadata_json", scrub_sensitive_metadata(meta))
+                total_cleaned += 1
+
+            db.commit()
+            batches_processed += 1
+
+            if len(batch) < batch_size:
+                break
+
+        # Phase 2: Consumed or older challenges that still contain unscrubbed sensitive metadata
+        for sensitive_key in SENSITIVE_METADATA_KEYS:
+            while True:
+                if max_batches is not None and batches_processed >= max_batches:
+                    break
+
+                try:
+                    candidate_query = db.query(models.OtpChallenge).filter(
+                        (models.OtpChallenge.consumed == True) | (models.OtpChallenge.expires_at < now),
+                        cast(models.OtpChallenge.metadata_json, String).like(f'%"{sensitive_key}"%')
+                    ).order_by(models.OtpChallenge.created_at.asc()).limit(batch_size)
+                    batch = candidate_query.all()
+                except Exception:
+                    # In case casting JSON to String is unsupported by DB driver, fallback gracefully
+                    break
+
+                if not batch:
+                    break
+
+                scrubbed_in_batch = 0
+                for ch in batch:
+                    meta = getattr(ch, "metadata_json", None) or {}
+                    if any(k in meta for k in SENSITIVE_METADATA_KEYS):
+                        setattr(ch, "metadata_json", scrub_sensitive_metadata(meta))
+                        scrubbed_in_batch += 1
+                        total_cleaned += 1
+
+                db.commit()
+                batches_processed += 1
+
+                if scrubbed_in_batch == 0 or len(batch) < batch_size:
+                    break
+
+        return total_cleaned
 
     @staticmethod
     def create_reset_ticket(user_id: str, email: str) -> str:
@@ -332,24 +459,40 @@ class OtpService:
         after recovery OTP verification has successfully completed.
         """
         from jose import jwt
-        now = utc_now()
+        now_ts = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
         payload = {
             "sub": user_id,
             "email": OtpService.normalize_email(email),
             "purpose": "password_reset",
-            "iat": int(now.timestamp()),
-            "exp": int((now + datetime.timedelta(minutes=10)).timestamp()),
+            "iat": now_ts,
+            "exp": now_ts + (10 * 60),
             "jti": secrets.token_hex(16)
         }
         return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     @staticmethod
-    def verify_reset_ticket(ticket: str, expected_email: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    def verify_reset_ticket(
+        ticket_or_db: Any,
+        expected_email_or_ticket: str,
+        db_or_expected_email: Any = None,
+        consume: bool = True
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
-        Validates a password reset ticket.
+        Validates a password reset ticket and enforces single-use consumption.
+        Accepts either (db, ticket, expected_email) or (ticket, expected_email, db).
         Returns (is_valid, error_message, user_id).
         """
         from jose import jwt, JWTError
+
+        if isinstance(ticket_or_db, Session):
+            db: Optional[Session] = ticket_or_db
+            ticket: str = expected_email_or_ticket
+            expected_email: str = str(db_or_expected_email)
+        else:
+            ticket = str(ticket_or_db)
+            expected_email = expected_email_or_ticket
+            db = db_or_expected_email if isinstance(db_or_expected_email, Session) else None
+
         try:
             payload = jwt.decode(ticket, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             if payload.get("purpose") != "password_reset":
@@ -360,6 +503,42 @@ class OtpService:
             user_id = payload.get("sub")
             if not user_id:
                 return False, "Invalid ticket payload", None
+
+            jti = payload.get("jti")
+            if not jti:
+                return False, "Ticket missing unique identifier", None
+
+            # Check if reset ticket was already consumed
+            if db is not None:
+                jti_hash = hash_otp_code(jti)
+                used = db.query(models.OtpChallenge).filter(
+                    models.OtpChallenge.purpose == "RESET_TICKET",
+                    models.OtpChallenge.code_hash == jti_hash,
+                    models.OtpChallenge.consumed == True
+                ).first()
+                if used:
+                    return False, "Password reset ticket has already been used. Please request a new recovery code.", None
+
+                if consume:
+                    now = utc_now()
+                    exp_ts = payload.get("exp")
+                    exp_dt = datetime.datetime.fromtimestamp(exp_ts, datetime.timezone.utc).replace(tzinfo=None) if exp_ts else now + datetime.timedelta(minutes=10)
+                    ticket_record = models.OtpChallenge(
+                        email=ticket_email,
+                        purpose="RESET_TICKET",
+                        code_hash=jti_hash,
+                        attempts=1,
+                        max_attempts=1,
+                        consumed=True,
+                        consumed_at=now,
+                        expires_at=exp_dt,
+                        resend_available_at=now,
+                        metadata_json={"used": True, "user_id": user_id},
+                        created_at=now
+                    )
+                    db.add(ticket_record)
+                    db.commit()
+
             return True, None, user_id
         except JWTError:
             return False, "Invalid or expired password reset ticket", None

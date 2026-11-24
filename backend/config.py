@@ -51,6 +51,13 @@ class Settings:
             else:
                 self.SECRET_KEY = raw_secret
 
+        # Local password authentication policy:
+        # In production, local-login fallback is strictly disabled unless explicitly enabled via environment variable
+        self.ALLOW_LOCAL_LOGIN = os.getenv(
+            "ALLOW_LOCAL_LOGIN",
+            "False" if self.ENVIRONMENT == "production" else "True"
+        ).lower() in ("true", "1")
+
         # CORS configuration
         cors_origins_env = os.getenv("CORS_ORIGINS", "")
         if cors_origins_env:

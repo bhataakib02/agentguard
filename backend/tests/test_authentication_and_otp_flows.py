@@ -601,7 +601,7 @@ class TestAuthenticationAndOtpFlows(unittest.TestCase):
                 self.assertNotIn("password_hash", challenge.metadata_json or {})
 
     def test_20_supabase_auth_sync_existing_user_credential_sync(self):
-        """When Supabase returns 422 because user exists, it updates credentials and links the ID."""
+        """When Supabase returns 422 because user exists, it links ID safely without modifying password."""
         test_email = f"existing_sb_{uuid.uuid4().hex[:6]}@enterprise.ai"
         existing_sb_id = f"existing-uuid-{uuid.uuid4().hex}"
         chosen_pass = "UpdatePassword123!"
@@ -614,15 +614,15 @@ class TestAuthenticationAndOtpFlows(unittest.TestCase):
                 with unittest.mock.patch.object(client_instance, "update_user", return_value=True) as mock_update:
                     auth_id = client_instance.create_user(test_email, password=chosen_pass, full_name="Existing SB", email_confirm=True)
                     self.assertEqual(auth_id, existing_sb_id)
+                    # Password must NEVER be passed to update_user for existing identities
                     mock_update.assert_called_once_with(
                         existing_sb_id,
-                        password=chosen_pass,
                         email_confirm=True,
                         full_name="Existing SB"
                     )
 
     def test_21_supabase_auth_validation_failure_graceful_fallback(self):
-        """When Supabase Auth fails unexpectedly, local registration succeeds gracefully."""
+        """When Supabase Auth fails unexpectedly, registration fails closed and does not create an active account."""
         test_email = f"fallback_{uuid.uuid4().hex[:6]}@enterprise.ai"
         chosen_pass = "FallbackPass123!"
 
@@ -640,15 +640,12 @@ class TestAuthenticationAndOtpFlows(unittest.TestCase):
                     "email": test_email,
                     "otp": raw_code
                 })
-                self.assertEqual(verify_resp.status_code, 200)
+                # Registration fails closed with HTTP 502 Bad Gateway
+                self.assertEqual(verify_resp.status_code, 502)
 
-                # Local user created with auth_user_id=None
+                # Active local user is NEVER created with auth_user_id=None
                 user = self.db.query(models.User).filter(models.User.email == test_email).first()
-                self.assertIsNotNone(user)
-                self.assertIsNone(user.auth_user_id)
-
-                # Local password hash works
-                self.assertTrue(security.verify_password(chosen_pass, str(user.password_hash)))
+                self.assertIsNone(user)
 
     def test_22_ephemeral_password_encryption_and_zeroization(self):
         """AES-256-GCM ephemeral encryption prevents plaintext storage and enforces email binding."""

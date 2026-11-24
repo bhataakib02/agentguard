@@ -18,6 +18,7 @@ from services.otp_service import (
 )
 from services.email_service import email_service
 from core.supabase_admin import supabase_admin
+from config import settings
 
 logger = logging.getLogger("agentguard.auth")
 
@@ -80,9 +81,9 @@ def register_request_otp(
         )
 
     # 2. Anti-Enumeration & Duplicate Check:
-    # If account exists, record probe for IP rate limiting and return generic response
+    # If account exists and is ACTIVE, record probe for IP rate limiting and return generic response
     existing_user = db.query(models.User).filter(models.User.email == clean_email).first()
-    if existing_user:
+    if existing_user and existing_user.status == "ACTIVE":
         otp_service.record_ip_probe(db, ip_addr, clean_email, PURPOSE_REGISTRATION)
         audit = models.AuditLog(
             event_type="USER_REGISTER_OTP_REQUESTED",
@@ -175,9 +176,10 @@ def register_verify_otp(
             detail="Verification code must be exactly 6 digits."
         )
 
-    # 1. Atomic Verification (Enforces max 5 attempts & 10-minute expiration)
+    # 1. Verification without premature consumption (Enforces max 5 attempts & 10-minute expiration)
+    # The challenge is consumed ONLY after authoritative account creation succeeds.
     valid, err_msg, challenge = otp_service.verify_challenge(
-        db, clean_email, PURPOSE_REGISTRATION, req.otp
+        db, clean_email, PURPOSE_REGISTRATION, req.otp, consume=False
     )
     if not valid or not challenge:
         raise HTTPException(
@@ -185,9 +187,9 @@ def register_verify_otp(
             detail=err_msg or "Invalid or expired verification code."
         )
 
-    # 2. Check if user already exists
+    # 2. Check if active user already exists
     existing_user = db.query(models.User).filter(models.User.email == clean_email).first()
-    if existing_user:
+    if existing_user and existing_user.status == "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email address already exists. Please log in."
@@ -198,13 +200,7 @@ def register_verify_otp(
     org_name = meta.get("org_name") or f"{full_name}'s Organization"
     password_hash = meta.get("password_hash")
 
-    # 3. Transactional Organization Creation
-    org = models.Organization(name=org_name)
-    db.add(org)
-    db.commit()
-    db.refresh(org)
-
-    # 4. Safe Supabase Auth Synchronization (if configured)
+    # 3. Safe Supabase Auth Synchronization (Fail-Closed)
     auth_user_id = None
     if supabase_admin.is_configured:
         try:
@@ -216,26 +212,58 @@ def register_verify_otp(
                 email_confirm=True
             )
         except Exception as e:
-            logger.warning(f"[Registration] Supabase Auth creation notice: {e}")
+            logger.error(f"[Registration] Supabase Auth creation error: {e}")
+            auth_user_id = None
 
-    # Immediately scrub ephemeral encrypted password from challenge metadata
-    setattr(challenge, "metadata_json", {"full_name": full_name, "org_name": org_name, "completed": True})
-    db.commit()
+        if not auth_user_id:
+            # Registration MUST fail closed — do NOT create active local user, do NOT consume OTP
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Unable to complete account registration with identity provider. Please try again."
+            )
+    elif settings.ENVIRONMENT == "production":
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Identity provider configuration is required for registration in production."
+        )
 
-    # 5. Transactional User Creation (Strictly defaults to USER role)
-    user = models.User(
-        org_id=org.id,
-        auth_user_id=auth_user_id,
-        email=clean_email,
-        password_hash=password_hash,
-        full_name=full_name,
-        role="USER",
-        department="General",
-        status="ACTIVE"
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    # 4. Transactional Organization & User Creation / Activation
+    if existing_user:
+        user = existing_user
+        setattr(user, "auth_user_id", auth_user_id)
+        setattr(user, "status", "ACTIVE")
+        if password_hash:
+            setattr(user, "password_hash", password_hash)
+        if full_name:
+            setattr(user, "full_name", full_name)
+        org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
+        if not org:
+            org = models.Organization(name=org_name)
+            db.add(org)
+            db.flush()
+            setattr(user, "org_id", org.id)
+    else:
+        org = models.Organization(name=org_name)
+        db.add(org)
+        db.flush()
+
+        user = models.User(
+            org_id=org.id,
+            auth_user_id=auth_user_id,
+            email=clean_email,
+            password_hash=password_hash,
+            full_name=full_name,
+            role="USER",
+            department="General",
+            status="ACTIVE"
+        )
+        db.add(user)
+        db.flush()
+
+    # 5. Atomically consume challenge and scrub ephemeral credentials
+    otp_service.consume_challenge(db, challenge, scrub=True)
 
     # 6. Session Creation
     token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
@@ -624,13 +652,13 @@ def forgot_password_reset(
 
     user = None
     if req.reset_ticket:
-        valid, err_msg, user_id = otp_service.verify_reset_ticket(req.reset_ticket, clean_email)
+        valid, err_msg, user_id = otp_service.verify_reset_ticket(db, req.reset_ticket, clean_email, consume=True)
         if not valid or not user_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg or "Invalid reset ticket.")
         user = db.query(models.User).filter(models.User.id == user_id).first()
     elif req.otp:
         valid, err_msg, challenge = otp_service.verify_challenge(
-            db, clean_email, PURPOSE_PASSWORD_RESET, req.otp
+            db, clean_email, PURPOSE_PASSWORD_RESET, req.otp, consume=True
         )
         if not valid or not challenge:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err_msg or "Invalid recovery code.")
@@ -644,15 +672,33 @@ def forgot_password_reset(
     if not user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User account not found.")
 
-    # 1. Update Database Password Hash
-    setattr(user, "password_hash", security.get_password_hash(req.new_password))
-
-    # 2. Update Supabase Auth Password if configured
-    if user.auth_user_id and supabase_admin.is_configured:
+    # 1. Update Supabase Auth Password first for Supabase-backed users
+    is_supabase_user = bool(user.auth_user_id and supabase_admin.is_configured)
+    if is_supabase_user:
         try:
-            supabase_admin.update_user_password(str(user.auth_user_id), req.new_password)
+            sb_success = supabase_admin.update_user_password(str(user.auth_user_id), req.new_password)
         except Exception as e:
-            logger.warning(f"[PasswordReset] Supabase Auth password update notice: {e}")
+            logger.error(f"[PasswordReset] Supabase Auth password update error: {e}")
+            sb_success = False
+
+        if not sb_success:
+            # DO NOT commit local password hash update if authoritative update failed
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to update password with identity provider. Please try again."
+            )
+        # Commit local password hash ONLY after authoritative provider has succeeded
+        setattr(user, "password_hash", security.get_password_hash(req.new_password))
+    else:
+        # Local-only account: verify environment policy allows local auth
+        if settings.ENVIRONMENT == "production" and not getattr(settings, "ALLOW_LOCAL_LOGIN", False):
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Password updates for local accounts are disabled in production."
+            )
+        setattr(user, "password_hash", security.get_password_hash(req.new_password))
 
     # 3. Session Revocation Policy: Revoke all active sessions for this user
     revoked_count = db.query(models.Session).filter(
@@ -676,7 +722,36 @@ def forgot_password_reset(
         }
     )
     db.add(audit)
-    db.commit()
+
+    try:
+        db.commit()
+    except Exception as commit_err:
+        logger.error(f"[PasswordReset] Local database commit failed after Supabase update: {commit_err}")
+        db.rollback()
+        # Reconciliation: Authoritative update already succeeded in Supabase.
+        # Retry session revocation in a focused transaction to ensure existing sessions cannot persist.
+        try:
+            db.query(models.Session).filter(
+                models.Session.user_id == user.id,
+                models.Session.revoked == False
+            ).update({"revoked": True}, synchronize_session=False)
+            db.commit()
+        except Exception as retry_err:
+            logger.warning(f"[PasswordReset] Session revocation retry failed: {retry_err}")
+            db.rollback()
+
+        if is_supabase_user:
+            # For Supabase-backed users, authoritative credential update has already succeeded in Supabase.
+            # Stale local credentials cannot be used (local-login strictly forbids auth_user_id accounts).
+            # Return success guidance to user so they proceed to log in with their new password.
+            return schemas.OtpActionResponse(
+                status="SUCCESS",
+                message="Password has been reset successfully with the identity provider. All active sessions have been revoked. Please log in with your new password."
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist password update. Please try again."
+        )
 
     return schemas.OtpActionResponse(
         status="SUCCESS",
@@ -715,7 +790,21 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
                 email_confirm=True
             )
         except Exception as e:
-            logger.warning(f"[LegacyRegister] Supabase Admin sync notice: {e}")
+            logger.error(f"[LegacyRegister] Supabase Admin sync error: {e}")
+            auth_user_id = None
+
+        if not auth_user_id:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Identity provider synchronization failed. Registration cannot complete without authoritative identity."
+            )
+    elif not auth_user_id and settings.ENVIRONMENT == "production":
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Identity provider configuration is required for registration in production."
+        )
 
     # 4. Transactional User Creation (Strictly default to safe USER role)
     hashed_pw = security.get_password_hash(req.password) if req.password else None
@@ -881,15 +970,32 @@ def login(
 @router.post("/local-login", response_model=schemas.TokenResponse)
 def local_login(req: schemas.LocalLoginRequest, db: Session = Depends(get_db)):
     """
-    Fallback login for users who have a local password_hash but no Supabase Auth account.
-    This covers demo/seeded users created directly in the database by seed scripts.
+    Fallback login for explicitly supported local-only or development accounts.
+    - Prohibited in production unless explicitly enabled via environment configuration.
+    - Strictly rejects accounts with a Supabase identity when Supabase is configured.
     """
-    user = db.query(models.User).filter(models.User.email == req.email).first()
+    is_production = (settings.ENVIRONMENT == "production")
+    allow_local = getattr(settings, "ALLOW_LOCAL_LOGIN", False)
+    if is_production and not allow_local:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Local password authentication is disabled in this environment. Please authenticate via the enterprise identity provider."
+        )
+
+    clean_email = otp_service.normalize_email(req.email)
+    user = db.query(models.User).filter(models.User.email == clean_email).first()
 
     if not user or not user.password_hash:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
+        )
+
+    # Supabase Auth bypass protection: accounts managed by Supabase cannot use local-login fallback
+    if user.auth_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Local login is not permitted for accounts managed by Supabase Auth. Please sign in with Supabase."
         )
 
     if not security.verify_password(req.password, str(user.password_hash)):

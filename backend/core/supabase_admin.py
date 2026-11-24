@@ -135,17 +135,17 @@ class SupabaseAdminClient:
             )
             return auth_id
 
-        # 422: user already exists in Supabase Auth OR validation failure
-        if status_code == 422:
+        # 422: user already exists in Supabase Auth OR network timeout/lost response (0)
+        # In both cases, recover the existing identity safely without overwriting its password
+        if status_code in (422, 0):
             existing_id = self._get_existing_user_id(email)
             if existing_id:
                 logger.info(
-                    "[SupabaseAdmin] Supabase Auth user already exists for %s (id=%s); synchronizing credentials",
-                    email, existing_id
+                    "[SupabaseAdmin] Supabase Auth user already exists for %s (id=%s, status=%s); linking identity safely without modifying password",
+                    email, existing_id, status_code
                 )
                 self.update_user(
                     existing_id,
-                    password=password,
                     email_confirm=email_confirm,
                     full_name=full_name
                 )
@@ -202,7 +202,17 @@ class SupabaseAdminClient:
 
         url = f"{self.admin_api}/{auth_user_id}"
         status_code, _ = self._request("PUT", url, payload)
-        return status_code == 200
+        if status_code == 200:
+            return True
+        if status_code == 0:
+            # Network timeout or lost response: retry once idempotently
+            logger.warning(
+                f"[SupabaseAdmin] Retrying idempotent update_user for {auth_user_id} after transient network issue"
+            )
+            retry_code, _ = self._request("PUT", url, payload)
+            if retry_code == 200:
+                return True
+        return False
 
     def update_user_password(self, auth_user_id: str, new_password: str) -> bool:
         """
