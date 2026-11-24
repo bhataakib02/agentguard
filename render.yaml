@@ -1,16 +1,146 @@
+envVarGroups:
+  - name: agentguard-shared
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: ENVIRONMENT
+        value: production
+      - key: PROJECT_NAME
+        value: AGENTGUARD
+      - key: API_V1_STR
+        value: /api
+      - key: AUTO_BOOTSTRAP_DB
+        value: "false"
+      - key: ALLOW_LOCAL_LOGIN
+        value: "false"
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "false"
+
 services:
+  # ---------------------------------------------------------------------------
+  # 1. Managed Redis / Key Value Broker Service
+  # ---------------------------------------------------------------------------
+  - type: keyvalue
+    name: agentguard-redis
+    region: singapore
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  # ---------------------------------------------------------------------------
+  # 2. Primary Web API Service (FastAPI / Uvicorn)
+  # ---------------------------------------------------------------------------
   - type: web
     name: agentguard-backend
-    env: python
+    runtime: python
     region: singapore
     plan: starter
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --ws-ping-interval 20 --ws-ping-timeout 20
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.12
-      - key: PROJECT_NAME
-        value: AGENTGUARD
-      - key: API_V1_STR
-        value: /api
+      - fromGroup: agentguard-shared
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # 3. Asynchronous Celery Worker Service
+  # ---------------------------------------------------------------------------
+  - type: worker
+    name: agentguard-worker
+    runtime: python
+    region: singapore
+    plan: starter
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A celery_app.celery_app worker --loglevel=info --concurrency=4 -Q celery
+    envVars:
+      - fromGroup: agentguard-shared
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # 4. Periodic Celery Beat Scheduler Service
+  # ---------------------------------------------------------------------------
+  - type: worker
+    name: agentguard-beat
+    runtime: python
+    region: singapore
+    plan: starter
+    numInstances: 1
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A celery_app.celery_app beat --loglevel=info
+    envVars:
+      - fromGroup: agentguard-shared
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: agentguard-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false

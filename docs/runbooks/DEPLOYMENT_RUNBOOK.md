@@ -292,3 +292,179 @@ Outbound webhook secrets are encrypted at rest using AES-256-GCM authenticated e
      b. Re-encrypt all secrets with the new `SECRET_KEY`.
      c. Commit re-encrypted records and update environment configuration.
 
+---
+
+## 10. Render Cloud Deployment Runbook (Redis, Celery Worker & Beat)
+
+### A. Render Services Topology
+AGENTGUARD's Render Blueprint (`render.yaml`) provisions four tightly integrated services in the Singapore region:
+
+| Service Name | Service Type | Runtime / Plan | Purpose |
+| :--- | :--- | :--- | :--- |
+| **`agentguard-redis`** | `keyvalue` | `starter` | Managed Redis/Valkey broker for task distribution & Pub/Sub |
+| **`agentguard-backend`** | `web` | `python` / `starter` | FastAPI ASGI web application serving HTTP and WebSockets |
+| **`agentguard-worker`** | `worker` | `python` / `starter` | Celery asynchronous worker consuming background tasks |
+| **`agentguard-beat`** | `worker` | `python` / `starter` | Celery Beat singleton scheduler dispatching periodic tasks |
+
+### B. Startup Commands
+Each service executes from the `backend/` working directory (`rootDir: backend`):
+
+1. **Web API (`agentguard-backend`)**:
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port $PORT --ws-ping-interval 20 --ws-ping-timeout 20
+   ```
+2. **Celery Worker (`agentguard-worker`)**:
+   ```bash
+   celery -A celery_app.celery_app worker --loglevel=info --concurrency=4 -Q celery
+   ```
+   - Consumes exclusively from the primary `celery` queue where tasks are routed.
+   - Concurrency set to 4 execution threads/processes.
+   - Does NOT run an HTTP server or bind to `$PORT`.
+3. **Celery Beat (`agentguard-beat`)**:
+   ```bash
+   celery -A celery_app.celery_app beat --loglevel=info
+   ```
+   - Configured with `numInstances: 1` to guarantee a single scheduler instance.
+   - Dispatches tasks to the Redis broker according to `beat_schedule`.
+   - Does NOT consume tasks or run an HTTP server.
+
+### C. Redis Broker Architecture
+- **Service**: Render Key Value (`type: keyvalue`, plan `starter`).
+- **Access Control**: `ipAllowList: []` isolates Redis strictly to Render's internal private network.
+- **Eviction Policy**: `maxmemoryPolicy: noeviction` ensures Celery queues never drop pending tasks under memory pressure.
+- **Dynamic Ingestion**: Web, Worker, and Beat dynamically receive the internal connection string via `fromService`:
+  ```yaml
+  - key: REDIS_URL
+    fromService:
+      type: keyvalue
+      name: agentguard-redis
+      property: connectionString
+  - key: CELERY_BROKER_URL
+    fromService:
+      type: keyvalue
+      name: agentguard-redis
+      property: connectionString
+  - key: CELERY_RESULT_BACKEND
+    fromService:
+      type: keyvalue
+      name: agentguard-redis
+      property: connectionString
+  ```
+- **Zero Credentials in Code**: Connection passwords and host addresses are automatically managed by Render.
+
+### D. Required Environment Variables
+
+#### 1. Shared Non-Secret Variables (`envVarGroups: agentguard-shared`)
+- `PYTHON_VERSION=3.10.12`
+- `ENVIRONMENT=production`
+- `PROJECT_NAME=AGENTGUARD`
+- `API_V1_STR=/api`
+- `AUTO_BOOTSTRAP_DB=false` (Schema migrations managed explicitly; DDL on startup disabled)
+- `ALLOW_LOCAL_LOGIN=false` (Strictly enforces Supabase authentication in production)
+- `CELERY_TASK_ALWAYS_EAGER=false` (Forces asynchronous dispatch via Redis broker)
+
+#### 2. Service Secrets (`sync: false`)
+During Blueprint deployment or in the Render Dashboard, provision the following secrets for `agentguard-backend`, `agentguard-worker`, and `agentguard-beat`:
+- `DATABASE_URL`: Production PostgreSQL connection string (`postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/[DATABASE]`).
+- `SECRET_KEY`: High-entropy 64-character signing secret (`openssl rand -hex 32`).
+- `SUPABASE_URL`: Supabase project URL (`https://[PROJECT-ID].supabase.co`).
+- `SUPABASE_PUBLISHABLE_KEY`: Supabase client anon/publishable key.
+- `SUPABASE_JWT_SECRET`: Supabase JWT secret for validating access tokens.
+
+### E. Operational Verification Procedures
+
+#### 1. Verifying Worker is Consuming Tasks
+Inspect the Render deployment logs for `agentguard-worker`:
+```text
+[2026-11-24 16:00:00,000: INFO/MainProcess] Connected to redis://red-xxxx:6379//
+[2026-11-24 16:00:00,100: INFO/MainProcess] mingle: searching for neighbors
+[2026-11-24 16:00:01,200: INFO/MainProcess] mingle: all OK
+[2026-11-24 16:00:01,300: INFO/MainProcess] celery@agentguard-worker ready.
+[2026-11-24 16:00:01,350: INFO/MainProcess] [queues]
+    . celery exchange=celery(direct) key=celery
+[2026-11-24 16:00:01,400: INFO/MainProcess] [tasks]
+    . tasks.auth_tasks.cleanup_expired_otp_challenges_task
+    . tasks.escalation_tasks.escalate_approvals_task
+    . tasks.notification_tasks.deliver_notification_task
+    . tasks.report_tasks.execute_scheduled_reports_task
+    . tasks.retention_tasks.purge_expired_data_task
+    . tasks.sandbox_tasks.cleanup_expired_sandbox_artifacts_task
+    . tasks.siem_tasks.retry_pending_siem_deliveries_task
+    . tasks.webhook_tasks.dispatch_webhook_task
+    . tasks.webhook_tasks.retry_pending_webhooks_task
+```
+Or check worker health via authenticated API:
+```bash
+GET /api/system/health
+```
+Expected response:
+```json
+{
+  "worker": {
+    "status": "HEALTHY",
+    "mode": "DISTRIBUTED",
+    "active_workers": 1,
+    "worker_nodes": ["celery@agentguard-worker-..."]
+  }
+}
+```
+
+#### 2. Verifying Beat is Dispatching Hourly OTP Cleanup
+Inspect the Render deployment logs for `agentguard-beat`:
+```text
+[2026-11-24 16:00:00,000: INFO/MainProcess] beat: Starting...
+[2026-11-24 16:00:00,100: INFO/MainProcess] Writing entries...
+[2026-11-24 17:00:00,000: INFO/MainProcess] Scheduler: Sending due task cleanup-expired-otp-challenges (tasks.auth_tasks.cleanup_expired_otp_challenges_task)
+```
+Simultaneously, `agentguard-worker` logs will record task receipt and execution:
+```text
+[2026-11-24 17:00:00,050: INFO/MainProcess] Task tasks.auth_tasks.cleanup_expired_otp_challenges_task[...] received
+[2026-11-24 17:00:00,200: INFO/ForkPoolWorker-1] [AuthCleanup] Successfully processed 0 expired/abandoned OTP challenges.
+[2026-11-24 17:00:00,210: INFO/ForkPoolWorker-1] Task tasks.auth_tasks.cleanup_expired_otp_challenges_task[...] succeeded in 0.015s
+```
+
+#### 3. How to Safely Test OTP Cleanup in Staging
+To test the OTP cleanup task in a staging environment without waiting for the hourly schedule:
+1. Trigger task directly via staging Celery worker CLI or Python shell:
+   ```bash
+   python -c "
+   from celery_app import celery_app
+   from tasks.auth_tasks import cleanup_expired_otp_challenges_task
+   res = cleanup_expired_otp_challenges_task.apply_async(args=[500, 1])
+   print('Task dispatched:', res.id)
+   print('Result:', res.get(timeout=10))
+   "
+   ```
+2. Verify the task output:
+   ```json
+   {
+     "status": "COMPLETED",
+     "cleaned_count": 0,
+     "timestamp": "2026-11-24T17:00:00.000000"
+   }
+   ```
+3. Run the automated staging test runner:
+   ```bash
+   python backend/scripts/verify_render_deployment.py
+   pytest backend/tests/test_otp_cleanup_and_reconciliation.py -v
+   ```
+
+#### 4. Diagnosing Redis Connection and Celery Import Failures
+- **Symptom: `Broker unreachable` or `redis.exceptions.ConnectionError`**:
+  - Check that `agentguard-redis` is healthy and in the same region (`singapore`).
+  - Verify `REDIS_URL` is populated in service environment: Render automatically injects `fromService`.
+  - Ensure `ipAllowList: []` is present (allowing internal private connections within Render).
+  - Test broker reachability via `inspect_broker_health()` in `celery_app.py`.
+- **Symptom: `ModuleNotFoundError` or `ImportError: cannot import name celery_app`**:
+  - Verify `rootDir: backend` is specified in `render.yaml` for both Worker and Beat.
+  - Verify module specifier is `celery_app.celery_app` (module `celery_app`, object `celery_app`).
+  - Ensure all dependencies in `requirements.txt` installed cleanly during `buildCommand: pip install -r requirements.txt`.
+
+#### 5. Recovery if Beat Process Stops
+Render automatically restarts failed background workers if their process exits.
+If Celery Beat fails to recover or becomes stalled:
+1. In the Render Dashboard, navigate to `agentguard-beat` -> **Manual Deploy** -> **Restart Service**.
+2. If Beat was stopped due to a corrupt schedule database file (`celerybeat-schedule` lock):
+   - Trigger a clean deploy: Render containers are ephemeral, so redeploying provisions a fresh container and clears any stale lockfile.
+3. Verify only one Beat instance is running (`numInstances: 1`). Never scale Beat horizontally; duplicate Beat instances will dispatch duplicate periodic tasks.
+
