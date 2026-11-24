@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
 
       setMessage(resp?.message || "If the account exists and is eligible, a 6-digit recovery code has been sent.");
       setStep("RESET");
-      setCooldown(resp?.cooldown_seconds || 60);
+      setCooldown(resp?.cooldown_seconds || 120);
     } catch (err: any) {
       setError(err?.message || "Failed to process recovery request.");
     } finally {
@@ -82,7 +82,7 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       setMessage(resp?.message || "A fresh recovery code has been dispatched.");
-      setCooldown(resp?.cooldown_seconds || 60);
+      setCooldown(resp?.cooldown_seconds || 120);
     } catch (err: any) {
       setError(err?.message || "Failed to resend recovery code.");
     } finally {

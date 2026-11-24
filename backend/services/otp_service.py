@@ -141,7 +141,7 @@ class OtpService:
     @staticmethod
     def check_resend_cooldown(db: Session, email: str, purpose: str) -> Tuple[bool, int]:
         """
-        Checks if an unconsumed challenge exists that is still within the 60s resend cooldown.
+        Checks if an unconsumed challenge exists that is still within the 120s resend cooldown.
         Returns (is_cooldown_active, remaining_seconds).
         """
         norm_email = OtpService.normalize_email(email)

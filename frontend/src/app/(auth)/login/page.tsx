@@ -130,7 +130,7 @@ export default function LoginPage() {
 
       setMessage(resp?.message || "If the account exists and is eligible, a 6-digit verification code has been sent.");
       setOtpStep("VERIFY");
-      setCooldown(resp?.cooldown_seconds || 60);
+      setCooldown(resp?.cooldown_seconds || 120);
     } catch (err: any) {
       setError(err.message || "Failed to request OTP code.");
     } finally {

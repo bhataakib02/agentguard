@@ -122,7 +122,7 @@ function VerifyOtpForm() {
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       setMessage(resp?.message || "A fresh 6-digit verification code has been dispatched.");
-      setCooldown(resp?.cooldown_seconds || 60);
+      setCooldown(resp?.cooldown_seconds || 120);
     } catch (err: any) {
       setError(err?.message || "Failed to resend passcode.");
     } finally {

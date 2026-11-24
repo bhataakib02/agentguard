@@ -1,24 +1,24 @@
 # AGENTGUARD — DATABASE MIGRATION & RECONCILIATION RUNBOOK
 
-**Document Version:** 2.0.0 (Alembic Baseline Reconciliation & Migration Ownership)  
+**Document Version:** 2.1.0 (Alembic Baseline Reconciliation & 12-Point Schema Parity)  
 **Classification:** Enterprise Control Plane Database Operations  
 
 ---
 
-## 1. Database Migration Ownership Model
+## 1. Dual-Tier Database Architecture & Ownership Model
 
-To prevent schema conflicts and split-brain migrations between Alembic and Supabase, AGENTGUARD enforces a strict separation of database concerns:
+To prevent schema divergence and split-brain migrations between Alembic and Supabase, AGENTGUARD enforces a strict separation of database ownership:
 
-| Domain / Responsibility | Governing System | Location | Description |
+| Layer / Responsibility | Governing System | Source of Truth | Scope |
 | :--- | :--- | :--- | :--- |
-| **Application Tables & Schema** | **Alembic** | `backend/alembic/versions/` | All application tables, columns, data types, primary keys, foreign keys, unique constraints, and performance indexes. |
-| **Extensions, RLS & DB Roles** | **Supabase Migrations** | `supabase/migrations/` | PostgreSQL extensions (`uuid-ossp`, `pgcrypto`), Row-Level Security policies (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`), role grants, and security barriers. |
-| **Canonical Seed Data** | **Application Bootstrap** | `backend/bootstrap.py` | Idempotent reference data seeding (such as canonical subscription plans `FREE`, `STARTER`, `PROFESSIONAL`, `ENTERPRISE`). |
+| **Application Schema** | **Alembic** | `backend/alembic/versions/` | All 49 baseline application tables, plus forward extension tables (e.g. `otp_challenges`), columns, data types, nullability, primary keys, foreign keys, unique constraints, and indexes. |
+| **Infrastructure & Security** | **Supabase Migrations** | `supabase/migrations/` | PostgreSQL extensions (`uuid-ossp`, `pgcrypto`), Row-Level Security (RLS) policies (`ENABLE ROW LEVEL SECURITY`, `CREATE POLICY`), database roles, and connection grants. |
+| **Canonical Seed Data** | **Application Bootstrap** | `backend/bootstrap.py` | Idempotent reference data seeding (canonical subscription plans `FREE`, `STARTER`, `PROFESSIONAL`, `ENTERPRISE`). |
 
-### Rules for Schema Changes
-1. **Never duplicate table DDL in both systems.** Application tables and columns must **only** be declared in SQLAlchemy models and managed via Alembic revision scripts.
-2. **Never edit existing migration files** once deployed. Always generate a forward migration (`alembic revision -m "..."`).
-3. **`AUTO_BOOTSTRAP_DB=false` in production.** Production databases must strictly be migrated through version-controlled Alembic migration executions. Startup DDL generation is prohibited.
+### Core Architectural Invariants
+1. **Zero DDL Duplication:** Application tables and columns must **never** be defined or altered via raw SQL in Supabase migrations. They are exclusively authored in SQLAlchemy models and generated via Alembic.
+2. **`AUTO_BOOTSTRAP_DB=false` in Production:** Startup DDL creation (`create_all()`) is strictly prohibited in production and staging environments to protect database integrity.
+3. **Explicit Operator Authorization:** Neither `main.py`, `bootstrap.py`, nor Celery workers perform automatic baseline adoption or schema migrations. Migrations must be separately authorized and executed by an operator.
 
 ---
 
@@ -28,83 +28,84 @@ To prevent schema conflicts and split-brain migrations between Alembic and Supab
 (Base) 
   │
   ▼
-[ 0001_initial_canonical_schema ]  <-- Captures 49 baseline canonical application tables
+[ 0001_initial_canonical_schema ]  <-- 49 baseline application tables (canonical control plane)
   │
   ▼
-[ 0002_add_otp_challenges ]        <-- Adds otp_challenges table and 6 performance indexes
+[ 0002_add_otp_challenges ]        <-- otp_challenges table (HMAC storage, 120s cooldown, 6 indexes)
 ```
 
-* **Revision `0001_initial_canonical_schema`:** Baseline canonical schema covering all 49 core platform tables (organizations, users, sessions, agents, decisions, etc.).
-* **Revision `0002_add_otp_challenges`:** Creates the `otp_challenges` table with HMAC hash storage, attempts tracking, expiry bounds, and 6 performance indexes.
+* **Revision `0001_initial_canonical_schema`:** Baseline canonical schema capturing all 49 core platform tables (`organizations`, `users`, `sessions`, `agents`, `decisions`, etc.).
+* **Revision `0002_add_otp_challenges`:** Creates the `otp_challenges` table with HMAC hash representation, 120-second resend cooldown boundary, 10-minute expiry, 5-attempt brute-force lockout, and 6 performance indexes.
 
 ---
 
-## 3. Fresh (Greenfield) Database Provisioning
+## 3. Preflight Schema Audit & Status Classifications
 
-For a brand new, completely empty PostgreSQL database:
+The reconciliation tool provides a read-only, non-mutating preflight audit:
 
 ```bash
-# 1. Ensure DATABASE_URL is configured
-export DATABASE_URL="postgresql://user:pass@host:5432/dbname"
-
-# 2. Run Alembic upgrade head
-alembic upgrade head
+python backend/scripts/reconcile_alembic_baseline.py --preflight
 ```
 
-This sequentially executes:
-1. `0001_initial_canonical_schema`: Creates extensions and all 49 baseline tables.
-2. `0002_add_otp_challenges`: Creates `otp_challenges` and its indexes.
-3. Sets `alembic_version` to `0002_add_otp_challenges`.
+### Preflight Status Taxonomy
+* **`EMPTY`**: Zero tables found in the database. Safe for greenfield `alembic upgrade head`.
+* **`MATCHING_UNSTAMPED_BASELINE`**: Exactly 49 baseline tables match the canonical manifest 1:1; `alembic_version` is absent; `otp_challenges` is absent. **Only in this state is adoption permitted.**
+* **`ALREADY_ADOPTED`**: `alembic_version` already contains `0001_initial_canonical_schema` or `0002_add_otp_challenges`.
+* **`PARTIALLY_MIGRATED`**: Incomplete set of baseline tables found (< 49). Adoption is strictly blocked.
+* **`SCHEMA_MISMATCH`**: Tables exist but column, type, nullability, PK, or FK differences are detected. Adoption is strictly blocked.
+* **`CONFLICTING_REVISION`**: `alembic_version` exists but points to an unrecognized or conflicting revision. Adoption is strictly blocked.
+
+### 12-Point Schema Parity Audit Matrix
+The tool evaluates 12 categories, reporting `[MATCH]`, `[MISMATCH]`, `[NOT CHECKED]`, or `[NOT APPLICABLE]`:
+1. **Column Data Types:** Invariant type categories (String, Integer, Float, DateTime, JSON, GUID).
+2. **Nullability:** Strict validation of required `NOT NULL` columns.
+3. **Server Defaults:** Defaults inspection.
+4. **Identity & Generated Columns:** Application-level UUID generation (`NOT APPLICABLE`).
+5. **Primary Keys:** Constrained columns and single/composite PK definitions.
+6. **Foreign Keys:** References, constrained local columns, and target tables.
+7. **Unique Constraints:** Table-level and column-level unique constraints.
+8. **Check Constraints:** Table check constraints.
+9. **Index Definitions:** Names, target columns, and uniqueness.
+10. **Sequences & Ownership:** Sequence bindings (`MATCH`).
+11. **PostgreSQL Extensions:** Verified `uuid-ossp` and `pgcrypto` installed (`MATCH`).
+12. **RLS Policies & Grants:** Verified Supabase RLS security layer (`MATCH`).
 
 ---
 
 ## 4. Existing Database Baseline Adoption (Reconciliation)
 
-When connecting Alembic to an existing database whose baseline tables were provisioned prior to Alembic tracking (e.g. initial Supabase SQL schemas):
+When adopting an existing database whose baseline was provisioned prior to Alembic tracking:
 
 > [!CAUTION]
 > Never run `alembic upgrade head` blindly on an unstamped existing database! It will attempt to recreate existing tables and fail with `relation already exists`.
-> Never run `alembic stamp` without executing the automated preflight reconciliation audit.
+> Production adoption and migration require separate explicit authorization.
 
-### Step 1: Pre-Migration Backup
-Always capture an authoritative snapshot prior to migration activities:
+### Step 1: Pre-Migration Backup Snapshot
+Always take an authoritative database dump prior to adoption:
 ```bash
 pg_dump -h <HOST> -p 5432 -U <USER> -d <DBNAME> -F c -b -v -f /backups/pre_reconciliation_$(date +%Y%m%d_%H%M%S).dump
 ```
 
-### Step 2: Execute Read-Only Preflight Audit
-Run the baseline reconciler in preflight mode:
+### Step 2: Run Read-Only Preflight
 ```bash
 python backend/scripts/reconcile_alembic_baseline.py --preflight
 ```
+Confirm `Audit Status: MATCHING_UNSTAMPED_BASELINE` and `Eligible for Adoption: True`.
 
-**Expected Preflight Output:**
-* `Audit Status`: `MATCHING_UNSTAMPED_BASELINE`
-* `Total Tables in DB`: `49`
-* `Columns Audited`: `528`
-* `Missing Baseline Tabs`: `[]`
-* `Column Diffs`: `0`
-* `Eligible for Adoption`: `True`
-
-If any diffs, missing tables, or conflicting revisions are reported, **STOP**. Resolve the discrepancies before proceeding.
-
-### Step 3: Authorized Baseline Adoption
-Only after preflight reports `Eligible for Adoption: True`, execute the baseline adoption:
+### Step 3: Execute Authorized Adoption
 ```bash
 python backend/scripts/reconcile_alembic_baseline.py --adopt --confirm
 ```
+*Stamps `0001_initial_canonical_schema` transactionally without modifying application data.*
 
-This safely stamps `alembic_version` with `0001_initial_canonical_schema` without mutating or dropping any application data.
-
-### Step 4: Apply Pending Migration 0002
-Now that the baseline is authoritatively adopted, apply migration 0002:
+### Step 4: Apply Migration 0002
 ```bash
 alembic upgrade head
 ```
 
-### Step 5: Post-Migration Verification
-Verify that `otp_challenges` exists and `alembic_version` is at head:
+### Step 5: Verify Post-Migration Revision & Schema
 ```bash
+alembic current
 python -c "
 from database import engine
 from sqlalchemy import inspect
@@ -118,48 +119,50 @@ print('SUCCESS: otp_challenges created with all 6 indexes!')
 
 ---
 
-## 5. Rollback & Disaster Recovery Procedures
+## 5. Greenfield (Fresh) Database Installation
+
+For a brand new empty database:
+```bash
+export DATABASE_URL="postgresql://user:pass@host:5432/dbname"
+alembic upgrade head
+```
+Executes `0001_initial_canonical_schema` followed by `0002_add_otp_challenges` cleanly.
+
+---
+
+## 6. Rollback & Disaster Recovery Procedures
 
 ### A. Rolling Back Migration 0002
 If an issue occurs with `otp_challenges`, downgrade safely to revision 0001:
 ```bash
 alembic downgrade 0001_initial_canonical_schema
 ```
-* **Effect:** Drops the `otp_challenges` table and its 6 indexes.
-* **Safety:** Does NOT drop or alter any of the 49 baseline application tables.
+* **Effect:** Drops table `otp_challenges` and its 6 indexes.
+* **Safety:** Does **not** touch or drop any of the 49 baseline application tables.
 
 ### B. Recovery from an Interrupted Migration
-If a migration is interrupted (e.g., process termination or network disconnect):
-1. Inspect the current revision in `alembic_version`:
-   ```bash
-   alembic current
-   ```
-2. Inspect the database with the preflight tool:
-   ```bash
-   python backend/scripts/reconcile_alembic_baseline.py --preflight
-   ```
-3. If partial objects exist, resolve the lock or drop uncommitted partial indexes, and re-run:
-   ```bash
-   alembic upgrade head
-   ```
+1. Inspect current recorded revision: `alembic current`
+2. Run preflight: `python backend/scripts/reconcile_alembic_baseline.py --preflight`
+3. Drop any orphaned index attempts if necessary, and re-run `alembic upgrade head`.
 
 ---
 
-## 6. Isolated Staging Database Validation Workflow
+## 7. Isolated Staging Database Validation Workflow
 
-When Docker Desktop or a staging PostgreSQL instance is available:
+When Docker Desktop or an authorized staging PostgreSQL instance is available:
 ```bash
-# 1. Start staging container
-docker-compose -f docker-compose.staging.yml up -d staging-postgres
+# 1. Start isolated staging containers
+docker-compose -f docker-compose.staging.yml up -d staging-postgres staging-redis
 
-# 2. Point to staging database
+# 2. Configure environment
 export DATABASE_URL="postgresql://agentguard_stage:stage_test_pass_only@127.0.0.1:5433/agentguard_staging"
 
-# 3. Validate greenfield upgrade chain
+# 3. Test greenfield migration
 alembic upgrade head
 
-# 4. Run test suite against staging database
+# 4. Run test suites
 pytest backend/tests/test_alembic_baseline_reconciliation.py -v
 pytest backend/tests/test_authentication_and_otp_flows.py -v
+pytest backend/tests/test_registration_consistency_scenarios.py -v
 pytest backend/tests/test_otp_cleanup_and_reconciliation.py -v
 ```

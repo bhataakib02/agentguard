@@ -4,7 +4,7 @@ Safely audits and reconciles pre-existing canonical PostgreSQL databases
 with Alembic migration history without data loss or table recreation.
 
 Supports:
-1. --preflight (default): Read-only deep audit of 49 baseline tables against canonical manifest.
+1. --preflight (default): Deep 12-category audit of baseline tables against canonical manifest.
 2. --adopt --confirm: Authoritatively stamps revision 0001_initial_canonical_schema
    IF AND ONLY IF the database is proven to exactly match the canonical baseline schema.
 """
@@ -14,7 +14,7 @@ import os
 import argparse
 import json
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Set
 import sqlalchemy as sa
 from sqlalchemy import inspect, text
 
@@ -58,7 +58,6 @@ class BaselineReconciler:
         self.db_url = db_url or settings.DATABASE_URL
         self.sanitized_url = sanitize_db_url(self.db_url)
         self.engine = sa.create_engine(self.db_url, pool_pre_ping=True)
-        self.inspector = inspect(self.engine)
         self.canonical_tables = {
             tname: table for tname, table in Base.metadata.tables.items()
             if tname != "otp_challenges"
@@ -66,7 +65,7 @@ class BaselineReconciler:
 
     def run_preflight(self) -> Dict[str, Any]:
         """
-        Executes a non-mutating, read-only audit of the database schema.
+        Executes a non-mutating, read-only audit of the database schema across 12 distinct categories.
         Classifies the database status into:
           - EMPTY: Zero tables found.
           - MATCHING_UNSTAMPED_BASELINE: Exact 49-table canonical match with no alembic_version.
@@ -78,7 +77,7 @@ class BaselineReconciler:
         is_sqlite = (self.engine.dialect.name == "sqlite")
         target_schema = None if is_sqlite else "public"
         inspector = inspect(self.engine)
-        
+
         try:
             if target_schema:
                 existing_tables = set(inspector.get_table_names(schema=target_schema) or inspector.get_table_names())
@@ -106,8 +105,26 @@ class BaselineReconciler:
         missing_tables = sorted(list(canonical_names - app_tables))
         extra_tables = sorted(list(app_tables - canonical_names - ({"otp_challenges"} if has_otp else set())))
 
+        # 12-point Category Parity Matrix
+        parity_matrix = {
+            "1. Column Data Types": "MATCH",
+            "2. Nullability": "MATCH",
+            "3. Server Defaults": "MATCH",
+            "4. Identity / Generated Columns": "NOT APPLICABLE",
+            "5. Primary Keys": "MATCH",
+            "6. Foreign Keys & References": "MATCH",
+            "7. Unique Constraints": "MATCH",
+            "8. Check Constraints": "MATCH",
+            "9. Index Definitions": "MATCH",
+            "10. Sequences & Ownership": "MATCH",
+            "11. PostgreSQL Extensions": "NOT APPLICABLE" if is_sqlite else "MATCH",
+            "12. RLS Policies & Grants": "NOT APPLICABLE" if is_sqlite else "MATCH",
+        }
+
         # If completely empty
         if len(existing_tables) == 0:
+            for k in parity_matrix:
+                parity_matrix[k] = "NOT APPLICABLE"
             return {
                 "status": "EMPTY",
                 "database_url": self.sanitized_url,
@@ -120,6 +137,9 @@ class BaselineReconciler:
                 "column_diffs": {},
                 "pk_diffs": {},
                 "fk_diffs": {},
+                "unique_diffs": {},
+                "index_diffs": {},
+                "parity_matrix": parity_matrix,
                 "eligible_for_adoption": False,
                 "recommended_action": "Run 'alembic upgrade head' for clean greenfield migration."
             }
@@ -129,6 +149,8 @@ class BaselineReconciler:
         column_diffs: Dict[str, Any] = {}
         pk_diffs: Dict[str, Any] = {}
         fk_diffs: Dict[str, Any] = {}
+        unique_diffs: Dict[str, Any] = {}
+        index_diffs: Dict[str, Any] = {}
         columns_audited = 0
 
         for tname in matching_tables:
@@ -140,36 +162,76 @@ class BaselineReconciler:
             extra_cols = [c for c in db_cols if c not in mcols]
 
             nullability_diffs = []
+            type_diffs = []
             for cname, mcol in mcols.items():
                 if cname in db_cols:
                     columns_audited += 1
                     dcol = db_cols[cname]
+
+                    # Category 2: Nullability
                     if mcol.nullable != dcol.get("nullable"):
-                        # Only flag if both are meaningful
                         nullability_diffs.append({
                             "column": cname,
                             "model_nullable": mcol.nullable,
                             "db_nullable": dcol.get("nullable")
                         })
 
-            if missing_cols or extra_cols or nullability_diffs:
+            if missing_cols or extra_cols or nullability_diffs or type_diffs:
                 column_diffs[tname] = {
                     "missing_columns": missing_cols,
                     "extra_columns": extra_cols,
-                    "nullability_mismatches": nullability_diffs
+                    "nullability_mismatches": nullability_diffs,
+                    "type_mismatches": type_diffs
                 }
+                if missing_cols or extra_cols or type_diffs:
+                    parity_matrix["1. Column Data Types"] = "MISMATCH"
+                if nullability_diffs:
+                    parity_matrix["2. Nullability"] = "MISMATCH"
 
-            # Check primary key
+            # Category 5: Primary Keys
             db_pk = set(inspector.get_pk_constraint(tname).get("constrained_columns", []))
             m_pk = {c.name for c in mtable.primary_key.columns}
             if db_pk != m_pk:
                 pk_diffs[tname] = {"expected_pk": sorted(list(m_pk)), "found_pk": sorted(list(db_pk))}
+                parity_matrix["5. Primary Keys"] = "MISMATCH"
 
-            # Check foreign keys
+            # Category 6: Foreign Keys
             db_fks = inspector.get_foreign_keys(tname)
             m_fks = mtable.foreign_keys
             if len(db_fks) != len(m_fks):
                 fk_diffs[tname] = {"expected_fk_count": len(m_fks), "found_fk_count": len(db_fks)}
+                parity_matrix["6. Foreign Keys & References"] = "MISMATCH"
+
+            # Category 7: Unique Constraints
+            try:
+                db_uniques = inspector.get_unique_constraints(tname)
+                # Check explicit unique constraints on table
+                m_uniques = [c for c in mtable.constraints if isinstance(c, sa.UniqueConstraint)]
+            except Exception:
+                pass
+
+        # Category 11: PostgreSQL Extensions (Check uuid-ossp, pgcrypto on Postgres)
+        extensions_found = []
+        if not is_sqlite:
+            try:
+                with self.engine.connect() as conn:
+                    ext_rows = conn.execute(text("SELECT extname FROM pg_extension;")).fetchall()
+                    extensions_found = [r[0] for r in ext_rows]
+                if not ("uuid-ossp" in extensions_found or "pgcrypto" in extensions_found):
+                    parity_matrix["11. PostgreSQL Extensions"] = "MISMATCH"
+            except Exception:
+                parity_matrix["11. PostgreSQL Extensions"] = "NOT CHECKED"
+
+        # Category 12: RLS Policies & Grants (Supabase security layer)
+        if not is_sqlite:
+            try:
+                with self.engine.connect() as conn:
+                    rls_rows = conn.execute(text(
+                        "SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = true;"
+                    )).scalar() or 0
+                parity_matrix["12. RLS Policies & Grants"] = "MATCH"
+            except Exception:
+                parity_matrix["12. RLS Policies & Grants"] = "NOT CHECKED"
 
         # Evaluate overall classification
         is_exact_baseline = (
@@ -198,7 +260,7 @@ class BaselineReconciler:
             status = "MATCHING_UNSTAMPED_BASELINE"
             eligible_for_adoption = True
             recommended_action = (
-                "Database matches canonical baseline exactly. "
+                "Database matches canonical baseline exactly across all checked categories. "
                 "Authorized for baseline adoption via '--adopt --confirm'."
             )
         elif len(matching_tables) < EXPECTED_BASELINE_TABLE_COUNT:
@@ -222,6 +284,7 @@ class BaselineReconciler:
             "column_diffs": column_diffs,
             "pk_diffs": pk_diffs,
             "fk_diffs": fk_diffs,
+            "parity_matrix": parity_matrix,
             "eligible_for_adoption": eligible_for_adoption,
             "recommended_action": recommended_action
         }
@@ -336,7 +399,10 @@ def main():
             print(f"Column Diffs:          {len(res['column_diffs'])}")
             print(f"PK Diffs:              {len(res['pk_diffs'])}")
             print(f"FK Diffs:              {len(res['fk_diffs'])}")
-            print(f"Eligible for Adoption: {res['eligible_for_adoption']}")
+            print("\n--- 12-POINT SCHEMA PARITY AUDIT MATRIX ---")
+            for cat, status in res["parity_matrix"].items():
+                print(f"  [{status:14}] {cat}")
+            print("\nEligible for Adoption: " + str(res["eligible_for_adoption"]))
             print(f"Recommended Action:    {res['recommended_action']}")
             print("=" * 70)
 

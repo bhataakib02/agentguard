@@ -79,7 +79,7 @@ class TestAuthenticationAndOtpFlows(unittest.TestCase):
         data = resp.json()
         self.assertEqual(data["status"], "SUCCESS")
         self.assertIn("6-digit verification code", data["message"])
-        self.assertEqual(data["cooldown_seconds"], 60)
+        self.assertEqual(data["cooldown_seconds"], 120)
 
         # Verify challenge in DB
         challenge = self.db.query(models.OtpChallenge).filter(
@@ -420,8 +420,8 @@ class TestAuthenticationAndOtpFlows(unittest.TestCase):
         valid_post, err_post, _ = otp_service.verify_challenge(self.db, test_email, PURPOSE_REGISTRATION, raw_code)
         self.assertFalse(valid_post)
 
-    def test_13_otp_resend_cooldown_60s(self):
-        """Requesting another OTP within 60s cooldown is rejected with HTTP 429."""
+    def test_13_otp_resend_cooldown_120s(self):
+        """Requesting another OTP within 120s cooldown is rejected with HTTP 429."""
         test_email = f"cd_{uuid.uuid4().hex[:6]}@enterprise.ai"
         # First request succeeds
         resp1 = client.post("/api/auth/register/request-otp", json={

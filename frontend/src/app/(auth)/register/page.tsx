@@ -45,7 +45,7 @@ export default function RegisterPage() {
 
       setMessage(resp?.message || "A 6-digit verification code has been dispatched to your email address.");
       setStep("VERIFY_OTP");
-      setCooldown(resp?.cooldown_seconds || 60);
+      setCooldown(resp?.cooldown_seconds || 120);
     } catch (err: any) {
       setError(err?.message || "Failed to initiate registration. Please check your details and try again.");
     } finally {
@@ -97,7 +97,7 @@ export default function RegisterPage() {
         }),
       });
       setMessage(resp?.message || "A fresh 6-digit verification code has been dispatched.");
-      setCooldown(resp?.cooldown_seconds || 60);
+      setCooldown(resp?.cooldown_seconds || 120);
     } catch (err: any) {
       setError(err?.message || "Failed to resend verification code.");
     } finally {

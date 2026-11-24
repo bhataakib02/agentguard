@@ -327,3 +327,61 @@ class TestBaselineReconciliation:
         indexes = {ix["name"] for ix in insp.get_indexes("otp_challenges")}
         for col in ["email", "purpose", "code_hash", "consumed", "expires_at", "created_at"]:
             assert f"ix_otp_challenges_{col}" in indexes
+
+    # 17. Pre-existing OTP table with incompatible index definition is rejected
+    def test_17_otp_incompatible_index_rejected(self, temp_db):
+        db_url, engine, _ = temp_db
+        alembic_ini_path = os.path.join(backend_dir, "alembic.ini")
+        alembic_cfg = Config(alembic_ini_path)
+        alembic_cfg.set_main_option("script_location", os.path.join(backend_dir, "alembic"))
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+
+        # Create baseline first
+        command.upgrade(alembic_cfg, BASELINE_REVISION)
+
+        # Manually create otp_challenges with an incompatible unique index
+        Base.metadata.tables["otp_challenges"].create(bind=engine, checkfirst=True)
+        with engine.connect() as conn:
+            conn.execute(sa.text("DROP INDEX IF EXISTS ix_otp_challenges_email;"))
+            conn.execute(sa.text("CREATE UNIQUE INDEX ix_otp_challenges_email ON otp_challenges (email);"))
+            conn.commit()
+
+        # Running migration 0002 should raise RuntimeError due to incompatible unique index
+        with pytest.raises(Exception) as exc_info:
+            command.upgrade(alembic_cfg, HEAD_REVISION)
+        assert "incompatible definition" in str(exc_info.value).lower()
+
+    # 18. Pre-existing OTP table missing required NOT NULL constraint is rejected
+    def test_18_otp_incompatible_nullability_rejected(self, temp_db):
+        db_url, engine, _ = temp_db
+        alembic_ini_path = os.path.join(backend_dir, "alembic.ini")
+        alembic_cfg = Config(alembic_ini_path)
+        alembic_cfg.set_main_option("script_location", os.path.join(backend_dir, "alembic"))
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+
+        command.upgrade(alembic_cfg, BASELINE_REVISION)
+
+        # Create corrupt otp_challenges where email is nullable
+        with engine.connect() as conn:
+            conn.execute(sa.text("""
+                CREATE TABLE otp_challenges (
+                    id CHAR(36) PRIMARY KEY,
+                    email VARCHAR NULL,
+                    purpose VARCHAR NOT NULL,
+                    code_hash VARCHAR NOT NULL,
+                    attempts INTEGER DEFAULT 0 NOT NULL,
+                    max_attempts INTEGER DEFAULT 5 NOT NULL,
+                    consumed BOOLEAN DEFAULT 0 NOT NULL,
+                    consumed_at DATETIME,
+                    expires_at DATETIME NOT NULL,
+                    resend_available_at DATETIME NOT NULL,
+                    ip_address VARCHAR,
+                    metadata_json JSON,
+                    created_at DATETIME
+                );
+            """))
+            conn.commit()
+
+        with pytest.raises(Exception) as exc_info:
+            command.upgrade(alembic_cfg, HEAD_REVISION)
+        assert "must be not null" in str(exc_info.value).lower()
