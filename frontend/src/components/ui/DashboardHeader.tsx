@@ -63,9 +63,12 @@ export default function DashboardHeader() {
         {/* Customer Organization Tenant Identity */}
         <div className="flex items-center gap-3">
           {tenantLogo ? (
-            <img
+            <Image
               src={tenantLogo}
               alt={`${tenantName} Logo`}
+              width={36}
+              height={36}
+              unoptimized
               className="w-9 h-9 rounded-[8px] object-cover border border-[#8064C8] shadow-sm shrink-0"
             />
           ) : (

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -23,7 +23,7 @@ export default function DecisionsPage() {
   const [enforcing, setEnforcing] = useState(false);
   const [paceResult, setPaceResult] = useState<any>(null);
 
-  const loadDecisions = async () => {
+  const loadDecisions = useCallback(async () => {
     try {
       const [decData, agData, metricsData] = await Promise.all([
         fetchApi("/decisions").catch(() => []),
@@ -33,19 +33,19 @@ export default function DecisionsPage() {
       setDecisions(decData || []);
       setAgents(agData || []);
       setMetrics(metricsData);
-      if (agData && agData.length > 0 && !selectedAgentCode) {
-        setSelectedAgentCode(agData[0].agent_code);
+      if (agData && agData.length > 0) {
+        setSelectedAgentCode((prev) => prev || agData[0].agent_code);
       }
     } catch (err) {
       console.error("Decisions fetch error:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadDecisions();
-  }, []);
+  }, [loadDecisions]);
 
   const handleEvaluate = async (executeBoundary: boolean = false) => {
     if (!selectedAgentCode) {

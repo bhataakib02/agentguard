@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import { fetchApi } from "@/lib/api";
 import {
   Building,
@@ -159,9 +160,12 @@ export default function OrganizationPage() {
       <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[12px] p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           {currentLogo ? (
-            <img
+            <Image
               src={currentLogo}
               alt="Organization Custom Logo"
+              width={64}
+              height={64}
+              unoptimized
               className="w-16 h-16 rounded-[14px] object-cover border-2 border-[#8064C8] shadow-md shrink-0"
             />
           ) : (
@@ -320,11 +324,13 @@ export default function OrganizationPage() {
                 <span className="text-[11px] font-bold text-[#666666] uppercase block mb-3">Live Logo Preview</span>
                 <div className="flex items-center gap-4">
                   {editLogoUrl ? (
-                    <img
+                    <Image
                       src={editLogoUrl}
                       alt="Custom Logo Preview"
+                      width={80}
+                      height={80}
+                      unoptimized
                       className="w-20 h-20 rounded-[12px] object-cover border-2 border-[#8064C8] shadow"
-                      onError={() => {}}
                     />
                   ) : (
                     <div className="w-20 h-20 rounded-[12px] bg-[#8064C8] text-white flex items-center justify-center text-[28px] font-bold shadow border-2 border-[#8064C8]">

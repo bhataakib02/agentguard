@@ -187,9 +187,12 @@ export default function SidebarNav({ isOpen = false, onClose }: SidebarNavProps)
         ) : (
           <div className="flex items-center gap-2.5">
             {orgBranding?.logo_url ? (
-              <img
+              <Image
                 src={orgBranding.logo_url}
                 alt={`${orgBranding.name} Logo`}
+                width={28}
+                height={28}
+                unoptimized
                 className="w-7 h-7 rounded-[6px] object-cover border border-[#E8E8E4] shrink-0"
               />
             ) : (

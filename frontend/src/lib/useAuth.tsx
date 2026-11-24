@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, createContext, useContext } from "react";
+import React, { useEffect, useState, createContext, useContext, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { fetchApi } from "@/lib/api";
 
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const clearSession = () => {
+  const clearSession = useCallback(() => {
     document.cookie = "agentguard_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     localStorage.removeItem("agentguard_token");
     localStorage.removeItem("agentguard_user");
@@ -43,9 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSession(null);
     setLoading(false);
-  };
+  }, []);
 
-  const validateAndApplyBackendSession = async (token: string): Promise<boolean> => {
+  const validateAndApplyBackendSession = useCallback(async (token: string): Promise<boolean> => {
     try {
       const profile = await fetchApi("/auth/me");
       if (profile && profile.id && profile.email) {
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     clearSession();
     return false;
-  };
+  }, [clearSession]);
 
   useEffect(() => {
     let mounted = true;
@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [validateAndApplyBackendSession, clearSession]);
 
   const logout = async () => {
     setLoading(true);

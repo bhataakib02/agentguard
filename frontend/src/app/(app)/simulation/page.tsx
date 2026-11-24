@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { fetchApi } from "@/lib/api";
 import {
   FlaskConical,
@@ -291,38 +291,38 @@ export default function SimulationLabPage() {
   // --------------------------------------------------------------------------
   // Scenario Loading
   // --------------------------------------------------------------------------
-  const loadScenarios = async (category: string = "ALL") => {
+  const loadScenarios = useCallback(async (category: string = "ALL") => {
     try {
       setLoadingScenarios(true);
       const url = category === "ALL" ? "/simulation/scenarios" : `/simulation/scenarios?category=${category}`;
       const data = await fetchApi(url);
       setScenarios(data || []);
-      if (data && data.length > 0 && !activeScenario) {
-        setActiveScenario(data[0]);
+      if (data && data.length > 0) {
+        setActiveScenario((prev: any) => prev || data[0]);
       }
     } catch (err) {
       console.error("Error loading scenarios:", err);
     } finally {
       setLoadingScenarios(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadScenarios(selectedCategory);
-  }, [selectedCategory]);
+  }, [selectedCategory, loadScenarios]);
 
   // --------------------------------------------------------------------------
   // Dataset Manager Data Fetching
   // --------------------------------------------------------------------------
-  const loadDatasets = async () => {
+  const loadDatasets = useCallback(async () => {
     try {
       setLoadingDatasets(true);
       setDatasetListError(null);
       setIsPermissionDenied(false);
       const data: EvaluationDatasetSummary[] = await fetchApi("/simulation/eval-data");
       setDatasets(data || []);
-      if (data && data.length > 0 && !selectedDatasetName) {
-        setSelectedDatasetName(data[0].dataset_name);
+      if (data && data.length > 0) {
+        setSelectedDatasetName((prev: any) => prev || data[0].dataset_name);
       }
     } catch (err: any) {
       const errMsg = err?.message || String(err);
@@ -334,13 +334,13 @@ export default function SimulationLabPage() {
     } finally {
       setLoadingDatasets(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (activeMainTab === "datasets") {
       loadDatasets();
     }
-  }, [activeMainTab]);
+  }, [activeMainTab, loadDatasets]);
 
   const loadDatasetDetail = async (datasetName: string) => {
     try {
