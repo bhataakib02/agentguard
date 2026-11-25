@@ -133,6 +133,15 @@ def utc_now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
 
+def to_naive_utc(dt: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
+    """Ensures datetime is timezone-naive UTC for consistent in-memory comparisons across SQLite and Postgres."""
+    if dt is None:
+        return None
+    if getattr(dt, "tzinfo", None) is not None:
+        return dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 class OtpService:
     @staticmethod
     def normalize_email(email: str) -> str:
@@ -154,8 +163,9 @@ class OtpService:
             models.OtpChallenge.expires_at > now
         ).order_by(models.OtpChallenge.created_at.desc()).first()
 
-        if latest and latest.resend_available_at and latest.resend_available_at > now:
-            remaining = int((latest.resend_available_at - now).total_seconds())
+        resend_at = to_naive_utc(latest.resend_available_at) if latest else None
+        if latest and resend_at and resend_at > now:
+            remaining = int((resend_at - now).total_seconds())
             return True, max(1, remaining)
 
         return False, 0
@@ -315,7 +325,8 @@ class OtpService:
             return False, "Invalid or expired verification code. Please request a new code.", None
 
         # Expiry Check — terminal failure scrubs sensitive metadata
-        if getattr(challenge, "expires_at") < now:
+        exp_at = to_naive_utc(getattr(challenge, "expires_at", None))
+        if exp_at and exp_at < now:
             setattr(challenge, "consumed", True)
             if getattr(challenge, "metadata_json", None):
                 setattr(challenge, "metadata_json", scrub_sensitive_metadata(challenge.metadata_json))
