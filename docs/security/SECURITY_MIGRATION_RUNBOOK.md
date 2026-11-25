@@ -6,7 +6,8 @@ This operational runbook governs the deployment of PostgreSQL Row Level Security
 
 - **Migration File**: `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql`
 - **Rollback File**: `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls_rollback.sql`
-- **Risk Classification**: Medium (Requires transaction-wrapped deployment and application verification)
+- **Current Operational Status**: **GATED / MIGRATION BLOCKED** pending correction of the 6 identified SQL security defects and local PostgreSQL validation.
+- **Risk Classification**: Medium-High (Requires transaction-wrapped deployment, TRUNCATE privilege revocation, and application verification).
 - **Deployment Window**: Standard maintenance or zero-downtime rolling update (policies include full `service_role` bypass, ensuring backend continuity).
 
 ---
@@ -15,75 +16,72 @@ This operational runbook governs the deployment of PostgreSQL Row Level Security
 
 Before executing the migration in staging or production:
 
+- [ ] **SQL Defects Remediated**: Confirm that `audit_logs` is read-only, `tools` permits `org_id IS NULL`, `agent_relationships` validates both agents, `sessions` is service_role only, and `decisions` has symmetric `WITH CHECK`.
+- [ ] **Local PostgreSQL Validation Passed**: Run `test_postgresql_rls_validation.py` against a disposable local PostgreSQL container.
 - [ ] **Database Backup**: Verify that an automated point-in-time recovery (PITR) snapshot or physical `pg_dump` backup completed within the last 60 minutes.
-- [ ] **Role Existence**: Ensure `anon`, `authenticated`, and `service_role` exist in the target PostgreSQL instance (standard on Supabase).
-- [ ] **Alembic Version**: Confirm Alembic is at `0002_add_otp_challenges` (`alembic current`).
-- [ ] **Connection Pooling Check**: Verify that backend database session managers use transaction scoping (`SET LOCAL app.current_org_id = ...`) to prevent context bleed across pooled connections.
-- [ ] **Test Suite Green**: Full backend regression test suite must be 100% passing (737/737 tests).
+- [ ] **Alembic Version Alignment**: Confirm Alembic has adopted the baseline and stamped `0002_add_otp_challenges`.
+- [ ] **Connection Pooling Check**: Verify backend session manager uses transaction-scoped `SET LOCAL app.current_org_id = ...`.
+- [ ] **Application Test Suite Green**: Backend regression suite verified at 737/737 passed.
 
 ---
 
-## 3. Staging Deployment & Dry Run
+## 3. Phased Deployment Procedure
 
-Execute the migration against the staging database first:
-
+### Phase 1: Staging Dry-Run
 ```bash
-# 1. Connect to Staging Database via psql as superuser / postgres
-psql "$STAGING_DATABASE_URL" -f docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql
+# 1. Connect to Staging Database via psql as postgres administrator
+psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql
 
 # 2. Verify all policies are created
-psql "$STAGING_DATABASE_URL" -c "SELECT tablename, policyname, permissive, roles, cmd FROM pg_policies WHERE schemaname = 'public';"
+psql "$STAGING_DATABASE_URL" -c "SELECT tablename, policyname, permissive, roles, cmd FROM pg_policies WHERE schemaname = 'public' ORDER BY tablename;"
 
-# 3. Verify backend connectivity
+# 3. Verify TRUNCATE revocation on anon and authenticated
+psql "$STAGING_DATABASE_URL" -c "SELECT has_table_privilege('anon', 'public.users', 'TRUNCATE') AS anon_truncate, has_table_privilege('authenticated', 'public.users', 'TRUNCATE') AS auth_truncate;"
+# Must return FALSE for both!
+
+# 4. Verify backend health
 curl -I https://staging-api.agentguard.io/api/health
 ```
 
----
+### Phase 2: Production Execution Protocol
+1. Announce start of migration window on engineering status channel.
+2. Execute migration script inside a transaction:
+   ```bash
+   psql "$PROD_DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql
+   ```
+   *Note: Because the entire migration script is wrapped in `BEGIN ... COMMIT;`, any error will automatically trigger an immediate rollback, preventing partial policy states.*
 
-## 4. Production Execution Procedure
+3. Execute Post-Migration Verification Queries:
+   ```sql
+   -- 1. Ensure RLS is active on all 50 public tables
+   SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = true;
+   -- Expected: 50
 
-### Step 1: Notify Operational Team & Begin Maintenance Window
-Announce the start of migration window on the engineering status channel.
+   -- 2. Validate helper functions fail closed
+   SELECT public.current_org_id(); -- Must return NULL
+   SELECT public.is_super_admin();  -- Must return FALSE
 
-### Step 2: Execute Migration Script
-Run the transaction-wrapped migration using the `postgres` administrative role:
-```bash
-psql "$PROD_DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql
-```
-*Note: Because the entire migration script is wrapped in `BEGIN ... COMMIT;`, any error will automatically trigger an immediate rollback, preventing partial policy states.*
+   -- 3. Verify anon has NO SELECT or TRUNCATE on users
+   SELECT has_table_privilege('anon', 'public.users', 'SELECT');   -- FALSE
+   SELECT has_table_privilege('anon', 'public.users', 'TRUNCATE'); -- FALSE
 
-### Step 3: Run Post-Migration Verification Queries
-Execute the following verification queries immediately:
-```sql
--- 1. Ensure RLS is active on all public tenant tables
-SELECT tablename, rowsecurity 
-FROM pg_tables 
-WHERE schemaname = 'public' 
-ORDER BY tablename;
+   -- 4. Verify authenticated has NO TRUNCATE
+   SELECT has_table_privilege('authenticated', 'public.users', 'TRUNCATE'); -- FALSE
 
--- 2. Validate helper functions
-SELECT public.current_org_id(); -- Must return NULL
-SELECT public.is_super_admin();  -- Must return FALSE
+   -- 5. Verify service_role retains full access
+   SELECT has_table_privilege('service_role', 'public.users', 'ALL'); -- TRUE
+   ```
 
--- 3. Verify anon has no SELECT on users or organizations
-SELECT has_table_privilege('anon', 'public.users', 'SELECT'); -- Must return FALSE
-SELECT has_table_privilege('anon', 'public.organizations', 'SELECT'); -- Must return FALSE
-
--- 4. Verify service_role retains full access
-SELECT has_table_privilege('service_role', 'public.users', 'SELECT'); -- Must return TRUE
-SELECT has_table_privilege('service_role', 'public.organizations', 'ALL'); -- Must return TRUE
-```
-
-### Step 4: Execute API Smoke Tests
-1. Test User Login and JWT issuance.
-2. Query `/api/decisions` as Organization Admin A. Verify only Org A decisions appear.
-3. Query `/api/agents` as Organization Admin B. Verify only Org B agents appear.
-4. Execute `/api/capabilities/validate` with an active capability token.
-5. Trigger a test notification and scheduled report.
+4. Execute API Smoke Tests:
+   - User Login and JWT issuance.
+   - Query `/api/agents` as Org Admin A (only Org A visible).
+   - Query `/api/decisions` as Org Admin B (only Org B visible).
+   - Test capability token validation via `/api/capabilities/validate`.
+   - Verify immutable audit log rejection on attempted update.
 
 ---
 
-## 5. Emergency Rollback Procedure
+## 4. Emergency Rollback Procedure
 
 If the migration causes unexpected query failures, connection pool lockouts, or ORM degradation:
 
@@ -92,8 +90,8 @@ If the migration causes unexpected query failures, connection pool lockouts, or 
 psql "$PROD_DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls_rollback.sql
 ```
 
-The rollback script:
+### What the Rollback Script Executes:
 1. Drops all RLS policies in the `public` schema.
-2. Disables Row Level Security (`ALTER TABLE ... DISABLE ROW LEVEL SECURITY`) on all tables.
-3. Drops `public.current_org_id()` and `public.is_super_admin()`.
+2. Disables Row Level Security (`ALTER TABLE ... DISABLE ROW LEVEL SECURITY`) on all public tables.
+3. Drops helper functions `public.current_org_id()` and `public.is_super_admin()`.
 4. Leaves application-layer security intact and operational.
