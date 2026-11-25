@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from starlette.testclient import TestClient
 from main import app
 from database import SessionLocal
+from config import settings
 from core import security
 import models
 
@@ -435,12 +436,16 @@ class TestPhase6cTruthfulness(unittest.TestCase):
 
     def test_22_system_health_notification_not_configured(self):
         """When SMTP credentials are not in environment, notification_subsystem reports NOT_CONFIGURED."""
-        if not (os.getenv("SMTP_HOST") or os.getenv("SENDGRID_API_KEY")):
+        original_provider = settings.EMAIL_PROVIDER
+        try:
+            settings.EMAIL_PROVIDER = "NONE"
             res = client.get("/api/system/health", headers=self.headers_a)
             self.assertEqual(res.status_code, 200)
             data = res.json()
             notif = data.get("subsystems", {}).get("notification_subsystem", {})
             self.assertEqual(notif.get("status"), "NOT_CONFIGURED")
+        finally:
+            settings.EMAIL_PROVIDER = original_provider
 
     # ==================== 6. BILLING, EMAIL & INTEGRATION TESTS ====================
 
@@ -457,7 +462,9 @@ class TestPhase6cTruthfulness(unittest.TestCase):
 
     def test_24_email_invitation_truthful_delivery_status(self):
         """Invite user endpoint must report EMAIL_PROVIDER_NOT_CONFIGURED if SMTP is unconfigured."""
-        if not (os.getenv("SMTP_HOST") or os.getenv("SENDGRID_API_KEY")):
+        original_provider = settings.EMAIL_PROVIDER
+        try:
+            settings.EMAIL_PROVIDER = "NONE"
             test_email = f"invite-{uuid.uuid4().hex[:8]}@phase6c-a.com"
             res = client.post(
                 "/api/organization/invite-user",
@@ -473,6 +480,8 @@ class TestPhase6cTruthfulness(unittest.TestCase):
             data = res.json()
             self.assertEqual(data.get("email_delivery_status"), "EMAIL_PROVIDER_NOT_CONFIGURED")
             self.assertIn("SMTP provider is not configured", data.get("email_delivery_note", ""))
+        finally:
+            settings.EMAIL_PROVIDER = original_provider
 
     def test_25_slack_teams_truthful_state(self):
         """Slack and Teams must report NOT_CONFIGURED when webhook URLs are missing from environment."""

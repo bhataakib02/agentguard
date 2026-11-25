@@ -767,7 +767,7 @@ class TestRuntimeAuthorizationSuite:
             "agent_id": self.agent1_id,
             "capability_name": "PAYMENTS.EXECUTE",
             "amount": 150.0
-        })
+        }, headers=self.admin1_headers)
         assert resp.status_code == 200
         val_data = resp.json()
         assert val_data["valid"] is True

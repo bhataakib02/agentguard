@@ -101,7 +101,7 @@ class TestPACESimulationLabSuite:
 
     @classmethod
     def teardown_class(cls):
-        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
 
     def test_01_scenario_definitions_validated(self):
         """
@@ -335,6 +335,7 @@ class TestPACESimulationLabSuite:
             scenarios_completed=2,
             results=[]
         )
+        simulation_runner._runs_org[run_id] = self.org1_id
 
         cancel_res = client.post(
             f"/api/simulation/runs/{run_id}/cancel",

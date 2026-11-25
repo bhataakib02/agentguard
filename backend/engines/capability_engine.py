@@ -62,7 +62,7 @@ class CapabilityEngine:
             return {"valid": False, "reason": f"Capability token '{token_code}' not found in registry."}
 
         # Verify agent ownership
-        if str(token.agent_id) != str(agent.id):
+        if not agent or str(token.agent_id) != str(agent.id):
             return {"valid": False, "reason": "Capability token was issued to a different agent. Cross-agent token use rejected."}
 
         # Verify status

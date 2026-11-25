@@ -453,8 +453,9 @@ def revoke_session(
         raise HTTPException(status_code=404, detail="Session not found")
 
     u = s.user
-    if current_user.role != "SUPER_ADMIN" and u and u.org_id != current_user.org_id:
-        raise HTTPException(status_code=403, detail="Forbidden: Cannot revoke session for another organization")
+    if str(current_user.role) != "SUPER_ADMIN":
+        if not u or str(u.org_id) != str(current_user.org_id):
+            raise HTTPException(status_code=403, detail="Forbidden: Cannot revoke session for another organization")
 
     setattr(s, "revoked", True)
     db.commit()

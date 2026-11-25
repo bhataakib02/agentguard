@@ -60,10 +60,11 @@ async def act_on_approval(
     if not app_req:
         raise HTTPException(status_code=404, detail="Approval request not found")
 
-    # Org isolation check
+    # Org isolation check (fail-closed)
     agent = db.query(models.Agent).filter(models.Agent.id == app_req.agent_id).first()
-    if agent and str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Approval belongs to another organization")
+    if str(current_user.role) != "SUPER_ADMIN":
+        if not agent or str(agent.org_id) != str(current_user.org_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Approval belongs to another organization")
 
     # State transition integrity: Only PENDING requests may be resolved
     if str(app_req.status) != "PENDING":

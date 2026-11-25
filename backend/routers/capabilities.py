@@ -1,10 +1,11 @@
+from typing import Any, Optional, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
 from engines.capability_engine import capability_engine
 from ws_manager import manager as ws_manager
-from core.deps import get_current_user, require_role
+from core.deps import get_current_user, require_role, get_authenticated_entity, AuthenticatedAgent
 import datetime
 
 router = APIRouter(prefix="/capabilities", tags=["Dynamic Capabilities"])
@@ -113,8 +114,9 @@ async def revoke_capability_token(
         raise HTTPException(status_code=404, detail="Capability token not found")
 
     agent = db.query(models.Agent).filter(models.Agent.id == token.agent_id).first()
-    if agent and str(current_user.role) != "SUPER_ADMIN" and str(agent.org_id) != str(current_user.org_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Token belongs to another organization")
+    if str(current_user.role) != "SUPER_ADMIN":
+        if not agent or str(agent.org_id) != str(current_user.org_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Token belongs to another organization")
 
     setattr(token, "status", "REVOKED")
 
@@ -140,16 +142,39 @@ async def revoke_capability_token(
 @router.post("/validate")
 def validate_capability_token_endpoint(
     req: schemas.CapabilityTokenValidateRequest,
+    entity: Any = Depends(get_authenticated_entity),
     db: Session = Depends(get_db)
 ):
     """
     Validates a capability token against agent, capability scope, expiration, and amount limits.
+    Enforces tenant isolation: callers cannot validate tokens belonging to other organizations.
+    Accepts authenticated users or machine agents.
     """
+    caller_role = getattr(entity, "role", "AGENT")
+    caller_org_id = str(entity.org_id) if hasattr(entity, "org_id") else None
+
     agent = None
     if req.agent_id:
         agent = db.query(models.Agent).filter(
             (models.Agent.id == req.agent_id) | (models.Agent.agent_code == req.agent_id)
         ).first()
+        if agent and str(caller_role) != "SUPER_ADMIN" and str(agent.org_id) != caller_org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Cannot validate tokens for an agent belonging to another organization"
+            )
+
+    # Pre-validation tenant isolation check on requested token code
+    existing_token = db.query(models.CapabilityToken).filter(
+        models.CapabilityToken.token_code == req.token_code
+    ).first()
+    if existing_token:
+        token_agent = db.query(models.Agent).filter(models.Agent.id == existing_token.agent_id).first()
+        if token_agent and str(caller_role) != "SUPER_ADMIN" and str(token_agent.org_id) != caller_org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Cannot validate capability tokens belonging to another organization"
+            )
 
     validation = capability_engine.validate_token(
         db=db,
@@ -161,6 +186,14 @@ def validate_capability_token_endpoint(
     )
 
     token_rec = validation.get("token")
+    if token_rec:
+        token_agent = db.query(models.Agent).filter(models.Agent.id == token_rec.agent_id).first()
+        if token_agent and str(caller_role) != "SUPER_ADMIN" and str(token_agent.org_id) != caller_org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Cannot validate capability tokens belonging to another organization"
+            )
+
     return {
         "valid": validation["valid"],
         "reason": validation["reason"],

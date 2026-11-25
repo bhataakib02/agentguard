@@ -33,14 +33,18 @@ class EmailService:
 
     def is_configured(self) -> bool:
         """Returns True only if an email provider is explicitly configured."""
+        if settings.EMAIL_PROVIDER in ("NONE", "DISABLED"):
+            return False
         if settings.EMAIL_PROVIDER == "MOCK":
             return True
         if settings.EMAIL_PROVIDER == "RESEND":
             return self.is_resend_configured()
         if settings.EMAIL_PROVIDER == "SMTP":
             return self.is_smtp_configured()
-        # Fallback detection if EMAIL_PROVIDER is unset/NONE
-        return self.is_resend_configured() or self.is_smtp_configured()
+        # Fallback detection if EMAIL_PROVIDER is unset
+        if not settings.EMAIL_PROVIDER:
+            return self.is_resend_configured() or self.is_smtp_configured()
+        return False
 
     def get_status(self) -> Dict[str, Any]:
         """
@@ -49,27 +53,29 @@ class EmailService:
         configured = self.is_configured()
         provider_name = settings.EMAIL_PROVIDER
 
-        if provider_name == "NONE" or not provider_name:
-            if self.is_resend_configured():
+        if provider_name in ("NONE", "DISABLED") or not provider_name:
+            if not configured:
+                provider_name = "NONE"
+            elif self.is_resend_configured():
                 provider_name = "RESEND"
             elif self.is_smtp_configured():
                 provider_name = "SMTP"
             else:
                 provider_name = "NONE"
 
-        resend_active = self.is_resend_configured()
-        resend_from = getattr(settings, "RESEND_FROM_EMAIL", "onboarding@resend.dev") if resend_active else None
+        resend_active = self.is_resend_configured() if (configured and provider_name == "RESEND") else False
+        resend_from = getattr(settings, "RESEND_FROM_EMAIL", "onboarding@resend.dev") if self.is_resend_configured() else None
 
         return {
             "configured": configured,
             "provider": provider_name if configured else "NONE",
             "status": "HEALTHY" if configured else "NOT_CONFIGURED",
-            "resend_configured": resend_active,
+            "resend_configured": self.is_resend_configured(),
             "resend_from_email": resend_from,
             "smtp_configured": self.is_smtp_configured(),
             "smtp_host": settings.SMTP_HOST if settings.SMTP_HOST else None,
             "smtp_port": settings.SMTP_PORT if settings.SMTP_HOST else None,
-            "from_email": resend_from if (provider_name == "RESEND" or resend_active) else settings.SMTP_FROM_EMAIL,
+            "from_email": resend_from if (provider_name == "RESEND") else settings.SMTP_FROM_EMAIL,
             "tls_enabled": settings.SMTP_USE_TLS
         }
 
@@ -199,7 +205,7 @@ class EmailService:
             }
 
         # 3. Resend Provider
-        if settings.EMAIL_PROVIDER == "RESEND" or (self.is_resend_configured() and settings.EMAIL_PROVIDER != "SMTP"):
+        if settings.EMAIL_PROVIDER == "RESEND" or (not settings.EMAIL_PROVIDER and self.is_resend_configured()):
             return self._send_resend(to_email, subject, body_text, body_html)
 
         # 4. Live SMTP Provider

@@ -360,8 +360,9 @@ def get_decision_detail(
         raise HTTPException(status_code=404, detail="Decision record not found")
     
     agent = db.query(models.Agent).filter(models.Agent.id == dec.agent_id).first()
-    if agent and current_user.role != "SUPER_ADMIN" and agent.org_id != current_user.org_id:
-        raise HTTPException(status_code=403, detail="Forbidden: Decision record belongs to another organization")
+    if str(current_user.role) != "SUPER_ADMIN":
+        if not agent or str(agent.org_id) != str(current_user.org_id):
+            raise HTTPException(status_code=403, detail="Forbidden: Decision record belongs to another organization")
 
     prov = db.query(models.ProvenanceEvent).filter(models.ProvenanceEvent.decision_id == dec.id).first()
     app_req = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.decision_id == dec.id).first()

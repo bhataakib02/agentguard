@@ -440,10 +440,11 @@ class TestAIGuardrailsSuite:
 
     def test_scan_pii_diagnostics_api(self):
         """Validates standalone /api/runtime/scan-pii diagnostics endpoint."""
+        headers = {"Authorization": f"Bearer {self.user_token}"}
         res = client.post("/api/runtime/scan-pii", json={
             "text": "Card is 4111-1111-1111-1111 and email admin@shield.gov",
             "mode": "MASK"
-        })
+        }, headers=headers)
         assert res.status_code == 200
         data = res.json()
         assert data["has_pii"] is True

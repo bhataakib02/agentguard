@@ -321,12 +321,6 @@ class TestDynamicDatasetEvaluationSuite:
 
         db.close()
 
-    @classmethod
-    def teardown_class(cls):
-        Base.metadata.drop_all(bind=engine)
-        if os.path.exists("test_dynamic_eval_suite.db"):
-            os.remove("test_dynamic_eval_suite.db")
-
     # =========================================================================
     # 1. Valid Dataset-to-Scenario Conversion
     # =========================================================================

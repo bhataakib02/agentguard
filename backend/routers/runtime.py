@@ -757,7 +757,8 @@ from engines.pii_engine import pii_engine
 
 @router.post("/scan-pii", response_model=schemas.PIIScanResponse)
 async def runtime_scan_pii(
-    req: schemas.PIIScanRequest
+    req: schemas.PIIScanRequest,
+    entity: Any = Depends(get_authenticated_entity)
 ):
     """
     AI Guardrails PII Diagnostic & Redaction Endpoint.

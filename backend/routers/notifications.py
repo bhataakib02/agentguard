@@ -26,8 +26,9 @@ def mark_notification_read(
     if not notif:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
 
-    if current_user.role != "SUPER_ADMIN" and notif.user_id and str(notif.user_id) != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if current_user.role != "SUPER_ADMIN":
+        if not notif.user_id or str(notif.user_id) != str(current_user.id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Cannot modify notifications of another user")
 
     notif.is_read = True
     db.commit()

@@ -28,7 +28,6 @@ import models
 
 
 # Create tables for testing
-Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 TestSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)

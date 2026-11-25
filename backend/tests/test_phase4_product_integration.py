@@ -251,7 +251,7 @@ class TestPhase4ProductIntegrationSuite:
 
     @classmethod
     def teardown_class(cls):
-        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
 
     def test_01_user_journey_agent_directory_to_evaluation(self):
         """

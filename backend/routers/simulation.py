@@ -105,11 +105,12 @@ def get_simulation_run(
 
     run_org = simulation_runner.get_run_org(run_id)
     caller_org = str(current_user.org_id) if current_user.org_id else "default_org"
-    if run_org and caller_org and run_org != caller_org:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Simulation run '{run_id}' not found."
-        )
+    if str(current_user.role) != "SUPER_ADMIN":
+        if not run_org or run_org != caller_org:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Simulation run '{run_id}' not found."
+            )
 
     return run_record
 
@@ -144,11 +145,12 @@ def get_simulation_metrics(
 
     run_org = simulation_runner.get_run_org(run_id)
     caller_org = str(current_user.org_id) if current_user.org_id else "default_org"
-    if run_org and caller_org and run_org != caller_org:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Simulation run '{run_id}' not found."
-        )
+    if str(current_user.role) != "SUPER_ADMIN":
+        if not run_org or run_org != caller_org:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Simulation run '{run_id}' not found."
+            )
 
     if not run_record.metrics:
         raise HTTPException(
@@ -188,11 +190,12 @@ def cancel_simulation_run(
 
     run_org = simulation_runner.get_run_org(run_id)
     caller_org = str(current_user.org_id) if current_user.org_id else "default_org"
-    if run_org and caller_org and run_org != caller_org:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Simulation run '{run_id}' not found."
-        )
+    if str(current_user.role) != "SUPER_ADMIN":
+        if not run_org or run_org != caller_org:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Simulation run '{run_id}' not found."
+            )
 
     success = simulation_runner.cancel_run(run_id)
     if not success:
