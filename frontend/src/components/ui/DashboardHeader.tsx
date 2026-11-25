@@ -47,7 +47,27 @@ export default function DashboardHeader() {
   const tenantName = orgBranding?.display_name || orgBranding?.name || user?.org_name || "AgentGuard Enterprise";
   const tenantInitials = orgBranding?.initials || getInitials(tenantName, undefined);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.is_read && !n.read).length;
+
+  const handleMarkAllRead = async () => {
+    try {
+      await fetchApi("/notifications/read-all", { method: "POST" });
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, read: true })));
+    } catch (err) {
+      console.error("Failed to mark all notifications read:", err);
+    }
+  };
+
+  const handleMarkOneRead = async (id: string) => {
+    try {
+      await fetchApi(`/notifications/${id}/read`, { method: "PATCH" });
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true, read: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to mark notification read:", err);
+    }
+  };
 
   return (
     <header className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[12px] p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -108,23 +128,73 @@ export default function DashboardHeader() {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] shadow-xl p-3 z-30 space-y-2 text-[12px]">
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-32px)] bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] shadow-xl p-3 z-30 space-y-2 text-[12px]">
               <div className="flex items-center justify-between border-b border-[#E8E8E4] pb-2 font-bold text-[#1F1F1F]">
-                <span>Notifications & Alerts</span>
-                <span className="text-[10px] text-[#2E9D50] uppercase font-mono">{unreadCount} unread</span>
+                <div className="flex items-center gap-2">
+                  <span>Notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="text-[10px] bg-[#EAF7EE] text-[#237A3C] px-1.5 py-0.5 rounded font-mono">
+                      {unreadCount} unread
+                    </span>
+                  )}
+                </div>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="text-[11px] text-[#2E9D50] hover:underline font-normal"
+                  >
+                    Mark all read
+                  </button>
+                )}
               </div>
               {notifications.length === 0 ? (
-                <p className="text-[#666666] text-[11px] py-2 text-center">No active notifications</p>
+                <p className="text-[#666666] text-[11px] py-4 text-center">No notifications recorded</p>
               ) : (
-                <div className="max-h-60 overflow-y-auto space-y-2">
-                  {notifications.slice(0, 5).map((n, idx) => (
-                    <div key={idx} className="p-2 bg-[#FCFCFA] rounded-[6px] border border-[#E8E8E4] space-y-0.5">
-                      <span className="font-bold text-[#1F1F1F] block">{n.title}</span>
-                      <p className="text-[11px] text-[#666666]">{n.message}</p>
-                    </div>
-                  ))}
+                <div className="max-h-72 overflow-y-auto space-y-1.5 divide-y divide-[#F0F0ED]">
+                  {notifications.slice(0, 6).map((n) => {
+                    const isUnread = !n.is_read && !n.read;
+                    return (
+                      <div
+                        key={n.id}
+                        onClick={() => isUnread && handleMarkOneRead(n.id)}
+                        className={`pt-2 pb-1 px-2 rounded-[6px] transition-colors cursor-pointer ${
+                          isUnread ? "bg-[#F7FBF8] border-l-2 border-[#2E9D50]" : "hover:bg-[#FCFCFA]"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className={`text-[12px] block ${isUnread ? "font-bold text-[#1F1F1F]" : "text-[#444444]"}`}>
+                            {n.title}
+                          </span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-mono shrink-0 ${
+                            n.severity === "CRITICAL"
+                              ? "bg-[#FDECEC] text-[#C62828]"
+                              : n.severity === "HIGH" || n.severity === "WARNING"
+                              ? "bg-[#FFF4D9] text-[#B76E00]"
+                              : "bg-[#EAF7EE] text-[#237A3C]"
+                          }`}>
+                            {n.severity || "INFO"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#666666] mt-0.5 line-clamp-2">{n.message}</p>
+                        {n.created_at && (
+                          <span className="text-[10px] text-[#999999] font-mono mt-1 block">
+                            {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
+              <div className="pt-2 border-t border-[#E8E8E4] text-center">
+                <Link
+                  href="/notifications"
+                  onClick={() => setShowNotifications(false)}
+                  className="text-[11px] font-bold text-[#2E9D50] hover:underline"
+                >
+                  View All Notifications &rarr;
+                </Link>
+              </div>
             </div>
           )}
         </div>

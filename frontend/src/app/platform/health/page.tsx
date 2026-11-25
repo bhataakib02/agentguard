@@ -48,9 +48,11 @@ export default function PlatformHealthPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-[22px] font-bold text-white tracking-tight">System Health</h1>
             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono flex items-center gap-1 ${
-              healthData?.overall_status === "Operational"
+              (healthData?.overall_status || "").toUpperCase() === "OPERATIONAL" || (healthData?.overall_status || "").toUpperCase() === "HEALTHY"
                 ? "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
-                : "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
+                : (healthData?.overall_status || "").toUpperCase() === "DEGRADED"
+                ? "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
+                : "bg-[#281816] text-[#EF4444] border border-[#EF4444]/40"
             }`}>
               <CheckCircle className="w-3 h-3" /> {loading ? "CHECKING HEALTH..." : (healthData?.overall_status || "OPERATIONAL").toUpperCase()}
             </span>
@@ -88,17 +90,24 @@ export default function PlatformHealthPage() {
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">{srv.category || "Core"}</span>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
-                  srv.status === "Operational" || srv.status === "HEALTHY"
+                  srv.status?.toUpperCase() === "OPERATIONAL" || srv.status?.toUpperCase() === "HEALTHY"
                     ? "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
-                    : srv.status === "Not Configured" || srv.status === "NOT_CONFIGURED"
-                    ? "bg-[#281816] text-[#EF4444] border border-[#EF4444]/40"
-                    : "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
+                    : srv.status?.toUpperCase() === "DEGRADED"
+                    ? "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
+                    : "bg-[#281816] text-[#EF4444] border border-[#EF4444]/40"
                 }`}>
                   {srv.status}
                 </span>
               </div>
 
-              <h3 className="font-bold text-white text-[15px]">{srv.name}</h3>
+              <div>
+                <h3 className="font-bold text-white text-[15px]">{srv.name}</h3>
+                {srv.details && (
+                  <p className="text-[11px] text-[#94A3B8] mt-1 leading-snug font-sans">
+                    {srv.details}
+                  </p>
+                )}
+              </div>
 
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#1E2638] text-[11px] font-mono">
                 <div>

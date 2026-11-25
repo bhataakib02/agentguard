@@ -228,6 +228,21 @@ def dispatch_webhook_task(self, delivery_id: str, max_attempts: int = MAX_WEBHOO
             )
             db.add(audit)
             db.commit()
+
+            # Create in-app integration failure notification
+            try:
+                from services.notification_service import notification_service
+                notification_service.create_in_app_notification(
+                    db=db,
+                    user_id=None,
+                    title="Webhook Delivery Failure",
+                    message=f"Webhook delivery to '{endpoint.url}' failed permanently after {curr_attempts} attempts: {last_err[:120]}",
+                    severity="HIGH",
+                    notif_type="INTEGRATION_FAILURE"
+                )
+            except Exception as _notif_err:
+                pass
+
             return {"status": "DEAD_LETTER", "attempts": curr_attempts, "error": last_err}
 
     finally:

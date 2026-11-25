@@ -202,19 +202,64 @@ class NotificationService:
         severity: str = "INFO"
     ) -> Dict[str, Any]:
         """
-        Orchestrates notification dispatch: creates in-app notification and triggers active webhooks.
+        Orchestrates notification dispatch: creates in-app notifications, triggers active webhooks,
+        and dispatches email alerts via configured provider (Resend/SMTP/Mock) when enabled.
+        In-app notifications remain 100% operational even when email provider is not configured.
         """
         # 1. In-App Notification
-        in_app_notif = self.create_in_app_notification(
-            db=db,
-            user_id=user_id,
-            title=title,
-            message=message,
-            severity=severity,
-            notif_type=event_type.upper()
-        )
+        target_user_ids = []
+        if user_id:
+            target_user_ids.append(user_id)
+        elif org_id:
+            # Route org-wide events to active admins/managers of the tenant
+            org_members = db.query(models.User.id).filter(
+                models.User.org_id == org_id,
+                models.User.status == "ACTIVE"
+            ).limit(10).all()
+            target_user_ids = [str(u[0]) for u in org_members]
 
-        # 2. Webhooks
+        created_notifs = []
+        if target_user_ids:
+            for uid in target_user_ids:
+                notif = self.create_in_app_notification(
+                    db=db,
+                    user_id=uid,
+                    title=title,
+                    message=message,
+                    severity=severity,
+                    notif_type=event_type.upper()
+                )
+                created_notifs.append(notif)
+        else:
+            notif = self.create_in_app_notification(
+                db=db,
+                user_id=None,
+                title=title,
+                message=message,
+                severity=severity,
+                notif_type=event_type.upper()
+            )
+            created_notifs.append(notif)
+
+        # 2. Email Delivery (Optional Outbound Gateway)
+        from services.email_service import email_service
+        email_sent = False
+        if email_service.is_configured() and target_user_ids:
+            for uid in target_user_ids:
+                u_obj = db.query(models.User).filter(models.User.id == uid).first()
+                if u_obj and u_obj.email:
+                    try:
+                        email_service.send_email(
+                            to_email=u_obj.email,
+                            subject=f"[AGENTGUARD Alert] {title}",
+                            body_text=f"{title}\n\n{message}\n\nEvent Type: {event_type}\nSeverity: {severity}\nResource: {resource_type}/{resource_id}",
+                            body_html=f"<h3>{title}</h3><p>{message}</p><p><strong>Event:</strong> {event_type} | <strong>Severity:</strong> {severity}</p>"
+                        )
+                        email_sent = True
+                    except Exception as mail_err:
+                        logger.warning(f"Failed to dispatch alert email to {u_obj.email}: {mail_err}")
+
+        # 3. Webhooks
         payload = {
             "resource_type": resource_type,
             "resource_id": resource_id,
@@ -228,7 +273,6 @@ class NotificationService:
 
         dispatched_deliveries = []
         for wh in webhooks:
-            # Check event subscription
             sub_events = wh.event_types or ["*"]
             if "*" in sub_events or event_type in sub_events:
                 delivery = self.dispatch_webhook_delivery(
@@ -240,8 +284,10 @@ class NotificationService:
                 dispatched_deliveries.append(delivery)
 
         return {
-            "notification_id": str(in_app_notif.id),
-            "webhooks_dispatched": len(dispatched_deliveries)
+            "notification_ids": [str(n.id) for n in created_notifs],
+            "notification_id": str(created_notifs[0].id) if created_notifs else None,
+            "webhooks_dispatched": len(dispatched_deliveries),
+            "email_dispatched": email_sent
         }
 
 

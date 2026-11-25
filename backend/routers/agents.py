@@ -337,6 +337,23 @@ async def suspend_agent(
     db.add(audit)
     db.commit()
 
+    try:
+        from services.notification_service import notification_service
+        notification_service.notify_governance_event(
+            db=db,
+            org_id=str(agent.org_id),
+            event_type="agent.suspended",
+            resource_type="agent",
+            resource_id=str(agent.id),
+            title=f"Agent Suspended: {agent.name}",
+            message=f"Agent '{agent.name}' ({agent.agent_code}) was suspended by {current_user.email}. All capabilities revoked.",
+            data={"agent_id": str(agent.id), "agent_code": agent.agent_code, "status": "SUSPENDED"},
+            user_id=str(current_user.id),
+            severity="WARNING"
+        )
+    except Exception as _notif_err:
+        pass
+
     await ws_manager.broadcast({
         "type": "AGENT_SUSPENDED",
         "agent_code": agent.agent_code,
@@ -390,6 +407,23 @@ async def restore_agent(
     )
     db.add(audit)
     db.commit()
+
+    try:
+        from services.notification_service import notification_service
+        notification_service.notify_governance_event(
+            db=db,
+            org_id=str(agent.org_id),
+            event_type="agent.suspended",
+            resource_type="agent",
+            resource_id=str(agent.id),
+            title=f"Agent Suspended: {agent.name}",
+            message=f"Agent '{agent.name}' ({agent.agent_code}) was suspended by {current_user.email}. All capabilities revoked.",
+            data={"agent_id": str(agent.id), "agent_code": agent.agent_code, "status": "SUSPENDED"},
+            user_id=str(current_user.id),
+            severity="WARNING"
+        )
+    except Exception as _notif_err:
+        pass
 
     await ws_manager.broadcast({
         "type": "AGENT_RESTORED",

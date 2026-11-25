@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from typing import Optional, List, Any, Dict
 import datetime
 
@@ -471,9 +471,16 @@ class NotificationSchema(BaseModel):
     message: str
     severity: str
     is_read: bool
+    read: Optional[bool] = None
     created_at: datetime.datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def set_read_field(self) -> "NotificationSchema":
+        if self.read is None:
+            self.read = self.is_read
+        return self
 
 
 # --- Tool Registry Schemas ---

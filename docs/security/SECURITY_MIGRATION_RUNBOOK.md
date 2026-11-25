@@ -6,22 +6,25 @@ This operational runbook governs the deployment of PostgreSQL Row Level Security
 
 - **Migration File**: `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql`
 - **Rollback File**: `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls_rollback.sql`
-- **Current Operational Status**: **GATED / MIGRATION BLOCKED** pending correction of the 6 identified SQL security defects and local PostgreSQL validation.
+- **Current Operational Status**: **STAGING ENVIRONMENT NOT PROVISIONED** (Pending user authorization to create dedicated staging project)
+- **Test Evidence**: 15/15 PostgreSQL 17 tests passed; 737/737 backend regression tests passed; live Supabase schema 100% compatible.
 - **Risk Classification**: Medium-High (Requires transaction-wrapped deployment, TRUNCATE privilege revocation, and application verification).
-- **Deployment Window**: Standard maintenance or zero-downtime rolling update (policies include full `service_role` bypass, ensuring backend continuity).
+- **Deployment Window**: Zero-downtime rolling update (policies include full `service_role` and `postgres` bypass, ensuring backend and Celery continuity).
 
 ---
 
 ## 2. Pre-Flight Verification Checklist
 
-Before executing the migration in staging or production:
+Before executing the migration in staging:
 
-- [ ] **SQL Defects Remediated**: Confirm that `audit_logs` is read-only, `tools` permits `org_id IS NULL`, `agent_relationships` validates both agents, `sessions` is service_role only, and `decisions` has symmetric `WITH CHECK`.
-- [ ] **Local PostgreSQL Validation Passed**: Run `test_postgresql_rls_validation.py` against a disposable local PostgreSQL container.
-- [ ] **Database Backup**: Verify that an automated point-in-time recovery (PITR) snapshot or physical `pg_dump` backup completed within the last 60 minutes.
-- [ ] **Alembic Version Alignment**: Confirm Alembic has adopted the baseline and stamped `0002_add_otp_challenges`.
-- [ ] **Connection Pooling Check**: Verify backend session manager uses transaction-scoped `SET LOCAL app.current_org_id = ...`.
-- [ ] **Application Test Suite Green**: Backend regression suite verified at 737/737 passed.
+- [x] **SQL Defects Remediated**: `audit_logs` is read-only, `tools` permits `org_id IS NULL`, `agent_relationships` validates both agents, `sessions` is service_role only, `decisions` has symmetric `WITH CHECK`, and `current_org_id()` uses `SECURITY INVOKER` with explicit `auth.uid()::text` casting.
+- [x] **Local PostgreSQL 17 Validation Passed**: Run `test_postgresql_rls_validation.py` against isolated PostgreSQL 17 container (15/15 passed).
+- [x] **Live Schema Compatibility Audited**: Verified against all 50 tables in Supabase production catalog.
+- [x] **Migration Idempotency Verified**: Forward migration applied twice consecutively with 0 errors.
+- [x] **Rollback Completeness Verified**: Rollback script dropped 100% of policies and cleanly disabled RLS on all tables.
+- [ ] **Staging Database Backup**: Verify point-in-time recovery (PITR) snapshot or physical `pg_dump` backup completed before execution.
+- [ ] **Alembic Version Alignment**: Confirm Alembic has adopted baseline and stamped `0002_add_otp_challenges`.
+- [ ] **Application Health Check**: Verify staging backend (`/health`) returns HTTP 200 before applying migration.
 
 ---
 

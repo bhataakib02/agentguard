@@ -148,6 +148,23 @@ def create_incident(
     db.add(audit)
     db.commit()
 
+    try:
+        from services.notification_service import notification_service
+        notification_service.notify_governance_event(
+            db=db,
+            org_id=str(current_user.org_id) if current_user.org_id else "",
+            event_type="security.incident_created",
+            resource_type="incident",
+            resource_id=str(inc.id),
+            title=f"Security Alert: {inc.title}",
+            message=f"Incident of severity {inc.severity} logged from source {inc.source}.",
+            data={"incident_id": str(inc.id), "severity": inc.severity, "title": inc.title},
+            user_id=str(current_user.id),
+            severity=inc.severity
+        )
+    except Exception as _notif_err:
+        pass
+
     return {
         "status": "SUCCESS",
         "id": str(inc.id),
@@ -270,6 +287,23 @@ def update_incident(
     )
     db.add(audit)
     db.commit()
+
+    try:
+        from services.notification_service import notification_service
+        notification_service.notify_governance_event(
+            db=db,
+            org_id=str(current_user.org_id) if current_user.org_id else "",
+            event_type="security.incident_created",
+            resource_type="incident",
+            resource_id=str(inc.id),
+            title=f"Security Alert: {inc.title}",
+            message=f"Incident of severity {inc.severity} logged from source {inc.source}.",
+            data={"incident_id": str(inc.id), "severity": inc.severity, "title": inc.title},
+            user_id=str(current_user.id),
+            severity=inc.severity
+        )
+    except Exception as _notif_err:
+        pass
 
     return {
         "status": "SUCCESS",

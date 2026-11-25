@@ -66,6 +66,28 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
     if (user?.role === "SUPER_ADMIN") loadNotifs();
   }, [user]);
 
+  const unreadCount = notifications.filter((n: any) => !n.is_read && !n.read).length;
+
+  const handleMarkAllRead = async () => {
+    try {
+      await fetchApi("/notifications/read-all", { method: "POST" });
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, read: true })));
+    } catch (err) {
+      console.error("Failed to mark all notifications read:", err);
+    }
+  };
+
+  const handleMarkOneRead = async (id: string) => {
+    try {
+      await fetchApi(`/notifications/${id}/read`, { method: "PATCH" });
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true, read: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to mark notification read:", err);
+    }
+  };
+
   const handleSearch = async (val: string) => {
     setSearchQuery(val);
     if (val.trim().length < 2) {
@@ -428,31 +450,72 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                   className="w-9 h-9 rounded-[8px] bg-[#161C2A] border border-[#232F48] flex items-center justify-center hover:bg-[#1E2638] transition-colors relative"
                 >
                   <Bell className="w-4 h-4 text-[#94A3B8]" />
-                  {notifications.length > 0 && (
+                  {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#E53935] text-white text-[9px] font-bold flex items-center justify-center border border-[#0F131D]">
-                      {notifications.length > 99 ? "99+" : notifications.length}
+                      {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   )}
                 </button>
 
                 {showNotifDropdown && (
-                  <div className="absolute right-0 mt-2 w-72 bg-[#121722] border border-[#1E2638] rounded-[10px] shadow-2xl p-3 z-50 space-y-2 text-[12px]">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#121722] border border-[#1E2638] rounded-[10px] shadow-2xl p-3 z-50 space-y-2 text-[12px]">
                     <div className="flex items-center justify-between border-b border-[#1E2638] pb-2 font-bold text-white">
-                      <span>Platform Alerts</span>
-                      <span className="text-[10px] text-[#2E9D50] font-mono uppercase">Global Scope</span>
+                      <div className="flex items-center gap-2">
+                        <span>Platform Alerts</span>
+                        {unreadCount > 0 && (
+                          <span className="text-[10px] bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/30 px-1.5 py-0.5 rounded font-mono">
+                            {unreadCount} UNREAD
+                          </span>
+                        )}
+                      </div>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-[11px] text-[#2E9D50] hover:underline font-normal"
+                        >
+                          Mark all read
+                        </button>
+                      )}
                     </div>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                    <div className="space-y-1.5 max-h-72 overflow-y-auto divide-y divide-[#1A2234]">
                       {notifications.length === 0 ? (
-                        <div className="p-3 text-center text-[#64748B] text-[11px]">
+                        <div className="p-4 text-center text-[#64748B] text-[11px]">
                           No pending platform alerts.
                         </div>
                       ) : (
-                        notifications.map((n: any, idx: number) => (
-                          <div key={n.id || idx} className="p-2 bg-[#1A2234] rounded-[6px] border border-[#232F48] space-y-0.5">
-                            <span className="font-bold text-white block">{n.title || n.type || "Alert"}</span>
-                            <p className="text-[11px] text-[#94A3B8]">{n.message || n.description || n.content}</p>
-                          </div>
-                        ))
+                        notifications.slice(0, 6).map((n: any) => {
+                          const isUnread = !n.is_read && !n.read;
+                          return (
+                            <div
+                              key={n.id}
+                              onClick={() => isUnread && handleMarkOneRead(n.id)}
+                              className={`pt-2 pb-1 px-2 rounded-[6px] transition-colors cursor-pointer ${
+                                isUnread ? "bg-[#161C2A] border-l-2 border-[#2E9D50]" : "hover:bg-[#1A2234]"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className={`text-[12px] block ${isUnread ? "font-bold text-white" : "text-[#94A3B8]"}`}>
+                                  {n.title || n.type || "Alert"}
+                                </span>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-mono shrink-0 ${
+                                  n.severity === "CRITICAL"
+                                    ? "bg-[#281816] text-[#EF4444] border border-[#EF4444]/40"
+                                    : n.severity === "HIGH" || n.severity === "WARNING"
+                                    ? "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
+                                    : "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
+                                }`}>
+                                  {n.severity || "INFO"}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-[#64748B] mt-0.5 line-clamp-2">{n.message || n.description}</p>
+                              {n.created_at && (
+                                <span className="text-[10px] text-[#475569] font-mono mt-1 block">
+                                  {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>

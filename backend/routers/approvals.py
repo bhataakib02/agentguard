@@ -152,6 +152,24 @@ async def act_on_approval(
 
     db.commit()
 
+    try:
+        from services.notification_service import notification_service
+        target_uid = str(dec.user_id) if (dec and dec.user_id) else str(current_user.id)
+        notification_service.notify_governance_event(
+            db=db,
+            org_id=str(agent.org_id) if agent else "",
+            event_type=f"approval.{new_status.lower()}",
+            resource_type="approval",
+            resource_id=str(app_req.id),
+            title=f"Approval Request {new_status}",
+            message=f"Action '{dec.action_requested if dec else 'Action'}' was {new_status.lower()} by {current_user.full_name or current_user.email}.",
+            data={"approval_id": str(app_req.id), "status": new_status, "resolver": current_user.email},
+            user_id=target_uid,
+            severity="INFO" if new_status == "APPROVED" else "WARNING"
+        )
+    except Exception as _notif_err:
+        pass
+
     await ws_manager.broadcast({
         "type": "APPROVAL_RESOLVED",
         "approval_id": str(app_req.id),

@@ -47,10 +47,13 @@ def list_integrations(
     # 5. Cloud Storage
     aws_configured = bool(os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY"))
 
-    # 6. Messaging & Alerts (Slack, Teams, SMTP)
+    # 6. Messaging & Alerts (Slack, Teams, Email/Resend/SMTP)
     slack_configured = bool(os.getenv("SLACK_WEBHOOK_URL") or os.getenv("SLACK_BOT_TOKEN"))
     teams_configured = bool(os.getenv("TEAMS_WEBHOOK_URL"))
-    smtp_configured = bool(os.getenv("SMTP_HOST") or os.getenv("SENDGRID_API_KEY"))
+    from services.email_service import email_service
+    email_status_info = email_service.get_status()
+    email_configured = email_status_info.get("configured", False)
+    provider_name = email_status_info.get("provider", "NONE")
 
     # 7. SIEM Forwarder
     from services.siem_forwarder_service import resolve_siem_config
@@ -164,13 +167,13 @@ def list_integrations(
             "details": "Teams connector webhook configured in environment" if teams_configured else "TEAMS_WEBHOOK_URL not configured. Outbound channel alerts disabled."
         },
         {
-            "id": "smtp_email",
-            "name": "SMTP / SendGrid Email Gateway",
+            "id": "email_gateway",
+            "name": f"Email Gateway ({provider_name if email_configured else 'Resend / SMTP / SendGrid'})",
             "category": "Email & Notifications",
-            "classification": "CONFIGURED" if smtp_configured else "NOT_CONFIGURED",
-            "status": "CONFIGURED" if smtp_configured else "NOT_CONFIGURED",
-            "health": "STANDBY" if smtp_configured else "NOT_CONFIGURED",
-            "details": "SMTP email delivery configured in environment" if smtp_configured else "SMTP_HOST not configured. Email invitation and security digest delivery disabled."
+            "classification": "CONFIGURED" if email_configured else "NOT_CONFIGURED",
+            "status": "CONFIGURED" if email_configured else "NOT_CONFIGURED",
+            "health": "HEALTHY" if email_configured else "NOT_CONFIGURED",
+            "details": f"Outbound {provider_name} gateway active for governance alerts and notifications" if email_configured else "Email provider (RESEND_API_KEY or SMTP_HOST) not configured in environment. In-app notifications remain active."
         },
         {
             "id": "siem_forwarder",
