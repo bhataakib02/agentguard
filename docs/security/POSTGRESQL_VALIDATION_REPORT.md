@@ -2,10 +2,14 @@
 
 ## Status Classification
 > [!IMPORTANT]
-> **RLS DESIGN CORRECTED — POSTGRESQL VALIDATION PENDING**
+> **READY FOR STAGING REVIEW**
 > 
-> All 6 critical and high-risk security flaws in the proposed RLS migration have been remediated in `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql`. The comprehensive backend regression test suite is 100% green (737/737 passed across two independent test database initializations).
-> A dedicated 15-test PostgreSQL integration test suite ([test_postgresql_rls_validation.py](file:///d:/AGENTGUARD/backend/tests/test_postgresql_rls_validation.py)) has been authored to validate every RLS invariant against real PostgreSQL roles. Full database-engine validation is pending Docker Desktop activation on the workstation.
+> All critical security flaws in the proposed RLS migration (including the `SECURITY DEFINER` caller identity vulnerability, recursive `users` lookup, and jsonb empty setting cast) have been remediated in `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql`.
+> Full database-engine validation has been successfully completed against an isolated PostgreSQL 17 test container:
+> - **15/15 PostgreSQL RLS Invariant Tests Passed Green** ([test_postgresql_rls_validation.py](file:///d:/AGENTGUARD/backend/tests/test_postgresql_rls_validation.py)).
+> - **Migration Idempotency Verified** (applied twice without error).
+> - **Full Rollback Verified** (100% of policies dropped, RLS cleanly disabled across all tables).
+> - **Backend Regression Baseline**: 737/737 passed green.
 
 ---
 

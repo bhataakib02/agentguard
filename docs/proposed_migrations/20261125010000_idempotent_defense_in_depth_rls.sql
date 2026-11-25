@@ -20,7 +20,6 @@ CREATE OR REPLACE FUNCTION public.current_org_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public, auth, pg_temp
 AS $$
     SELECT CASE
@@ -28,14 +27,11 @@ AS $$
         WHEN CURRENT_USER IN ('postgres', 'service_role') THEN
             COALESCE(
                 nullif(current_setting('app.current_org_id', true), '')::uuid,
-                nullif(current_setting('request.jwt.claims', true)::jsonb -> 'app_metadata' ->> 'org_id', '')::uuid
+                nullif((nullif(current_setting('request.jwt.claims', true), ''))::jsonb -> 'app_metadata' ->> 'org_id', '')::uuid
             )
-        -- 2. Authenticated PostgREST client: resolve strictly from verified JWT or DB profile
+        -- 2. Authenticated PostgREST client: resolve strictly from verified JWT app_metadata
         WHEN CURRENT_USER = 'authenticated' THEN
-            COALESCE(
-                nullif(current_setting('request.jwt.claims', true)::jsonb -> 'app_metadata' ->> 'org_id', '')::uuid,
-                (SELECT org_id FROM public.users WHERE (auth_user_id = auth.uid() OR id = auth.uid()) AND status = 'ACTIVE' LIMIT 1)
-            )
+            nullif((nullif(current_setting('request.jwt.claims', true), ''))::jsonb -> 'app_metadata' ->> 'org_id', '')::uuid
         -- 3. Anonymous or untrusted roles fail closed
         ELSE NULL
     END;
@@ -45,7 +41,6 @@ CREATE OR REPLACE FUNCTION public.is_super_admin()
 RETURNS boolean
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
 SET search_path = public, auth, pg_temp
 AS $$
     SELECT CASE
@@ -53,19 +48,13 @@ AS $$
         WHEN CURRENT_USER IN ('postgres', 'service_role') THEN
             COALESCE(
                 current_setting('app.is_super_admin', true) = 'true',
-                (current_setting('request.jwt.claims', true)::jsonb -> 'app_metadata' ->> 'role') = 'SUPER_ADMIN',
+                ((nullif(current_setting('request.jwt.claims', true), ''))::jsonb -> 'app_metadata' ->> 'role') = 'SUPER_ADMIN',
                 false
             )
-        -- 2. Authenticated PostgREST client: check verified JWT or authoritative DB profile
+        -- 2. Authenticated PostgREST client: check verified JWT app_metadata
         WHEN CURRENT_USER = 'authenticated' THEN
             COALESCE(
-                (current_setting('request.jwt.claims', true)::jsonb -> 'app_metadata' ->> 'role') = 'SUPER_ADMIN',
-                EXISTS (
-                    SELECT 1 FROM public.users 
-                    WHERE (auth_user_id = auth.uid() OR id = auth.uid()) 
-                      AND role = 'SUPER_ADMIN' 
-                      AND status = 'ACTIVE'
-                ),
+                ((nullif(current_setting('request.jwt.claims', true), ''))::jsonb -> 'app_metadata' ->> 'role') = 'SUPER_ADMIN',
                 false
             )
         -- 3. Anonymous or untrusted roles fail closed
@@ -433,7 +422,7 @@ BEGIN
                     AND EXISTS (
                         SELECT 1 FROM public.users
                         WHERE public.users.id = public.notifications.user_id
-                          AND (public.users.auth_user_id = auth.uid() OR public.users.id = auth.uid())
+                          AND (public.users.auth_user_id = auth.uid()::text OR public.users.id = auth.uid())
                           AND public.users.org_id = public.current_org_id()
                     )
                 )

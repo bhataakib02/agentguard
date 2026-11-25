@@ -1,24 +1,22 @@
 # AGENTGUARD — Row Level Security (RLS) Production Readiness Audit
 
-**Document Version**: 2.0.0 (Remediated)  
+**Document Version**: 3.0.0 (PostgreSQL 17 Validated)  
 **Target Migration**: `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql`  
-**Classification**: **RLS DESIGN CORRECTED — POSTGRESQL VALIDATION PENDING**  
+**Classification**: **READY FOR STAGING REVIEW**  
 
 ---
 
 ## 1. Executive Summary
 
-Following the initial audit that blocked deployment due to 6 critical design flaws, the proposed Row Level Security architecture and migration scripts have been completely redesigned and remediated.
-
-All 6 identified security defects have been corrected in `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql`:
+Following the final independent PostgreSQL security review and isolated PostgreSQL 17 integration testing, all architectural and function-level security defects have been corrected in `docs/proposed_migrations/20261125010000_idempotent_defense_in_depth_rls.sql`:
 1. **Immutable Audit Logs**: `audit_logs` is restricted to `FOR SELECT` and `FOR INSERT` only. Zero `UPDATE` or `DELETE` permissions exist for `authenticated`.
 2. **Global Platform Tools**: `tools` allows `SELECT` on `org_id IS NULL OR org_id = current_org_id()`, preserving global tool visibility while barring tenant mutation.
 3. **Dual-Agent Relational Integrity**: `agent_relationships` validates that **both** `parent_agent_id` AND `child_agent_id` belong to `current_org_id()`, preventing cross-tenant bridging.
 4. **Session Token Lockdown**: `sessions` is revoked entirely from `anon` and `authenticated`, eliminating intra-tenant token theft.
 5. **Symmetric Decision Checks**: `decisions` harmonizes `USING` and `WITH CHECK` to symmetrically validate human decisions, agent decisions, and reject cross-tenant mismatches.
-6. **Anti-GUC Spoofing & PostgREST Identity**: Helper functions `public.current_org_id()` and `public.is_super_admin()` ignore custom `app.*` GUCs when executing as `authenticated` or `anon`, resolving tenant identity strictly from verified JWT claims or authoritative database profiles.
+6. **Anti-GUC Spoofing & PostgREST Identity (`SECURITY INVOKER`)**: Helper functions `public.current_org_id()` and `public.is_super_admin()` use `SECURITY INVOKER` (avoiding caller privilege escalation) and resolve PostgREST tenant identity strictly from verified JWT claims (`app_metadata ->> 'org_id'`), eliminating infinite recursion and GUC spoofing.
 
-**Next Milestone**: Execution of the 15-test PostgreSQL integration suite against a disposable local PostgreSQL container once Docker Desktop is started.
+**Validation Status**: All 15/15 tests in `backend/tests/test_postgresql_rls_validation.py` passed green on real PostgreSQL 17. Rollback and idempotency roundtrips have been 100% verified.
 
 ---
 

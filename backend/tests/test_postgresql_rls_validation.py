@@ -33,23 +33,88 @@ class TestPostgreSQLRLSValidation(unittest.TestCase):
         cls.user2_id = str(uuid.uuid4())
         cls.agent1_id = str(uuid.uuid4())
         cls.agent2_id = str(uuid.uuid4())
+        cls.global_tool_id = str(uuid.uuid4())
+        cls.audit1_id = str(uuid.uuid4())
+
+        # Seed test fixtures with elevated connection (postgres/service_role)
+        try:
+            with cls.engine.connect() as conn:
+                with conn.begin():
+                    # Create organizations
+                    conn.execute(text(f"""
+                        INSERT INTO public.organizations (id, name, slug)
+                        VALUES 
+                            ('{cls.org1_id}', 'Tenant A Inc', 'tenant-a-{cls.org1_id[:8]}'),
+                            ('{cls.org2_id}', 'Tenant B Corp', 'tenant-b-{cls.org2_id[:8]}')
+                        ON CONFLICT DO NOTHING;
+                    """))
+                    # Create users
+                    conn.execute(text(f"""
+                        INSERT INTO public.users (id, org_id, email, full_name, role, status)
+                        VALUES 
+                            ('{cls.user1_id}', '{cls.org1_id}', 'user1@{cls.org1_id[:8]}.com', 'User One', 'USER', 'ACTIVE'),
+                            ('{cls.user2_id}', '{cls.org2_id}', 'user2@{cls.org2_id[:8]}.com', 'User Two', 'USER', 'ACTIVE')
+                        ON CONFLICT DO NOTHING;
+                    """))
+                    # Create agents
+                    conn.execute(text(f"""
+                        INSERT INTO public.agents (id, org_id, owner_id, agent_code, name, purpose, status)
+                        VALUES 
+                            ('{cls.agent1_id}', '{cls.org1_id}', '{cls.user1_id}', 'agent-1-{cls.agent1_id[:8]}', 'Agent 1', 'Testing', 'ACTIVE'),
+                            ('{cls.agent2_id}', '{cls.org2_id}', '{cls.user2_id}', 'agent-2-{cls.agent2_id[:8]}', 'Agent 2', 'Testing', 'ACTIVE')
+                        ON CONFLICT DO NOTHING;
+                    """))
+                    # Create global tool
+                    conn.execute(text(f"""
+                        INSERT INTO public.tools (id, org_id, name)
+                        VALUES ('{cls.global_tool_id}', NULL, 'Global Calculator')
+                        ON CONFLICT DO NOTHING;
+                    """))
+                    # Create audit log
+                    conn.execute(text(f"""
+                        INSERT INTO public.audit_logs (id, org_id, event_type, actor_id, action, resource, result)
+                        VALUES ('{cls.audit1_id}', '{cls.org1_id}', 'AUTH', '{cls.user1_id}', 'LOGIN', 'USER', 'SUCCESS')
+                        ON CONFLICT DO NOTHING;
+                    """))
+        except Exception as e:
+            # If tables don't exist yet (e.g. migration hasn't been applied to blank DB), record warning
+            print(f"[Warning] Failed to seed fixtures: {e}")
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            with cls.engine.connect() as conn:
+                with conn.begin():
+                    conn.execute(text(f"DELETE FROM public.audit_logs WHERE id = '{cls.audit1_id}';"))
+                    conn.execute(text(f"DELETE FROM public.tools WHERE id = '{cls.global_tool_id}';"))
+                    conn.execute(text(f"DELETE FROM public.agents WHERE id IN ('{cls.agent1_id}', '{cls.agent2_id}');"))
+                    conn.execute(text(f"DELETE FROM public.users WHERE id IN ('{cls.user1_id}', '{cls.user2_id}');"))
+                    conn.execute(text(f"DELETE FROM public.organizations WHERE id IN ('{cls.org1_id}', '{cls.org2_id}');"))
+        except Exception:
+            pass
 
     # =========================================================================
     # 1. Tenant Isolation Invariants
     # =========================================================================
 
     def test_01_tenant_a_cannot_read_tenant_b(self):
-        """Verifies that Tenant A cannot SELECT records owned by Tenant B under RLS."""
+        """Verifies that Tenant A cannot SELECT records owned by Tenant B under RLS, but sees own data."""
         with self.engine.connect() as conn:
             with conn.begin():
                 conn.execute(text("SET LOCAL ROLE authenticated;"))
                 conn.execute(text(f"SET LOCAL request.jwt.claims = '{{\"app_metadata\": {{\"org_id\": \"{self.org1_id}\"}}}}';"))
                 
-                # Query agents for org2
-                res = conn.execute(
+                # Query agents for org2 - MUST be 0
+                res_b = conn.execute(
                     text(f"SELECT count(*) FROM public.agents WHERE org_id = '{self.org2_id}'")
                 ).scalar()
-                self.assertEqual(res, 0, "Tenant A should see 0 rows of Tenant B agents")
+                self.assertEqual(res_b, 0, "Tenant A should see 0 rows of Tenant B agents")
+
+                # Query agents for org1 - MUST be at least 1 (positive verification)
+                res_a = conn.execute(
+                    text(f"SELECT count(*) FROM public.agents WHERE org_id = '{self.org1_id}'")
+                ).scalar()
+                self.assertGreaterEqual(res_a, 1, "Tenant A must see their own agent under RLS")
 
     def test_02_tenant_a_cannot_modify_tenant_b(self):
         """Verifies that Tenant A cannot UPDATE or DELETE records owned by Tenant B."""
