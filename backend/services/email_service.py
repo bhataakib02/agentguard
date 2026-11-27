@@ -813,28 +813,100 @@ This code is valid for exactly 10 minutes and can only be used once.
 Security notice: If you did not initiate this request, please disregard this email. Never share your passcode.
 """
         body_html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f6f8fa; padding: 24px; color: #1f2328;">
-  <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #d0d7de; border-radius: 8px; padding: 32px;">
-    <div style="margin-bottom: 24px;">
-      <h2 style="color: #2E9D50; margin: 0; font-size: 20px;">🛡️ AGENTGUARD</h2>
-      <p style="color: #656d76; font-size: 13px; margin: 4px 0 0 0;">Runtime Control Plane for Autonomous AI</p>
-    </div>
-    <h3 style="margin-top: 0; font-size: 18px; color: #1f2328;">{title}</h3>
-    <p style="font-size: 14px; line-height: 1.5; color: #333333;">
-      Please use the following 6-digit passcode to {action_text}:
-    </p>
-    <div style="background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px; text-align: center; margin: 24px 0;">
-      <span style="font-family: monospace; font-size: 32px; letter-spacing: 8px; font-weight: bold; color: #1f2328;">{otp_code}</span>
-    </div>
-    <p style="font-size: 13px; color: #656d76; margin-bottom: 8px;">
-      ⏱️ This code expires in <strong>10 minutes</strong> and can only be used once.
-    </p>
-    <p style="font-size: 12px; color: #8c959f; margin-top: 24px; border-top: 1px solid #d0d7de; padding-top: 16px;">
-      Security Notice: If you did not request this verification code, please ignore this email. Never share your verification passcode with anyone.
-    </p>
-  </div>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F5F2; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1F1F1F; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F4F5F2; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 540px; background-color: #FFFFFF; border: 1px solid #E8E8E4; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 16px rgba(31, 31, 31, 0.04);">
+          <!-- Top Accent Bar -->
+          <tr>
+            <td style="height: 4px; background: linear-gradient(90deg, #237A3C 0%, #2E9D50 100%); font-size: 0; line-height: 0;">&nbsp;</td>
+          </tr>
+          <!-- Header -->
+          <tr>
+            <td style="padding: 28px 32px 20px 32px; border-bottom: 1px solid #E8E8E4; background-color: #FCFCFA;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="left" style="vertical-align: middle;">
+                    <div style="font-size: 18px; font-weight: 800; letter-spacing: -0.02em; color: #1F1F1F; line-height: 1.2;">
+                      AGENT<span style="color: #2E9D50;">GUARD</span>
+                    </div>
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #237A3C; margin-top: 4px;">
+                      Runtime Control Plane
+                    </div>
+                  </td>
+                  <td align="right" style="vertical-align: middle;">
+                    <span style="display: inline-block; padding: 4px 10px; background-color: #EAF7EE; border: 1px solid #B7E4C7; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #237A3C;">
+                      Security Verification
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px;">
+              <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #1F1F1F; line-height: 1.3;">
+                {title}
+              </h1>
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #555555;">
+                Use the 6-digit one-time passcode below to {action_text}. Enter this code on the verification screen to continue.
+              </p>
+
+              <!-- OTP Box -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0 0 24px 0;">
+                <tr>
+                  <td align="center" style="background-color: #F7FBF8; border: 1px solid #B7E4C7; border-radius: 12px; padding: 22px 16px;">
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #237A3C; margin-bottom: 10px;">
+                      One-Time Verification Code
+                    </div>
+                    <div style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 34px; font-weight: 800; letter-spacing: 10px; color: #1F1F1F; line-height: 1.2; padding-left: 10px;">
+                      {otp_code}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Expiry & Single-Use Callout -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0 0 24px 0;">
+                <tr>
+                  <td style="background-color: #FCFCFA; border: 1px solid #E8E8E4; border-radius: 10px; padding: 14px 16px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="font-size: 12px; line-height: 1.5; color: #555555;">
+                          <strong style="color: #1F1F1F;">Expires in 10 minutes</strong> &middot; Valid for a single use only.
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Security Notice -->
+              <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #777777; border-top: 1px solid #E8E8E4; padding-top: 20px;">
+                <strong style="color: #444444;">Security Notice:</strong> If you did not request this verification code, you can safely ignore this email. Never share your passcode with anyone — AGENTGUARD staff will never ask for it.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 16px 32px; background-color: #FCFCFA; border-top: 1px solid #E8E8E4; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.5;">
+                AGENTGUARD &middot; Enterprise AI Agent Governance &amp; Runtime Control Plane
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>"""
         return self.send_email(
