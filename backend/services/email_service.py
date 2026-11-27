@@ -834,12 +834,23 @@ Security notice: If you did not initiate this request, please disregard this ema
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td align="left" style="vertical-align: middle;">
-                    <div style="font-size: 18px; font-weight: 800; letter-spacing: -0.02em; color: #1F1F1F; line-height: 1.2;">
-                      AGENT<span style="color: #2E9D50;">GUARD</span>
-                    </div>
-                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #237A3C; margin-top: 4px;">
-                      Runtime Control Plane
-                    </div>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="vertical-align: middle; padding-right: 12px;">
+                          <div style="width: 40px; height: 40px; border-radius: 10px; background-color: #EAF7EE; border: 1px solid #B7E4C7; text-align: center; line-height: 40px;">
+                            <img src="https://agentguard-beta-ten.vercel.app/logo.png" alt="AGENTGUARD Logo" width="28" height="28" style="display: inline-block; vertical-align: middle; width: 28px; height: 28px; object-fit: contain; border: 0;" />
+                          </div>
+                        </td>
+                        <td style="vertical-align: middle;">
+                          <div style="font-size: 18px; font-weight: 800; letter-spacing: -0.02em; color: #1F1F1F; line-height: 1.2;">
+                            AGENT<span style="color: #2E9D50;">GUARD</span>
+                          </div>
+                          <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #237A3C; margin-top: 3px;">
+                            Runtime Control Plane
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                   <td align="right" style="vertical-align: middle;">
                     <span style="display: inline-block; padding: 4px 10px; background-color: #EAF7EE; border: 1px solid #B7E4C7; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #237A3C;">
