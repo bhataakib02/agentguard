@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   title: "Zero-Trust Security Architecture | AGENTGUARD",
   description:
     "Technical security documentation for AGENTGUARD: authentication, RBAC, tenant isolation, runtime policy enforcement, database security, and capability status.",
+  alternates: {
+    canonical: "/security",
+  },
 };
 
 const TOC: TocItem[] = [

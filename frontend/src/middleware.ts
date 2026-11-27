@@ -9,6 +9,9 @@ const PUBLIC_AUTH_ROUTES = [
   "/reset-password",
   "/verify-otp",
   "/verify-email",
+  "/privacy",
+  "/terms",
+  "/security",
   "/403",
   "/unauthorized",
 ];

@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   title: "Privacy Policy | AGENTGUARD",
   description:
     "Enterprise Privacy Policy for AGENTGUARD: data collection, AI agent runtime telemetry, subprocessors, retention, security, and privacy rights.",
+  alternates: {
+    canonical: "/privacy",
+  },
 };
 
 const TOC: TocItem[] = [

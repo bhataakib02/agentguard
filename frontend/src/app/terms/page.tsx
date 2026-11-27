@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "Terms of Service | AGENTGUARD",
   description:
     "Enterprise B2B Terms of Service for AGENTGUARD AI Agent Governance and Runtime Control Plane.",
+  alternates: {
+    canonical: "/terms",
+  },
 };
 
 const TOC: TocItem[] = [
