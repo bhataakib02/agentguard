@@ -1,305 +1,247 @@
-"use client";
+import type { Metadata } from "next";
+import LegalDocShell, { DocSection, TocItem } from "@/components/legal/LegalDocShell";
 
-import React from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { FileText, Shield, CheckCircle2, Ban, Zap, Scale } from "lucide-react";
+export const metadata: Metadata = {
+  title: "Terms of Service | AGENTGUARD",
+  description:
+    "Enterprise B2B Terms of Service for AGENTGUARD AI Agent Governance and Runtime Control Plane.",
+};
+
+const TOC: TocItem[] = [
+  { id: "agreement-acceptance", number: "1", title: "Agreement and Acceptance" },
+  { id: "definitions", number: "2", title: "Definitions" },
+  { id: "eligibility-authority", number: "3", title: "Eligibility and Authority" },
+  { id: "account-registration", number: "4", title: "Account Registration and Security" },
+  { id: "organization-workspace", number: "5", title: "Organization and Workspace Management" },
+  { id: "subscription-billing", number: "6", title: "Subscription Plans and Billing" },
+  { id: "trials-limitations", number: "7", title: "Free Trials and Service Limitations" },
+  { id: "permitted-use", number: "8", title: "Permitted Use" },
+  { id: "prohibited-activities", number: "9", title: "Prohibited Activities" },
+  { id: "ai-agent-responsibilities", number: "10", title: "AI Agent and Automated System Responsibilities" },
+  { id: "customer-responsibilities", number: "11", title: "Customer Responsibilities" },
+  { id: "api-sdk-integrations", number: "12", title: "API, SDK and Integration Terms" },
+  { id: "third-party-services", number: "13", title: "Third-Party Services" },
+  { id: "data-ownership", number: "14", title: "Data Ownership" },
+  { id: "customer-data-processing", number: "15", title: "Customer Data and Processing Rights" },
+  { id: "intellectual-property", number: "16", title: "Intellectual Property Rights" },
+  { id: "confidentiality", number: "17", title: "Confidentiality" },
+  { id: "security-incident-reporting", number: "18", title: "Security and Incident Reporting" },
+  { id: "availability-maintenance", number: "19", title: "Service Availability and Maintenance" },
+  { id: "suspension-termination", number: "20", title: "Suspension and Termination" },
+  { id: "data-export-deletion", number: "21", title: "Data Export and Deletion Following Termination" },
+  { id: "warranties-disclaimers", number: "22", title: "Warranties and Disclaimers" },
+  { id: "limitation-of-liability", number: "23", title: "Limitation of Liability" },
+  { id: "indemnification", number: "24", title: "Indemnification" },
+  { id: "dispute-resolution", number: "25", title: "Dispute Resolution" },
+  { id: "governing-law", number: "26", title: "Governing Law and Jurisdiction" },
+  { id: "changes-to-agreement", number: "27", title: "Changes to the Agreement" },
+  { id: "contact-information", number: "28", title: "Contact Information" },
+];
 
 export default function TermsOfServicePage() {
   return (
-    <div className="min-h-screen bg-[#FCFCFA] text-[#1F1F1F] font-sans">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#FCFCFA]/90 backdrop-blur-md border-b border-[#E8E8E4]">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-[8px] bg-[#EAF7EE] border border-[#2E9D50]/30 flex items-center justify-center p-1.5 group-hover:border-[#2E9D50] transition-colors">
-              <Image src="/logo.png" alt="AGENTGUARD Logo" width={28} height={28} className="object-contain" />
-            </div>
-            <span className="text-[16px] font-bold text-[#1F1F1F] tracking-tight">AGENTGUARD</span>
-          </Link>
-          <div className="flex items-center gap-4 text-[13px]">
-            <Link href="/privacy" className="text-[#666666] hover:text-[#1F1F1F] transition-colors">Privacy Policy</Link>
-            <Link href="/security" className="text-[#666666] hover:text-[#1F1F1F] transition-colors">Security</Link>
-            <Link href="/login" className="px-4 py-2 bg-[#2E9D50] hover:bg-[#237A3C] text-white font-bold rounded-[8px] transition-colors text-[12px]">Sign In</Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="pt-14 pb-10 border-b border-[#E8E8E4] bg-[#FFFFFF]">
-        <div className="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-[10px] bg-[#EAF7EE] border border-[#2E9D50]/30 flex items-center justify-center">
-              <FileText className="w-5 h-5 text-[#237A3C]" />
-            </div>
-            <div>
-              <h1 className="text-[28px] sm:text-[34px] font-bold text-[#1F1F1F] tracking-tight leading-tight">Terms of Service</h1>
-              <p className="text-[13px] text-[#666666] mt-0.5">Effective date: November 2026 &middot; Last updated: November 2026</p>
-            </div>
-          </div>
-          <p className="text-[15px] text-[#555555] leading-relaxed">
-            These Terms of Service govern your access to and use of AGENTGUARD, an enterprise AI Agent Governance and Runtime Control Plane. By accessing or using AGENTGUARD, you agree to be bound by these terms.
-          </p>
-        </div>
-      </section>
-
-      {/* Content */}
-      <div className="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
-
-        {/* 1. Service Description */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <Shield className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">1. Service Description</h2>
-          </div>
-          <p className="text-[14px] text-[#555555] leading-relaxed">
-            AGENTGUARD is a Software-as-a-Service platform that provides enterprise-grade governance infrastructure for autonomous AI agents. The platform includes:
-          </p>
-          <ul className="space-y-1.5 text-[13px] text-[#555555] list-disc list-inside">
-            <li><strong>Agent Identity Management:</strong> Digital passports, capability tokens, and permission matrices for AI agents</li>
-            <li><strong>Runtime Policy Engine:</strong> Deterministic rule evaluation for ALLOW / REVIEW / REFUSE governance decisions</li>
-            <li><strong>Risk Intelligence:</strong> Dynamic risk scoring (0–100) based on agent behavior and payload analysis</li>
-            <li><strong>Human-in-the-Loop Approvals:</strong> Approval workflow routing for high-risk agent operations</li>
-            <li><strong>Security Incident Management:</strong> Incident creation, tracking, resolution, and notification</li>
-            <li><strong>Circuit Breaker (Kill Switch):</strong> Immediate agent suspension capability</li>
-            <li><strong>Decision Black Box:</strong> Immutable governance audit records</li>
-            <li><strong>Causal Audit Provenance:</strong> Full forensic tracing of agent actions</li>
-            <li><strong>Multi-Tenant Organization Management:</strong> Isolated workspaces per organization with license controls</li>
-            <li><strong>Notification System:</strong> In-app governance alerts, security notifications, and event-driven messaging</li>
-            <li><strong>Reporting:</strong> PDF, Excel, and CSV compliance reports from live database records</li>
-          </ul>
-        </section>
-
-        {/* 2. Account Responsibility */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">2. Account Registration & Responsibility</h2>
-          </div>
-          <div className="space-y-3 text-[13px] text-[#555555]">
-            <p>To use AGENTGUARD, you must register with a valid email address and complete OTP email verification. You agree that:</p>
-            <ul className="space-y-1.5 list-disc list-inside">
-              <li>You will provide accurate registration information and keep it up to date</li>
-              <li>You are responsible for maintaining the security of your account credentials</li>
-              <li>You will immediately notify your organization administrator if you suspect unauthorized access</li>
-              <li>You are responsible for all actions taken under your account, including those of AI agents operating under your governance oversight</li>
-              <li>Sharing account credentials with other individuals is prohibited</li>
-              <li>Your organization administrator is responsible for managing IAM roles and removing access when users leave</li>
-            </ul>
-          </div>
-        </section>
-
-        {/* 3. Authorized Use */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">3. Authorized Use</h2>
-          </div>
-          <p className="text-[13px] text-[#555555]">AGENTGUARD is provided for legitimate enterprise AI governance purposes. Authorized use includes:</p>
-          <ul className="space-y-1.5 text-[13px] text-[#555555] list-disc list-inside">
-            <li>Governing, monitoring, and auditing autonomous AI agent operations within your organization</li>
-            <li>Configuring runtime policies and risk thresholds for AI agent behavior</li>
-            <li>Reviewing and approving or refusing AI agent operations requiring human oversight</li>
-            <li>Generating compliance and audit reports from your organization&apos;s governance records</li>
-            <li>Managing user IAM roles within your authorized organization scope</li>
-            <li>Administering platform organizations, licenses, and billing (SUPER_ADMIN only)</li>
-          </ul>
-        </section>
-
-        {/* 4. AI Agent Usage */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <Zap className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">4. AI Agent Usage & Governance Responsibility</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            AGENTGUARD provides a governance control plane. The underlying AI agents that you govern through AGENTGUARD are your responsibility. You acknowledge that:
-          </p>
-          <ul className="space-y-1.5 text-[13px] text-[#555555] list-disc list-inside">
-            <li>You are responsible for the AI agents you register, configure, and govern through AGENTGUARD</li>
-            <li>AGENTGUARD provides governance infrastructure — it does not independently operate, train, or deploy AI models</li>
-            <li>You are responsible for ensuring your AI agent operations comply with applicable laws and regulations in your jurisdiction</li>
-            <li>Governance decisions (ALLOW / REVIEW / REFUSE) are based on the policies and thresholds you configure — you are responsible for configuring appropriate controls</li>
-            <li>Human approvers designated in your organization are responsible for the approval decisions they make</li>
-            <li>The circuit breaker (kill switch) must be used responsibly; misuse to disrupt legitimate operations is prohibited</li>
-          </ul>
-        </section>
-
-        {/* 5. Prohibited Activity */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#FDECEC] flex items-center justify-center">
-              <Ban className="w-4 h-4 text-[#C62828]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">5. Prohibited Activity</h2>
-          </div>
-          <p className="text-[13px] text-[#555555]">The following activities are strictly prohibited:</p>
-          <div className="space-y-2">
-            {[
-              "Attempting to access another tenant organization&apos;s data, users, agents, or governance records",
-              "Attempting to bypass, circumvent, or defeat authentication, authorization, or tenant isolation controls",
-              "Using AGENTGUARD to govern AI agents engaged in illegal, harmful, fraudulent, or abusive activities",
-              "Submitting false registration information or impersonating another user or organization",
-              "Reverse engineering, decompiling, or attempting to extract AGENTGUARD source code or proprietary algorithms",
-              "Using the API beyond your licensed rate limits or in ways designed to degrade platform performance",
-              "Storing or processing data through AGENTGUARD that violates applicable law, including unlawful personal data",
-              "Attempting to exploit security vulnerabilities in the platform (responsible disclosure is encouraged — contact the platform operator)",
-              "Using AGENTGUARD platform features to process personal data of minors without required consents and safeguards",
-            ].map((item, i) => (
-              <div key={i} className="flex items-start gap-2.5 p-3 bg-[#FDECEC]/30 border border-[#E53935]/20 rounded-[8px]">
-                <Ban className="w-3.5 h-3.5 text-[#E53935] mt-0.5 shrink-0" />
-                <span className="text-[13px] text-[#555555]" dangerouslySetInnerHTML={{ __html: item }} />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 6. API Usage */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">6. API Usage</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            AGENTGUARD exposes a RESTful API for integration with your AI agent systems. API access requires valid JWT authentication. All API requests are subject to:
-          </p>
-          <ul className="space-y-1.5 text-[13px] text-[#555555] list-disc list-inside">
-            <li>Authentication via JWT token on every request</li>
-            <li>Role-based authorization enforced server-side on every endpoint</li>
-            <li>Rate limiting and pagination bounds (default: 50 notifications per request, max 200)</li>
-            <li>Tenant isolation — API responses are automatically scoped to the authenticated user&apos;s organization</li>
-          </ul>
-          <p className="text-[13px] text-[#555555]">API keys and tokens must be kept confidential and must not be committed to public version control repositories.</p>
-        </section>
-
-        {/* 7. Third-Party Services */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">7. Third-Party Services</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            AGENTGUARD relies on third-party infrastructure providers including Supabase (database and authentication), Render (backend hosting), Vercel (frontend hosting), and optionally Resend (email delivery). Your use of AGENTGUARD is also subject to the applicable terms of service of these providers. We are not responsible for outages, data loss, or service changes caused by our infrastructure providers.
-          </p>
-        </section>
-
-        {/* 8. Service Availability */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">8. Service Availability &amp; Limitations</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            AGENTGUARD is provided &ldquo;as available.&rdquo; While we strive for high availability, we may perform maintenance, security updates, or infrastructure changes that temporarily affect availability. The platform health dashboard (accessible to SUPER_ADMIN) provides real-time status of core platform services.
-          </p>
-        </section>
-
-        {/* 9. Intellectual Property */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">9. Intellectual Property</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            AGENTGUARD, its platform software, design system, governance algorithms, runtime policy engine, and all associated intellectual property are owned by the platform operator. You are granted a limited, non-exclusive, non-transferable license to use the platform in accordance with these Terms during your subscription period.
-          </p>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            Your organization&apos;s data — including agent records, audit logs, governance decisions, and user data — remains your property. By using AGENTGUARD, you grant us the right to process this data solely to deliver the platform services.
-          </p>
-        </section>
-
-        {/* 10. Suspension & Termination */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">10. Suspension & Termination</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            We reserve the right to suspend or terminate access to AGENTGUARD for:
-          </p>
-          <ul className="space-y-1.5 text-[13px] text-[#555555] list-disc list-inside">
-            <li>Violation of these Terms of Service</li>
-            <li>Non-payment of applicable subscription fees</li>
-            <li>Illegal or harmful use of the platform</li>
-            <li>Security breach or compromise of the platform</li>
-            <li>Exceeding license quotas after reasonable notice</li>
-          </ul>
-          <p className="text-[13px] text-[#555555] mt-2">
-            Upon termination, your access to the platform ceases. Reasonable data export requests from authorized organization administrators will be accommodated subject to applicable law and audit retention requirements.
-          </p>
-        </section>
-
-        {/* 11. Limitation of Liability */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <Scale className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">11. Limitation of Liability & Disclaimer</h2>
-          </div>
-          <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] space-y-3 text-[13px] text-[#555555]">
-            <p>
-              AGENTGUARD IS PROVIDED &ldquo;AS IS&rdquo; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
-            </p>
-            <p>
-              AGENTGUARD IS A GOVERNANCE TOOL &mdash; IT DOES NOT GUARANTEE THAT AI AGENTS GOVERNED THROUGH THE PLATFORM WILL NEVER CAUSE HARM. YOU REMAIN RESPONSIBLE FOR YOUR AI AGENTS AND THEIR ACTIONS. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, AGENTGUARD SHALL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES.
-            </p>
-          </div>
-        </section>
-
-        {/* 12. User Responsibility */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">12. User Responsibility &amp; Indemnification</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            You agree to indemnify and hold harmless AGENTGUARD and its operators from any claims, damages, or expenses arising from: (a) your violation of these Terms; (b) your use of AGENTGUARD in a manner that harms a third party; (c) the actions of AI agents you govern through the platform; or (d) your breach of applicable law.
-          </p>
-        </section>
-
-        {/* 13. Changes */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">13. Changes to These Terms</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            We may update these Terms as the platform evolves. Material changes will be communicated to organization administrators via in-app notification at least 14 days before they take effect. Continued use of AGENTGUARD after the effective date constitutes acceptance of the revised Terms.
-          </p>
-        </section>
-
-        {/* 14. Governing Law */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">14. Governing Law &amp; Dispute Resolution</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            These Terms are governed by applicable laws specified in your enterprise workspace agreement or order form, without regard to conflict-of-law principles. Any disputes arising under these Terms shall be resolved in good faith between the organization and the platform operator prior to formal proceedings.
-          </p>
-        </section>
-
-        {/* 15. Contact */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">15. Contact Information</h2>
-          </div>
-          <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] text-[13px] text-[#555555] space-y-2">
-            <p>For questions regarding these Terms of Service, please contact your organization administrator or the AGENTGUARD platform support contact provided during workspace onboarding.</p>
-          </div>
-        </section>
-
+    <LegalDocShell
+      activeRoute="/terms"
+      breadcrumbLabel="Terms of Service"
+      title="Terms of Service"
+      description="These Terms of Service govern enterprise access to and use of the AGENTGUARD AI Agent Governance and Runtime Control Plane."
+      effectiveDate="[LEGAL REVIEW REQUIRED: Effective Date]"
+      lastUpdated="November 27, 2026"
+      version="2.0 (Draft — Pending Legal Counsel & Company Details)"
+      toc={TOC}
+    >
+      <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] text-[13px] text-[#444444] leading-relaxed">
+        <strong>Document Notice:</strong> This draft B2B Terms of Service requires review and approval by qualified legal counsel, including completion of governing law, liability caps, and registered company details, before being treated as a binding commercial agreement.
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-[#E8E8E4] bg-[#FFFFFF] py-8 mt-8">
-        <div className="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-[#666666]">
-          <span>© {new Date().getFullYear()} AGENTGUARD. All rights reserved.</span>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="hover:text-[#1F1F1F] transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="text-[#2E9D50] font-bold">Terms of Service</Link>
-            <Link href="/security" className="hover:text-[#1F1F1F] transition-colors">Zero-Trust Security</Link>
-          </div>
+      <DocSection id="agreement-acceptance" number="1" title="Agreement and Acceptance">
+        <p>
+          These Terms of Service (&ldquo;Agreement&rdquo;) constitute a legal agreement between{" "}
+          <strong>[COMPANY INFORMATION REQUIRED: Legal Entity Name]</strong> (&ldquo;AGENTGUARD&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) and the organization or entity accepting this Agreement (&ldquo;Customer&rdquo;, &ldquo;you&rdquo;). By creating an account, provisioning a workspace, or using the AGENTGUARD platform, you agree to be bound by this Agreement.
+        </p>
+      </DocSection>
+
+      <DocSection id="definitions" number="2" title="Definitions">
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li><strong>&ldquo;Platform&rdquo;</strong> means the AGENTGUARD web application, REST APIs, policy engine, risk scoring engine, approval workflows, and audit provenance tools.</li>
+          <li><strong>&ldquo;Authorized User&rdquo;</strong> means an employee, contractor, or agent of Customer granted workspace credentials under Customer&apos;s IAM hierarchy.</li>
+          <li><strong>&ldquo;Customer Data&rdquo;</strong> means all data, policies, agent metadata, logs, and reports submitted by or generated for Customer in its workspace.</li>
+          <li><strong>&ldquo;Governed Agent&rdquo;</strong> means any autonomous software or AI agent registered, evaluated, or controlled by Customer using AGENTGUARD.</li>
+        </ul>
+      </DocSection>
+
+      <DocSection id="eligibility-authority" number="3" title="Eligibility and Authority">
+        <p>
+          You represent that you are at least 18 years old and have full legal authority to bind the Customer organization to this Agreement. AGENTGUARD is intended strictly for business and enterprise use.
+        </p>
+      </DocSection>
+
+      <DocSection id="account-registration" number="4" title="Account Registration and Security">
+        <p>
+          Registration requires a valid email address verified via a six-digit OTP. Each Authorized User must maintain confidential credentials and must not share accounts. Customer is responsible for all activity occurring under its Authorized Users&apos; accounts and must promptly revoke access for personnel who leave or no longer require access.
+        </p>
+      </DocSection>
+
+      <DocSection id="organization-workspace" number="5" title="Organization and Workspace Management">
+        <p>
+          AGENTGUARD operates a multi-tenant architecture with organization-scoped workspaces. Customer workspace administrators (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">ADMIN</code>) manage user roles, agent registrations, and policies within their tenant. Platform Super Administrators (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">SUPER_ADMIN</code>) are isolated to platform-level administration and licensing.
+        </p>
+      </DocSection>
+
+      <DocSection id="subscription-billing" number="6" title="Subscription Plans and Billing">
+        <p>
+          Access to AGENTGUARD is governed by the Customer&apos;s assigned subscription tier (such as <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">STARTER</code>, <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">PROFESSIONAL</code>, or <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">ENTERPRISE</code>) and associated seat and agent quotas.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Specify payment terms, invoicing, renewal, taxes, and refund policy.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="trials-limitations" number="7" title="Free Trials and Service Limitations">
+        <p>
+          If Customer accesses AGENTGUARD under a trial or evaluation license, access may be subject to reduced agent quotas, user seat limits, or time-limited availability, and may be modified or terminated at any time without SLA commitments.
+        </p>
+      </DocSection>
+
+      <DocSection id="permitted-use" number="8" title="Permitted Use">
+        <p>
+          Subject to compliance with this Agreement, AGENTGUARD grants Customer a non-exclusive, non-transferable, revocable right during the subscription term to access and use the Platform for internal enterprise AI agent governance, policy evaluation, human approval routing, security monitoring, and compliance reporting.
+        </p>
+      </DocSection>
+
+      <DocSection id="prohibited-activities" number="9" title="Prohibited Activities">
+        <p>Customer and its Authorized Users shall not:</p>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li>Attempt to access, probe, or interfere with another tenant organization&apos;s workspace or data;</li>
+          <li>Bypass or attempt to defeat authentication, OTP rate limits, RBAC, or tenant-isolation controls;</li>
+          <li>Reverse engineer, decompile, or copy the Platform&apos;s proprietary source code or algorithms;</li>
+          <li>Use the Platform to govern AI agents engaged in unlawful, fraudulent, or abusive conduct; or</li>
+          <li>Conduct unauthorized load testing, scraping, or denial-of-service activity against Platform endpoints.</li>
+        </ul>
+      </DocSection>
+
+      <DocSection id="ai-agent-responsibilities" number="10" title="AI Agent and Automated System Responsibilities">
+        <p>
+          <strong>Human Oversight Requirement:</strong> AGENTGUARD provides runtime governance infrastructure, risk scoring, and deterministic policy evaluation (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">ALLOW</code> / <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">REVIEW</code> / <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">REFUSE</code>). Automated outputs, risk scores, and enforcement decisions depend on policies configured by Customer and may require human oversight and judgment.
+        </p>
+        <p>
+          Customer remains solely responsible for the design, deployment, prompts, downstream tool executions, regulatory compliance, and real-world actions of its Governed Agents.
+        </p>
+      </DocSection>
+
+      <DocSection id="customer-responsibilities" number="11" title="Customer Responsibilities">
+        <p>
+          Customer is responsible for: (a) configuring appropriate policy thresholds, autonomy tiers, and approval workflows; (b) reviewing pending <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">REVIEW</code> items in a timely manner; (c) maintaining accurate IAM role assignments; and (d) ensuring lawful collection and submission of Customer Data.
+        </p>
+      </DocSection>
+
+      <DocSection id="api-sdk-integrations" number="12" title="API, SDK and Integration Terms">
+        <p>
+          API access requires valid JWT authentication and is subject to server-side role enforcement, pagination bounds (maximum 200 items per list request on supported endpoints), and webhook security controls. Customer must protect API credentials and capability tokens from unauthorized disclosure.
+        </p>
+      </DocSection>
+
+      <DocSection id="third-party-services" number="13" title="Third-Party Services">
+        <p>
+          The Platform relies on third-party infrastructure providers (including Supabase, Render, Vercel, and transactional email providers such as Brevo or Resend) and may integrate with Customer-configured external webhooks or LLM APIs. AGENTGUARD is not responsible for outages or changes caused by third-party providers outside our reasonable control.
+        </p>
+      </DocSection>
+
+      <DocSection id="data-ownership" number="14" title="Data Ownership">
+        <p>
+          As between the parties, Customer retains all right, title, and interest in and to Customer Data. AGENTGUARD claims no ownership over Customer Data, agent configurations, or generated compliance reports.
+        </p>
+      </DocSection>
+
+      <DocSection id="customer-data-processing" number="15" title="Customer Data and Processing Rights">
+        <p>
+          Customer grants AGENTGUARD a limited license to host, process, transmit, and display Customer Data solely as necessary to provide, maintain, secure, and support the Platform in accordance with this Agreement and our Privacy Policy.
+        </p>
+      </DocSection>
+
+      <DocSection id="intellectual-property" number="16" title="Intellectual Property Rights">
+        <p>
+          AGENTGUARD and its licensors retain all intellectual property rights in the Platform, user interfaces, software architecture, documentation, and trademarks. No rights are granted to Customer other than the limited right to use the Platform under this Agreement.
+        </p>
+      </DocSection>
+
+      <DocSection id="confidentiality" number="17" title="Confidentiality">
+        <p>
+          Each party agrees to protect the other party&apos;s non-public business, technical, and security information with at least reasonable care and not to disclose it except to personnel or subprocessors bound by confidentiality obligations or as required by law.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Expand mutual confidentiality carve-outs and survival period.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="security-incident-reporting" number="18" title="Security and Incident Reporting">
+        <p>
+          AGENTGUARD maintains technical controls documented on our Zero-Trust Security page. Customer agrees to promptly notify AGENTGUARD upon discovering any suspected compromise of workspace credentials, capability tokens, or Platform security.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Define breach notification timelines.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="availability-maintenance" number="19" title="Service Availability and Maintenance">
+        <p>
+          The Platform is provided on an &ldquo;as available&rdquo; basis. We do not promise uninterrupted, error-free operation. Planned maintenance, security patches, or infrastructure updates may result in temporary service interruptions.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Add any commercial SLA or service credit schedule if offered.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="suspension-termination" number="20" title="Suspension and Termination">
+        <p>
+          AGENTGUARD may suspend or terminate access if Customer materially breaches this Agreement, poses a security risk to the Platform or other tenants, or fails to pay applicable fees. Either party may terminate in accordance with the applicable subscription terms.
+        </p>
+      </DocSection>
+
+      <DocSection id="data-export-deletion" number="21" title="Data Export and Deletion Following Termination">
+        <p>
+          Following termination, Customer&apos;s right to access the Platform ceases. Customer may request export of available governance and audit records prior to workspace deactivation.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Specify post-termination export window and deletion timeline.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="warranties-disclaimers" number="22" title="Warranties and Disclaimers">
+        <p>
+          TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE PLATFORM IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE&rdquo; WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. AGENTGUARD DOES NOT WARRANT THAT GOVERNANCE CONTROLS WILL PREVENT ALL UNAUTHORIZED AGENT BEHAVIOR OR SECURITY INCIDENTS.
+        </p>
+      </DocSection>
+
+      <DocSection id="limitation-of-liability" number="23" title="Limitation of Liability">
+        <p>
+          TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, NEITHER PARTY SHALL BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR LOSS OF PROFITS, REVENUE, OR DATA.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Insert aggregate liability cap (e.g., fees paid in prior 12 months) and statutory carve-outs.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="indemnification" number="24" title="Indemnification">
+        <p>
+          <strong>[LEGAL REVIEW REQUIRED: Define mutual IP infringement indemnity by AGENTGUARD and Customer indemnity covering Governed Agents, Customer Data, and breach of Prohibited Activities.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="dispute-resolution" number="25" title="Dispute Resolution">
+        <p>
+          Before initiating formal legal proceedings, the parties agree to attempt in good faith to resolve any dispute through written notice and executive negotiation.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Specify arbitration or litigation procedures.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="governing-law" number="26" title="Governing Law and Jurisdiction">
+        <p>
+          <strong>[LEGAL REVIEW REQUIRED: Specify governing law, venue, and exclusive jurisdiction once operating entity domicile is confirmed.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="changes-to-agreement" number="27" title="Changes to the Agreement">
+        <p>
+          We may revise this Agreement from time to time by posting an updated version and updating the &ldquo;Last Updated&rdquo; date. Material changes will be communicated to Customer administrators via email or in-app notification.
+        </p>
+      </DocSection>
+
+      <DocSection id="contact-information" number="28" title="Contact Information">
+        <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] space-y-2 text-[13.5px]">
+          <p><strong>Legal Entity:</strong> [COMPANY INFORMATION REQUIRED: Registered Legal Entity Name]</p>
+          <p><strong>Registered Address:</strong> [COMPANY INFORMATION REQUIRED: Physical Business Address]</p>
+          <p><strong>Legal Notices Email:</strong> [COMPANY INFORMATION REQUIRED: Legal Contact Email]</p>
         </div>
-      </footer>
-    </div>
+      </DocSection>
+    </LegalDocShell>
   );
 }

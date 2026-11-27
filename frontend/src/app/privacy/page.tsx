@@ -1,382 +1,305 @@
-"use client";
-
-import React from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
-import { Shield, Lock, Database, Eye, Users, Mail, FileText, CheckCircle2, ExternalLink } from "lucide-react";
+import LegalDocShell, { DocSection, TocItem } from "@/components/legal/LegalDocShell";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | AGENTGUARD",
+  description:
+    "Enterprise Privacy Policy for AGENTGUARD: data collection, AI agent runtime telemetry, subprocessors, retention, security, and privacy rights.",
+};
+
+const TOC: TocItem[] = [
+  { id: "introduction-scope", number: "1", title: "Introduction and Scope" },
+  { id: "definitions", number: "2", title: "Definitions and Interpretation" },
+  { id: "information-we-collect", number: "3", title: "Information We Collect and Do Not Collect" },
+  { id: "personal-account-info", number: "4", title: "Personal and Account Information" },
+  { id: "agent-runtime-usage", number: "5", title: "AI Agent, Runtime and Usage Data" },
+  { id: "technical-logs-telemetry", number: "6", title: "Technical Information, Logs and Telemetry" },
+  { id: "cookies-storage", number: "7", title: "Cookies and Similar Technologies" },
+  { id: "how-we-use-info", number: "8", title: "How We Use Personal Information" },
+  { id: "legal-bases", number: "9", title: "Legal Bases for Processing" },
+  { id: "ai-automated-decisions", number: "10", title: "AI Processing and Automated Decision-Making" },
+  { id: "ai-third-party-integrations", number: "11", title: "AI Model and Third-Party Integrations" },
+  { id: "data-sharing-subprocessors", number: "12", title: "Data Sharing and Subprocessors" },
+  { id: "core-infrastructure-providers", number: "13", title: "Supabase, Render, Vercel and Email Providers" },
+  { id: "storage-hosting-locations", number: "14", title: "Data Storage and Hosting Locations" },
+  { id: "international-transfers", number: "15", title: "International Data Transfers" },
+  { id: "retention-deletion", number: "16", title: "Data Retention and Deletion" },
+  { id: "data-security", number: "17", title: "Data Security Measures" },
+  { id: "access-correction-deletion", number: "18", title: "Access, Correction and Deletion Rights" },
+  { id: "jurisdictional-rights", number: "19", title: "User and Jurisdictional Privacy Rights" },
+  { id: "childrens-privacy", number: "20", title: "Children's Privacy" },
+  { id: "business-transfers", number: "21", title: "Business Transfers" },
+  { id: "policy-changes", number: "22", title: "Changes to This Privacy Policy" },
+  { id: "contact-enquiries", number: "23", title: "Contact and Privacy Enquiries" },
+];
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen bg-[#FCFCFA] text-[#1F1F1F] font-sans">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#FCFCFA]/90 backdrop-blur-md border-b border-[#E8E8E4]">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-[8px] bg-[#EAF7EE] border border-[#2E9D50]/30 flex items-center justify-center p-1.5 group-hover:border-[#2E9D50] transition-colors">
-              <Image src="/logo.png" alt="AGENTGUARD Logo" width={28} height={28} className="object-contain" />
-            </div>
-            <span className="text-[16px] font-bold text-[#1F1F1F] tracking-tight">AGENTGUARD</span>
-          </Link>
-          <div className="flex items-center gap-4 text-[13px]">
-            <Link href="/terms" className="text-[#666666] hover:text-[#1F1F1F] transition-colors">Terms of Service</Link>
-            <Link href="/security" className="text-[#666666] hover:text-[#1F1F1F] transition-colors">Security</Link>
-            <Link href="/login" className="px-4 py-2 bg-[#2E9D50] hover:bg-[#237A3C] text-white font-bold rounded-[8px] transition-colors text-[12px]">Sign In</Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="pt-14 pb-10 border-b border-[#E8E8E4] bg-[#FFFFFF]">
-        <div className="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-[10px] bg-[#EAF7EE] border border-[#2E9D50]/30 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-[#237A3C]" />
-            </div>
-            <div>
-              <h1 className="text-[28px] sm:text-[34px] font-bold text-[#1F1F1F] tracking-tight leading-tight">Privacy Policy</h1>
-              <p className="text-[13px] text-[#666666] mt-0.5">Effective date: November 2026 &middot; Last updated: November 2026</p>
-            </div>
-          </div>
-          <p className="text-[15px] text-[#555555] leading-relaxed">
-            AGENTGUARD is an enterprise AI Agent Governance and Runtime Control Plane. This policy explains what data we collect, how we use it, and your rights regarding that data. We do not sell personal data.
-          </p>
-        </div>
-      </section>
-
-      {/* Content */}
-      <div className="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
-
-        {/* 1. Who We Are */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <Shield className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">1. Who We Are</h2>
-          </div>
-          <p className="text-[14px] text-[#555555] leading-relaxed">
-            AGENTGUARD is a Software-as-a-Service platform for governing autonomous AI agents in enterprise environments. The platform provides agent identity management (Agent Passports), runtime policy enforcement, risk scoring, human-in-the-loop approval workflows, security incident management, audit provenance tracking, and notification services.
-          </p>
-          <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] text-[13px] text-[#555555] space-y-1">
-            <p><strong className="text-[#1F1F1F]">Privacy Inquiries:</strong> For privacy or data-handling questions, please contact your organization administrator or the platform support contact provided during workspace onboarding.</p>
-          </div>
-        </section>
-
-        {/* 2. Data We Collect */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <Database className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">2. Data We Collect</h2>
-          </div>
-
-          <div className="space-y-4">
-            <div className="p-4 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] space-y-2">
-              <h3 className="text-[14px] font-bold text-[#1F1F1F]">2.1 Account & Authentication Data</h3>
-              <ul className="text-[13px] text-[#555555] space-y-1 list-disc list-inside">
-                <li>Full name and email address (collected at registration)</li>
-                <li>Hashed password (never stored in plaintext; hashed by the authentication layer)</li>
-                <li>OTP (one-time passcode) for email verification — stored temporarily, expires after 10 minutes</li>
-                <li>Organization affiliation, IAM role (USER / MANAGER / ADMIN / SUPER_ADMIN)</li>
-                <li>Session tokens (JWT) stored in browser cookies and localStorage with configurable expiry</li>
-                <li>Last login timestamp</li>
-                <li>Account status (ACTIVE / SUSPENDED / PENDING)</li>
-              </ul>
-            </div>
-
-            <div className="p-4 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] space-y-2">
-              <h3 className="text-[14px] font-bold text-[#1F1F1F]">2.2 AI Agent Data</h3>
-              <ul className="text-[13px] text-[#555555] space-y-1 list-disc list-inside">
-                <li>Agent identity records (Agent ID, name, purpose, autonomy tier, capability tokens)</li>
-                <li>Agent ownership and organization association</li>
-                <li>Agent operational status (ACTIVE / SUSPENDED)</li>
-                <li>Capability token grants and revocations</li>
-                <li>Permission matrix configurations</li>
-              </ul>
-            </div>
-
-            <div className="p-4 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] space-y-2">
-              <h3 className="text-[14px] font-bold text-[#1F1F1F]">2.3 Governance & Decision Records</h3>
-              <ul className="text-[13px] text-[#555555] space-y-1 list-disc list-inside">
-                <li>Policy engine evaluation records (resource target, transaction value, risk threshold)</li>
-                <li>Runtime governance decisions (ALLOW / REVIEW / REFUSE) with rationale</li>
-                <li>Human approval workflow records (approver identity, decision, timestamp)</li>
-                <li>Risk scoring records (dynamic risk scores 0–100)</li>
-                <li>Decision Black Box entries (immutable governance audit records)</li>
-              </ul>
-            </div>
-
-            <div className="p-4 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] space-y-2">
-              <h3 className="text-[14px] font-bold text-[#1F1F1F]">2.4 Security & Incident Data</h3>
-              <ul className="text-[13px] text-[#555555] space-y-1 list-disc list-inside">
-                <li>Security incident records (incident type, severity, affected agents, timeline, resolution)</li>
-                <li>Agent suspension and restoration records</li>
-                <li>Webhook delivery logs including failure (dead-letter) records</li>
-                <li>In-app notification records (type, severity, read status)</li>
-              </ul>
-            </div>
-
-            <div className="p-4 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] space-y-2">
-              <h3 className="text-[14px] font-bold text-[#1F1F1F]">2.5 Audit Logs</h3>
-              <ul className="text-[13px] text-[#555555] space-y-1 list-disc list-inside">
-                <li>Causal provenance records tracing every agent action to its originating user, agent version, and policy rule</li>
-                <li>Role-history change log (IAM role changes, timestamps, authorizing administrators)</li>
-                <li>Report generation records (who generated, when, type)</li>
-              </ul>
-            </div>
-
-            <div className="p-4 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] space-y-2">
-              <h3 className="text-[14px] font-bold text-[#1F1F1F]">2.6 Usage & Telemetry</h3>
-              <ul className="text-[13px] text-[#555555] space-y-1 list-disc list-inside">
-                <li>API request logs (endpoint, timestamp, HTTP status) — used for platform health monitoring</li>
-                <li>Organization-level usage metrics (agent count, seat count, API call volume)</li>
-                <li>Browser cookies for session management (see Section 6)</li>
-              </ul>
-              <p className="text-[12px] text-[#888888] mt-2">AGENTGUARD does not currently integrate third-party web analytics trackers (e.g., Google Analytics). The platform owner should update this if analytics are added.</p>
-            </div>
-          </div>
-        </section>
-
-        {/* 3. How We Use Data */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <Eye className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">3. How We Use Your Data</h2>
-          </div>
-          <div className="space-y-3 text-[13px] text-[#555555]">
-            {[
-              ["Platform Operation", "To authenticate your identity, enforce your IAM role permissions, enforce tenant isolation across organizations, and deliver the AGENTGUARD governance platform features."],
-              ["Security & Compliance", "To detect, record, and respond to security incidents involving AI agents; to generate governance audit trails; to enforce runtime policies."],
-              ["Notifications", "To deliver in-app governance alerts, security warnings, approval requests, and system notifications scoped to your user account."],
-              ["Email Delivery", "To deliver OTP verification codes via email at registration and password reset. The platform uses either Resend or SMTP, configured by the platform operator."],
-              ["Reporting", "To generate compliance PDF and Excel reports from actual database records upon authorized user request."],
-              ["Platform Health Monitoring", "To assess whether platform services (database, email, API) are operational and to surface accurate health status to Super Admin."],
-            ].map(([title, desc]) => (
-              <div key={title} className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] flex items-start gap-3">
-                <CheckCircle2 className="w-4 h-4 text-[#2E9D50] mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-bold text-[#1F1F1F] block">{title}</span>
-                  <span className="text-[#666666]">{desc}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 4. Tenant Isolation */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <Users className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">4. Multi-Tenant Data Isolation</h2>
-          </div>
-          <p className="text-[14px] text-[#555555] leading-relaxed">
-            AGENTGUARD is a multi-tenant platform. Each organization&apos;s data — including users, AI agents, audit logs, notifications, and governance records — is strictly scoped to that organization and cannot be accessed by another tenant organization. The platform enforces this through SQL-level filtering on <code className="bg-[#F0F0ED] px-1.5 py-0.5 rounded text-[12px] font-mono">organization_id</code> across all data resources.
-          </p>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            The <span className="font-mono font-bold text-[#8064C8]">SUPER_ADMIN</span> role is a platform-level identity that administers organization licenses and platform health. SUPER_ADMIN access is restricted to platform administration operations and does not expose individual organization users&apos; personal data beyond what is operationally necessary for platform administration.
-          </p>
-        </section>
-
-        {/* 5. Third-Party Services */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <ExternalLink className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">5. Third-Party Services</h2>
-          </div>
-          <p className="text-[14px] text-[#555555] leading-relaxed">
-            AGENTGUARD uses the following infrastructure services. Each processes data subject to their own terms and privacy policies:
-          </p>
-          <div className="space-y-3">
-            {[
-              {
-                name: "Supabase",
-                role: "Authentication and PostgreSQL database hosting",
-                link: "https://supabase.com/privacy",
-                data: "Authentication tokens, session data, database records. Supabase Auth is used for JWT token verification."
-              },
-              {
-                name: "Render",
-                role: "Backend API server hosting",
-                link: "https://render.com/privacy",
-                data: "API server deployment. Render hosts the FastAPI backend application."
-              },
-              {
-                name: "Vercel",
-                role: "Frontend Next.js application hosting",
-                link: "https://vercel.com/legal/privacy-policy",
-                data: "Frontend deployment and static page serving."
-              },
-              {
-                name: "Resend (if configured)",
-                role: "Transactional email delivery",
-                link: "https://resend.com/legal/privacy-policy",
-                data: "Email address and email content for OTP delivery and governance alert emails. Only used if the platform operator configures a Resend API key."
-              },
-            ].map((s) => (
-              <div key={s.name} className="p-4 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[10px] space-y-1">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="font-bold text-[#1F1F1F] text-[14px]">{s.name}</span>
-                  <span className="text-[11px] font-mono text-[#666666] bg-[#F0F0ED] px-2 py-0.5 rounded">{s.role}</span>
-                </div>
-                <p className="text-[13px] text-[#555555]">{s.data}</p>
-                <a href={s.link} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[#2E9D50] hover:underline flex items-center gap-1 w-fit">
-                  Privacy Policy <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 6. Cookies */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <FileText className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">6. Cookies & Session Storage</h2>
-          </div>
-          <div className="space-y-3 text-[13px] text-[#555555]">
-            <p>AGENTGUARD uses the following browser storage mechanisms:</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[12px] border border-[#E8E8E4] rounded-[8px] overflow-hidden">
-                <thead className="bg-[#FCFCFA]">
-                  <tr className="border-b border-[#E8E8E4]">
-                    <th className="text-left px-3 py-2 font-bold text-[#1F1F1F]">Name</th>
-                    <th className="text-left px-3 py-2 font-bold text-[#1F1F1F]">Type</th>
-                    <th className="text-left px-3 py-2 font-bold text-[#1F1F1F]">Purpose</th>
-                    <th className="text-left px-3 py-2 font-bold text-[#1F1F1F]">Expiry</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#E8E8E4] bg-white">
-                  <tr>
-                    <td className="px-3 py-2 font-mono">agentguard_token</td>
-                    <td className="px-3 py-2">Cookie</td>
-                    <td className="px-3 py-2">JWT authentication session</td>
-                    <td className="px-3 py-2">24 hours (SameSite=Lax)</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 font-mono">agentguard_token</td>
-                    <td className="px-3 py-2">localStorage</td>
-                    <td className="px-3 py-2">JWT authentication session (browser fallback)</td>
-                    <td className="px-3 py-2">Until explicit sign-out</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 font-mono">agentguard_selected_org_id</td>
-                    <td className="px-3 py-2">localStorage</td>
-                    <td className="px-3 py-2">SUPER_ADMIN organization context selection</td>
-                    <td className="px-3 py-2">Until sign-out or manual clear</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="text-[12px] text-[#888888]">No third-party tracking cookies are set by AGENTGUARD. If analytics or advertising integrations are added, this table must be updated.</p>
-          </div>
-        </section>
-
-        {/* 7. Data Retention */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">7. Data Retention</h2>
-          </div>
-          <div className="space-y-2 text-[13px] text-[#555555]">
-            <p>Data is retained for as long as your account and organization license remain active, or as needed to maintain governance and audit integrity:</p>
-            <ul className="space-y-1 list-disc list-inside">
-              <li><strong>OTP codes:</strong> Expire after 10 minutes and are invalidated on use</li>
-              <li><strong>Audit logs and Decision Black Box records:</strong> Retained for the duration of the organization&apos;s license as immutable governance records</li>
-              <li><strong>Notifications:</strong> Retained until manually dismissed or deleted by the user</li>
-              <li><strong>Webhook dead-letter logs:</strong> Retained until cleared by an administrator</li>
-              <li><strong>Account data:</strong> Retained for the life of the account and removed upon verified deletion request, subject to legal or audit obligations</li>
-            </ul>
-          </div>
-        </section>
-
-        {/* 8. Your Rights */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">8. Your Rights</h2>
-          </div>
-          <p className="text-[13px] text-[#555555]">Depending on your jurisdiction, you may have rights including:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px]">
-            {[
-              ["Access", "Request a copy of your personal data held by AGENTGUARD"],
-              ["Rectification", "Correct inaccurate personal data via your profile settings"],
-              ["Erasure", "Request deletion of your personal data subject to legal obligations"],
-              ["Portability", "Request your data in a machine-readable format"],
-              ["Objection / Restriction", "Object to or restrict specific processing activities"],
-              ["Withdraw Consent", "Where processing is based on consent, withdraw at any time"],
-            ].map(([title, desc]) => (
-              <div key={title} className="p-3 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px]">
-                <span className="font-bold text-[#1F1F1F] block text-[12px]">{title}</span>
-                <span className="text-[#666666] text-[12px]">{desc}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-[13px] text-[#555555]">To exercise these rights, please contact your organization administrator or the platform support contact provided during onboarding.</p>
-        </section>
-
-        {/* 9. Security */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">9. Security Practices</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            AGENTGUARD implements multiple technical security controls. See our <Link href="/security" className="text-[#2E9D50] font-bold hover:underline">Zero-Trust Security</Link> page for a detailed technical breakdown. Verified measures include:
-          </p>
-          <ul className="space-y-1.5 text-[13px] text-[#555555] list-disc list-inside">
-            <li>JWT-based authentication with local secret verification and Supabase API fallback</li>
-            <li>OTP verification for account creation with rate-limiting and cooldown</li>
-            <li>Strict tenant isolation enforced at the SQL query layer (organization_id filtering)</li>
-            <li>Role-based access control (RBAC) with 9-tier IAM hierarchy</li>
-            <li>IDOR protection on all notification, agent, and resource endpoints</li>
-            <li>No credential exposure in platform health API responses</li>
-            <li>Session revocation checking on each authenticated request</li>
-          </ul>
-          <p className="text-[12px] text-[#888888]">No security system is 100% infallible. The platform owner should commission a penetration test and security audit before production launch and before making specific certification claims.</p>
-        </section>
-
-        {/* 10. Policy Changes */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">10. Changes to this Policy</h2>
-          </div>
-          <p className="text-[13px] text-[#555555] leading-relaxed">
-            We may update this Privacy Policy as the platform evolves. When we make material changes, we will update the &ldquo;Last reviewed&rdquo; date at the top and, where appropriate, notify organization administrators via in-app notification. Continued use of AGENTGUARD after changes constitutes acceptance of the revised policy.
-          </p>
-        </section>
-
-        {/* 11. Contact */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <div className="w-8 h-8 rounded-[6px] bg-[#EAF7EE] flex items-center justify-center">
-              <Mail className="w-4 h-4 text-[#237A3C]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">11. Contact</h2>
-          </div>
-          <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] text-[13px] text-[#555555] space-y-2">
-            <p>For privacy-related questions, data access requests, or to exercise your rights, please reach out to your organization administrator or the AGENTGUARD platform support team via your workspace onboarding contact.</p>
-          </div>
-        </section>
-
+    <LegalDocShell
+      activeRoute="/privacy"
+      breadcrumbLabel="Privacy Policy"
+      title="Privacy Policy"
+      description="This Privacy Policy describes how AGENTGUARD collects, processes, stores, and protects information in connection with the AGENTGUARD AI Agent Governance and Runtime Control Plane."
+      effectiveDate="[LEGAL REVIEW REQUIRED: Effective Date]"
+      lastUpdated="November 27, 2026"
+      version="2.0 (Draft — Pending Legal Counsel & Company Details)"
+      toc={TOC}
+    >
+      <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] text-[13px] text-[#444444] leading-relaxed">
+        <strong>Document Notice:</strong> This draft Privacy Policy reflects the verified technical architecture of AGENTGUARD and requires review and approval by qualified legal counsel, along with insertion of registered entity details, before being treated as binding legal documentation.
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-[#E8E8E4] bg-[#FFFFFF] py-8 mt-8">
-        <div className="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-[#666666]">
-          <span>© {new Date().getFullYear()} AGENTGUARD. All rights reserved.</span>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="text-[#2E9D50] font-bold">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-[#1F1F1F] transition-colors">Terms of Service</Link>
-            <Link href="/security" className="hover:text-[#1F1F1F] transition-colors">Zero-Trust Security</Link>
+      <DocSection id="introduction-scope" number="1" title="Introduction and Scope">
+        <p>
+          This Privacy Policy applies to the AGENTGUARD web application, APIs, and enterprise governance control plane operated by{" "}
+          <strong>[COMPANY INFORMATION REQUIRED: Legal Entity Name]</strong> (&ldquo;AGENTGUARD&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;).
+        </p>
+        <p>
+          It governs information processed when organizations (&ldquo;Customers&rdquo;) and their authorized personnel (&ldquo;Users&rdquo;) register accounts, authenticate, configure policies, monitor autonomous AI agents, review approvals, or interact with our public documentation.
+        </p>
+      </DocSection>
+
+      <DocSection id="definitions" number="2" title="Definitions and Interpretation">
+        <ul className="list-disc pl-5 space-y-2">
+          <li><strong>&ldquo;Customer&rdquo;</strong> means the organization or business entity that provisions a workspace or license in AGENTGUARD.</li>
+          <li><strong>&ldquo;User&rdquo;</strong> means an individual authorized by a Customer (or a Platform Super Administrator) to access AGENTGUARD.</li>
+          <li><strong>&ldquo;Customer Data&rdquo;</strong> means all data, agent configurations, policy rules, approval records, and audit logs submitted to or generated within a Customer&apos;s isolated tenant workspace.</li>
+          <li><strong>&ldquo;Personal Information&rdquo;</strong> means any information relating to an identified or identifiable natural person.</li>
+          <li><strong>&ldquo;OTP&rdquo;</strong> means a six-digit one-time passcode used for email verification, passwordless sign-in, or password recovery.</li>
+        </ul>
+      </DocSection>
+
+      <DocSection id="information-we-collect" number="3" title="Information We Collect and Do Not Collect">
+        <p>AGENTGUARD collects only the information required to authenticate users, isolate tenant workspaces, govern AI agents, and maintain security and audit logs.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div className="p-4 border border-[#E8E8E4] rounded-[8px] bg-[#FCFCFA]">
+            <h3 className="font-bold text-[#141414] text-[13.5px] mb-2">What We Collect</h3>
+            <ul className="list-disc pl-4 space-y-1 text-[13px]">
+              <li>Account profile and authentication records (name, email, hashed credentials, IAM role)</li>
+              <li>AI agent identity, capability tokens, policies, and risk scores</li>
+              <li>Governance decisions, human approvals, security incidents, and audit provenance</li>
+              <li>Session tokens, IP addresses on auth/OTP requests, and API health metrics</li>
+            </ul>
+          </div>
+          <div className="p-4 border border-[#E8E8E4] rounded-[8px] bg-[#FCFCFA]">
+            <h3 className="font-bold text-[#141414] text-[13.5px] mb-2">What We Do Not Collect</h3>
+            <ul className="list-disc pl-4 space-y-1 text-[13px]">
+              <li>We do not sell Personal Information to third parties</li>
+              <li>We do not embed third-party advertising trackers or cross-site ad cookies</li>
+              <li>We do not store plaintext passwords or plaintext OTP codes in database records</li>
+              <li>We do not expose API keys or database credentials in API responses or logs</li>
+            </ul>
           </div>
         </div>
-      </footer>
-    </div>
+      </DocSection>
+
+      <DocSection id="personal-account-info" number="4" title="Personal and Account Information">
+        <p>When you register or are provisioned in an organization workspace, we collect:</p>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li><strong>Identity &amp; Contact:</strong> Full name and normalized email address.</li>
+          <li><strong>Credentials:</strong> Password hashes (plaintext passwords are never persisted; during registration OTP verification, an ephemeral AES-256-GCM encrypted payload is held temporarily in the challenge metadata and scrubbed immediately upon verification).</li>
+          <li><strong>OTP Verification Challenges:</strong> Keyed HMAC-SHA256 digests of six-digit OTP codes, purpose binding (registration, passwordless login, or password reset), attempt counters, 10-minute expiration timestamps, and 120-second resend cooldown timestamps.</li>
+          <li><strong>Organization &amp; IAM Metadata:</strong> Organization identifier (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">org_id</code>), department, IAM role (e.g., <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">USER</code>, <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">MANAGER</code>, <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">ADMIN</code>), account status (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">ACTIVE</code> / <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">SUSPENDED</code>), and last login timestamp.</li>
+        </ul>
+      </DocSection>
+
+      <DocSection id="agent-runtime-usage" number="5" title="AI Agent, Runtime and Usage Data">
+        <p>Within each Customer workspace, AGENTGUARD processes operational governance data including:</p>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li><strong>Agent Passports:</strong> Agent codes, names, model identifiers, autonomy tiers, daily budgets, owners, and operational status.</li>
+          <li><strong>Policy &amp; Decision Records:</strong> Policy rules, deterministic evaluation outcomes (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">ALLOW</code>, <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">REVIEW</code>, <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">REFUSE</code>), risk scores (0&ndash;100), and Decision Black Box entries.</li>
+          <li><strong>Human Approvals &amp; Security Incidents:</strong> Approval requests, reviewer decisions, circuit-breaker (kill switch) actions, security incidents, and in-app notifications.</li>
+        </ul>
+      </DocSection>
+
+      <DocSection id="technical-logs-telemetry" number="6" title="Technical Information, Logs and Telemetry">
+        <p>Our backend API and infrastructure record operational logs necessary for security and troubleshooting:</p>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li><strong>IP Addresses:</strong> Captured from request headers (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">X-Forwarded-For</code> or client socket) on session creation, OTP rate limiting, and security audit logs.</li>
+          <li><strong>Audit &amp; Delivery Logs:</strong> Authentication events, role-history changes, webhook delivery attempts, and email dispatch correlation IDs/HTTP status codes (OTP codes, passwords, and API keys are excluded from logs).</li>
+        </ul>
+      </DocSection>
+
+      <DocSection id="cookies-storage" number="7" title="Cookies and Similar Technologies">
+        <p>AGENTGUARD uses strictly necessary browser cookies and <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">localStorage</code> entries for authentication and workspace state:</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] border border-[#E8E8E4] border-collapse">
+            <thead>
+              <tr className="bg-[#FCFCFA] border-b border-[#E8E8E4]">
+                <th className="text-left px-3 py-2 font-bold text-[#141414]">Key</th>
+                <th className="text-left px-3 py-2 font-bold text-[#141414]">Mechanism</th>
+                <th className="text-left px-3 py-2 font-bold text-[#141414]">Purpose</th>
+                <th className="text-left px-3 py-2 font-bold text-[#141414]">Lifetime</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E8E8E4]">
+              <tr>
+                <td className="px-3 py-2 font-mono text-[12px]">agentguard_token</td>
+                <td className="px-3 py-2">Cookie (<code className="text-[12px]">SameSite=Lax</code>)</td>
+                <td className="px-3 py-2">JWT session authentication</td>
+                <td className="px-3 py-2">24 hours</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-mono text-[12px]">agentguard_token</td>
+                <td className="px-3 py-2">localStorage</td>
+                <td className="px-3 py-2">API Bearer token attachment</td>
+                <td className="px-3 py-2">Until sign-out or clearance</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-mono text-[12px]">agentguard_selected_org_id</td>
+                <td className="px-3 py-2">localStorage</td>
+                <td className="px-3 py-2">Super Admin tenant context selector</td>
+                <td className="px-3 py-2">Until cleared</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </DocSection>
+
+      <DocSection id="how-we-use-info" number="8" title="How We Use Personal Information">
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li>Authenticate users, verify email ownership via OTP, and enforce role-based access control.</li>
+          <li>Maintain strict organization-level tenant isolation across multi-tenant workspaces.</li>
+          <li>Evaluate AI agent runtime policies, compute risk scores, and route high-risk operations for human approval.</li>
+          <li>Deliver transactional OTP emails and in-app security or governance notifications.</li>
+          <li>Detect, investigate, and prevent abuse, rate-limit violations, unauthorized access, and security incidents.</li>
+        </ul>
+      </DocSection>
+
+      <DocSection id="legal-bases" number="9" title="Legal Bases for Processing">
+        <p>
+          Where data protection laws require a legal basis (such as the GDPR or UK GDPR), processing is based on: (a) performance of a contract with the Customer; (b) legitimate interests in platform security, fraud prevention, and AI governance; (c) compliance with legal obligations; or (d) user consent where explicitly obtained.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Confirm applicable legal bases for target jurisdictions.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="ai-automated-decisions" number="10" title="AI Processing and Automated Decision-Making">
+        <p>
+          AGENTGUARD evaluates AI agent actions using deterministic policy rules and risk scoring models (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">ALLOW</code>, <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">REVIEW</code>, <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">REFUSE</code>). Operations classified as <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">REVIEW</code> are routed to human approvers (<code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">MANAGER</code> / <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">ADMIN</code>). AGENTGUARD does not perform automated profiling of human end-users for advertising, credit, or employment decisions.
+        </p>
+      </DocSection>
+
+      <DocSection id="ai-third-party-integrations" number="11" title="AI Model and Third-Party Integrations">
+        <p>
+          Where a Customer or operator configures optional external LLM providers (such as OpenAI, Anthropic, or Google Gemini) for assistant or intelligence features, prompts and relevant context are transmitted to the configured provider. Customers are responsible for reviewing the privacy terms of any third-party AI providers they enable.
+        </p>
+      </DocSection>
+
+      <DocSection id="data-sharing-subprocessors" number="12" title="Data Sharing and Subprocessors">
+        <p>
+          We do not sell Personal Information. Information is shared only with infrastructure subprocessors required to operate AGENTGUARD, with Customer workspace administrators as permitted by IAM roles, or when required by valid legal process.
+        </p>
+      </DocSection>
+
+      <DocSection id="core-infrastructure-providers" number="13" title="Supabase, Render, Vercel and Email Providers">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] border border-[#E8E8E4] border-collapse">
+            <thead>
+              <tr className="bg-[#FCFCFA] border-b border-[#E8E8E4]">
+                <th className="text-left px-3 py-2 font-bold text-[#141414]">Provider</th>
+                <th className="text-left px-3 py-2 font-bold text-[#141414]">Role</th>
+                <th className="text-left px-3 py-2 font-bold text-[#141414]">Data Processed</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E8E8E4]">
+              <tr>
+                <td className="px-3 py-2 font-bold">Supabase</td>
+                <td className="px-3 py-2">PostgreSQL Database &amp; Auth</td>
+                <td className="px-3 py-2">Authentication identities, JWT verification, tenant and audit records</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-bold">Render</td>
+                <td className="px-3 py-2">Backend API &amp; Worker Hosting</td>
+                <td className="px-3 py-2">FastAPI application traffic, API logs, Redis-backed background tasks</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-bold">Vercel</td>
+                <td className="px-3 py-2">Frontend Application Hosting</td>
+                <td className="px-3 py-2">Next.js web application serving and edge HTTP request routing</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-bold">Brevo / Resend / SMTP</td>
+                <td className="px-3 py-2">Transactional Email Delivery</td>
+                <td className="px-3 py-2">Recipient email address and OTP/notification email content (based on active <code className="text-[12px]">EMAIL_PROVIDER</code>)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </DocSection>
+
+      <DocSection id="storage-hosting-locations" number="14" title="Data Storage and Hosting Locations">
+        <p>
+          Application data is stored in PostgreSQL hosted via Supabase, with backend services configured for Render (currently configured in <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">singapore</code> in deployment manifests) and frontend delivery via Vercel&apos;s global edge network.{" "}
+          <strong>[COMPANY INFORMATION REQUIRED: Confirm exact production Supabase database region and object storage region.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="international-transfers" number="15" title="International Data Transfers">
+        <p>
+          Because our hosting and email subprocessors operate globally, Personal Information may be transferred to and processed in countries other than your country of residence.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Specify transfer safeguards such as Standard Contractual Clauses (SCCs) or adequacy mechanisms where applicable.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="retention-deletion" number="16" title="Data Retention and Deletion">
+        <p>AGENTGUARD configuration includes retention parameters for operational tables (with defaults in backend configuration of 365 days for audit logs, 90 days for telemetry, and 7 days for expired sessions), though automated scheduled purge jobs are not yet uniformly enforced across all tables:</p>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li><strong>OTP Challenges:</strong> Expire 10 minutes after issuance and are invalidated upon consumption or superseding issuance.</li>
+          <li><strong>Sessions:</strong> Expire after 24 hours or upon explicit revocation.</li>
+          <li><strong>Notifications:</strong> Retained until dismissed/deleted by the user.</li>
+          <li><strong>Audit Logs &amp; Governance Records:</strong> Retained as part of the organization&apos;s governance history; automated deletion schedules require further implementation and Customer policy alignment.</li>
+        </ul>
+      </DocSection>
+
+      <DocSection id="data-security" number="17" title="Data Security Measures">
+        <p>
+          Technical controls implemented in the codebase include JWT signature verification, session revocation checks, 9-tier RBAC, SQL-level <code className="text-[12.5px] bg-[#F2F2EE] px-1.5 py-0.5 rounded">org_id</code> tenant isolation, parameterized SQLAlchemy queries, HMAC-SHA256 OTP storage, and AES-256-GCM ephemeral secret encryption during registration. Full technical details and verification status are published on our{" "}
+          <Link href="/security" className="text-[#1E6B36] font-bold hover:underline">
+            Zero-Trust Security
+          </Link>{" "}
+          page.
+        </p>
+      </DocSection>
+
+      <DocSection id="access-correction-deletion" number="18" title="Access, Correction and Deletion Rights">
+        <p>
+          Users may view and update profile details in the workspace Profile settings. Requests for full account deletion, data export, or correction of administrative records should be directed to your Customer organization administrator or our privacy contact below.
+        </p>
+      </DocSection>
+
+      <DocSection id="jurisdictional-rights" number="19" title="User and Jurisdictional Privacy Rights">
+        <p>
+          Depending on applicable law (such as GDPR, UK GDPR, or CCPA/CPRA), individuals may have rights to access, rectify, erase, restrict, or object to processing of their Personal Information, as well as data portability and the right to lodge a complaint with a supervisory authority.{" "}
+          <strong>[LEGAL REVIEW REQUIRED: Tailor statutory disclosures for target jurisdictions.]</strong>
+        </p>
+      </DocSection>
+
+      <DocSection id="childrens-privacy" number="20" title="Children's Privacy">
+        <p>
+          AGENTGUARD is an enterprise B2B software platform and is not directed to individuals under 18 years of age (or the applicable age of digital consent). We do not knowingly collect Personal Information from children.
+        </p>
+      </DocSection>
+
+      <DocSection id="business-transfers" number="21" title="Business Transfers">
+        <p>
+          In the event of a merger, acquisition, reorganization, or sale of assets, Personal Information may be transferred as part of the transaction, subject to continued protection consistent with this Privacy Policy or prior notice to affected Customers.
+        </p>
+      </DocSection>
+
+      <DocSection id="policy-changes" number="22" title="Changes to This Privacy Policy">
+        <p>
+          We may update this Privacy Policy to reflect platform changes or legal requirements. Material updates will be indicated by updating the &ldquo;Last Updated&rdquo; date and version number at the top of this page and, where appropriate, via in-app notification.
+        </p>
+      </DocSection>
+
+      <DocSection id="contact-enquiries" number="23" title="Contact and Privacy Enquiries">
+        <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] space-y-2 text-[13.5px]">
+          <p><strong>Data Controller / Operator:</strong> [COMPANY INFORMATION REQUIRED: Registered Legal Entity Name]</p>
+          <p><strong>Registered Address:</strong> [COMPANY INFORMATION REQUIRED: Physical Business Address]</p>
+          <p><strong>Privacy Contact / DPO:</strong> [COMPANY INFORMATION REQUIRED: Privacy Contact Email]</p>
+        </div>
+      </DocSection>
+    </LegalDocShell>
   );
 }

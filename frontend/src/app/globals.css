@@ -77,4 +77,21 @@
   }
 }
 
+@media print {
+  header,
+  footer,
+  aside,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  section,
+  article {
+    break-inside: avoid-page;
+  }
+}
+
 
