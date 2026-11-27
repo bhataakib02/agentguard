@@ -419,7 +419,7 @@ export default function ProfilePage() {
               <div className="p-3.5 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[8px] space-y-1">
                 <span className="text-[10px] font-bold text-[#666666] uppercase block">Member Since</span>
                 <span className="text-[12px] font-bold text-[#1F1F1F]">
-                  {displayUser?.created_at ? new Date(displayUser.created_at).toLocaleDateString() : "31 Aug 2026"}
+                  {displayUser?.created_at ? new Date(displayUser.created_at).toLocaleDateString() : "—"}
                 </span>
               </div>
 

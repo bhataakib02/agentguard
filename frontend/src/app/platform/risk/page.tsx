@@ -17,17 +17,23 @@ import {
 export default function PlatformRiskScoringPage() {
   const [secData, setSecData] = useState<any>(null);
   const [organizations, setOrganizations] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const loadRiskData = async () => {
     setLoading(true);
     try {
-      const [sec, orgs] = await Promise.all([
+      const [sec, orgs, ags, ov] = await Promise.all([
         fetchApi("/platform/security"),
-        fetchApi("/platform/organizations")
+        fetchApi("/platform/organizations"),
+        fetchApi("/platform/agents").catch(() => []),
+        fetchApi("/analytics/overview").catch(() => null),
       ]);
       setSecData(sec);
       setOrganizations(orgs || []);
+      setAgents(ags || []);
+      setAnalytics(ov);
     } catch (err) {
       console.error(err);
     } finally {
@@ -65,31 +71,44 @@ export default function PlatformRiskScoringPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
-          <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Platform Risk Index</span>
-          <h2 className="text-[28px] font-bold text-[#2E9D50]">38.4 / 100</h2>
-          <span className="text-[10px] text-[#2E9D50] font-bold">LOW RISK CLASSIFICATION</span>
-        </div>
+      {(() => {
+        const numericRisk = parseFloat(String(secData?.risk_score ?? "0").split("/")[0]) || 0;
+        const riskClass = numericRisk >= 70 ? "HIGH RISK CLASSIFICATION" : numericRisk >= 40 ? "MEDIUM RISK CLASSIFICATION" : "LOW RISK CLASSIFICATION";
+        const highRiskAgents = agents.filter((a) => (a.risk_score || 0) >= 70 || a.autonomy_level === "LEVEL_4" || a.autonomy_level === "4").length;
+        const totalDecisions = analytics?.total_decisions ?? 0;
+        const refusedCount = analytics?.refused_count ?? 0;
+        const safetyRate = totalDecisions > 0 ? `${(((totalDecisions - refusedCount) / totalDecisions) * 100).toFixed(1)}%` : "N/A";
 
-        <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
-          <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">High Risk Agents</span>
-          <h2 className="text-[28px] font-bold text-[#F59A23]">2</h2>
-          <span className="text-[10px] text-[#94A3B8] font-bold">Autonomy Level 4</span>
-        </div>
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
+              <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Platform Risk Index</span>
+              <h2 className="text-[28px] font-bold text-[#2E9D50]">{secData?.risk_score ?? "0.0 / 100"}</h2>
+              <span className="text-[10px] text-[#2E9D50] font-bold">{riskClass}</span>
+            </div>
 
-        <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
-          <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Critical Factors</span>
-          <h2 className="text-[28px] font-bold text-[#E53935]">{secData?.critical_risks_count ?? 7}</h2>
-          <span className="text-[10px] text-[#E53935] font-bold">Monitored Vectors</span>
-        </div>
+            <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
+              <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">High Risk Agents</span>
+              <h2 className="text-[28px] font-bold text-[#F59A23]">{highRiskAgents}</h2>
+              <span className="text-[10px] text-[#94A3B8] font-bold">Risk ≥ 70 or Level 4</span>
+            </div>
 
-        <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
-          <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Safety Compliance Rate</span>
-          <h2 className="text-[28px] font-bold text-[#2E9D50]">98.2%</h2>
-          <span className="text-[10px] text-[#2E9D50] font-bold">↑ 0.5% vs 30d</span>
-        </div>
-      </div>
+            <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
+              <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Critical Factors</span>
+              <h2 className="text-[28px] font-bold text-[#E53935]">{secData?.critical_risks_count ?? 0}</h2>
+              <span className="text-[10px] text-[#E53935] font-bold">Monitored Vectors</span>
+            </div>
+
+            <div className="bg-[#121722] border border-[#1E2638] rounded-[12px] p-5 space-y-1">
+              <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono">Safety Compliance Rate</span>
+              <h2 className="text-[28px] font-bold text-[#2E9D50]">{safetyRate}</h2>
+              <span className="text-[10px] text-[#94A3B8] font-bold">
+                {totalDecisions > 0 ? `Across ${totalDecisions} decisions` : "No decisions evaluated yet"}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* RISK BY ORGANIZATION & AGENT TABLES */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -111,9 +130,12 @@ export default function PlatformRiskScoringPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1E2638]">
-                {organizations.map((org, idx) => {
-                  const score = idx === 0 ? 42 : idx === 1 ? 68 : idx === 2 ? 25 : 18;
-                  const level = score > 60 ? "MEDIUM" : "LOW";
+                {organizations.map((org) => {
+                  const orgAgents = agents.filter((a) => (a.org_id && a.org_id === org.id) || a.org_name === org.name);
+                  const score = orgAgents.length > 0
+                    ? Math.round(orgAgents.reduce((sum, a) => sum + Number(a.risk_score || 0), 0) / orgAgents.length)
+                    : 0;
+                  const level = score >= 70 ? "HIGH" : score >= 40 ? "MEDIUM" : "LOW";
                   return (
                     <tr key={org.id} className="hover:bg-[#161C2A] transition-colors">
                       <td className="py-3 px-4 font-bold text-white">{org.name}</td>

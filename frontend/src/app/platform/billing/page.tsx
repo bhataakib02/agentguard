@@ -131,7 +131,7 @@ export default function PlatformBillingPage() {
                     {lic.agent_count} / {lic.max_ai_agents}
                   </td>
                   <td className="py-3.5 px-4 font-mono text-[#64748B]">
-                    {lic.expiry_date ? new Date(lic.expiry_date).toISOString().split("T")[0] : "2026-08-31"}
+                    {lic.expiry_date ? new Date(lic.expiry_date).toISOString().split("T")[0] : "No expiry"}
                   </td>
                   <td className="py-3.5 px-4 text-right space-x-2">
                     <button

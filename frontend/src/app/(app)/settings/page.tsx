@@ -517,7 +517,12 @@ export default function SettingsPage() {
       {/* TAB 3: NOTIFICATIONS */}
       {activeTab === "notifications" && (
         <div className="bg-[#FFFFFF] border border-[#E8E8E4] rounded-[12px] p-6 shadow-sm space-y-6">
-          <h3 className="text-[16px] font-bold text-[#1F1F1F] border-b border-[#E8E8E4] pb-3">Notification Preferences</h3>
+          <div className="border-b border-[#E8E8E4] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-[16px] font-bold text-[#1F1F1F]">Notification Preferences</h3>
+            <span className="text-[11px] font-mono text-[#666666] bg-[#FCFCFA] px-2.5 py-1 rounded border border-[#E8E8E4]">
+              Local session display preferences (all org alerts remain persisted)
+            </span>
+          </div>
           
           <div className="space-y-4 max-w-2xl text-[13px]">
             {[

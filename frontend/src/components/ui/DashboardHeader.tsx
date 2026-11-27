@@ -13,23 +13,35 @@ export default function DashboardHeader() {
 
   const [orgBranding, setOrgBranding] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadTotal, setUnreadTotal] = useState<number | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   useEffect(() => {
+    let active = true;
     async function loadData() {
       try {
-        const [brandData, notifData] = await Promise.all([
+        const [brandData, notifData, unreadData] = await Promise.all([
           fetchApi("/organization/branding").catch(() => null),
-          fetchApi("/notifications").catch(() => []),
+          fetchApi("/notifications?limit=15").catch(() => []),
+          fetchApi("/notifications/unread-count").catch(() => null),
         ]);
+        if (!active) return;
         if (brandData) setOrgBranding(brandData);
         if (notifData) setNotifications(notifData);
+        if (unreadData && typeof unreadData.unread_count === "number") {
+          setUnreadTotal(unreadData.unread_count);
+        }
       } catch (err) {
         console.error("Header load error:", err);
       }
     }
     loadData();
+    const timer = setInterval(loadData, 60000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   const getInitials = (name?: string, email?: string) => {
@@ -47,12 +59,15 @@ export default function DashboardHeader() {
   const tenantName = orgBranding?.display_name || orgBranding?.name || user?.org_name || "AgentGuard Enterprise";
   const tenantInitials = orgBranding?.initials || getInitials(tenantName, undefined);
 
-  const unreadCount = notifications.filter((n) => !n.is_read && !n.read).length;
+  const unreadCount = unreadTotal !== null
+    ? unreadTotal
+    : notifications.filter((n) => !n.is_read && !n.read).length;
 
   const handleMarkAllRead = async () => {
     try {
       await fetchApi("/notifications/read-all", { method: "POST" });
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, read: true })));
+      setUnreadTotal(0);
     } catch (err) {
       console.error("Failed to mark all notifications read:", err);
     }
@@ -64,6 +79,7 @@ export default function DashboardHeader() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true, read: true } : n))
       );
+      setUnreadTotal((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
     } catch (err) {
       console.error("Failed to mark notification read:", err);
     }

@@ -126,10 +126,12 @@ export default function PlatformProfilePage() {
           </div>
 
           <div className="bg-[#161C2A] border border-[#232F48] rounded-[10px] p-4 space-y-1">
-            <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono block">Multi-Factor Auth (MFA)</span>
+            <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono block">Auth Verification</span>
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-[#2E9D50]" />
-              <p className="font-bold text-white text-[15px]">Enforced (Hardware/TOTP)</p>
+              <p className="font-bold text-white text-[15px]">
+                {profile?.mfa_enabled ? "MFA Enabled" : "Email OTP / Session Verified"}
+              </p>
             </div>
           </div>
 
@@ -137,7 +139,7 @@ export default function PlatformProfilePage() {
             <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono block">Session Status</span>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-[#2E9D50]" />
-              <p className="font-bold text-[#2E9D50] text-[15px]">Active & Verified</p>
+              <p className="font-bold text-[#2E9D50] text-[15px]">Active &amp; Verified</p>
             </div>
           </div>
         </div>
@@ -151,27 +153,33 @@ export default function PlatformProfilePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
             <div className="flex items-center justify-between p-3 bg-[#121722] rounded-[6px] border border-[#1E2638]">
               <span className="text-[#94A3B8]">Super Admin Identity ID</span>
-              <span className="font-mono text-white font-bold">{profile?.id || "sa-00000-00000-00000"}</span>
+              <span className="font-mono text-white font-bold">{profile?.id || "—"}</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-[#121722] rounded-[6px] border border-[#1E2638]">
               <span className="text-[#94A3B8]">Access Level</span>
               <span className="font-mono text-[#2E9D50] font-bold">Level 9 (Super Admin)</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-[#121722] rounded-[6px] border border-[#1E2638]">
-              <span className="text-[#94A3B8]">MFA Status</span>
-              <span className="font-mono text-[#2E9D50] font-bold">Enforced (Hardware TOTP)</span>
+              <span className="text-[#94A3B8]">Verification Factor</span>
+              <span className="font-mono text-[#2E9D50] font-bold">
+                {profile?.mfa_enabled ? "MFA Enabled" : "Email OTP / Session Verified"}
+              </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-[#121722] rounded-[6px] border border-[#1E2638]">
               <span className="text-[#94A3B8]">Authentication Status</span>
-              <span className="font-mono text-[#2E9D50] font-bold">Authenticated & Verified</span>
+              <span className="font-mono text-[#2E9D50] font-bold">Authenticated &amp; Verified</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-[#121722] rounded-[6px] border border-[#1E2638]">
               <span className="text-[#94A3B8]">Last Login</span>
-              <span className="font-mono text-white font-bold">Sep 1, 2026 10:24 AM</span>
+              <span className="font-mono text-white font-bold">
+                {profile?.last_login_at ? new Date(profile.last_login_at).toLocaleString() : "Current session"}
+              </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-[#121722] rounded-[6px] border border-[#1E2638]">
               <span className="text-[#94A3B8]">Account Created</span>
-              <span className="font-mono text-white font-bold">Aug 1, 2026</span>
+              <span className="font-mono text-white font-bold">
+                {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "—"}
+              </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-[#121722] rounded-[6px] border border-[#1E2638]">
               <span className="text-[#94A3B8]">Password Credential</span>

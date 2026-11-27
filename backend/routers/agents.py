@@ -413,14 +413,14 @@ async def restore_agent(
         notification_service.notify_governance_event(
             db=db,
             org_id=str(agent.org_id),
-            event_type="agent.suspended",
+            event_type="agent.restored",
             resource_type="agent",
             resource_id=str(agent.id),
-            title=f"Agent Suspended: {agent.name}",
-            message=f"Agent '{agent.name}' ({agent.agent_code}) was suspended by {current_user.email}. All capabilities revoked.",
-            data={"agent_id": str(agent.id), "agent_code": agent.agent_code, "status": "SUSPENDED"},
+            title=f"Agent Restored: {agent.name}",
+            message=f"Agent '{agent.name}' ({agent.agent_code}) was restored to active duty by {current_user.email}.",
+            data={"agent_id": str(agent.id), "agent_code": agent.agent_code, "status": "NORMAL"},
             user_id=str(current_user.id),
-            severity="WARNING"
+            severity="INFO"
         )
     except Exception as _notif_err:
         pass

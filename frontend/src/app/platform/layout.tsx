@@ -56,22 +56,45 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
     }
   }, [user, loading, router]);
 
+  const [unreadTotal, setUnreadTotal] = useState<number | null>(null);
+
   useEffect(() => {
+    let active = true;
     async function loadNotifs() {
       try {
-        const notifs = await fetchApi("/notifications").catch(() => []);
+        const [notifs, unreadRes] = await Promise.all([
+          fetchApi("/notifications?limit=15").catch(() => []),
+          fetchApi("/notifications/unread-count").catch(() => null),
+        ]);
+        if (!active) return;
         setNotifications(notifs || []);
+        if (unreadRes && typeof unreadRes.unread_count === "number") {
+          setUnreadTotal(unreadRes.unread_count);
+        }
       } catch (err) {}
     }
-    if (user?.role === "SUPER_ADMIN") loadNotifs();
+    if (user?.role === "SUPER_ADMIN") {
+      loadNotifs();
+      const timer = setInterval(loadNotifs, 60000);
+      return () => {
+        active = false;
+        clearInterval(timer);
+      };
+    }
+    return () => {
+      active = false;
+    };
   }, [user]);
 
-  const unreadCount = notifications.filter((n: any) => !n.is_read && !n.read).length;
+  const unreadCount = unreadTotal !== null
+    ? unreadTotal
+    : notifications.filter((n: any) => !n.is_read && !n.read).length;
 
   const handleMarkAllRead = async () => {
     try {
       await fetchApi("/notifications/read-all", { method: "POST" });
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, read: true })));
+      setUnreadTotal(0);
     } catch (err) {
       console.error("Failed to mark all notifications read:", err);
     }
@@ -83,6 +106,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true, read: true } : n))
       );
+      setUnreadTotal((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
     } catch (err) {
       console.error("Failed to mark notification read:", err);
     }
@@ -209,7 +233,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
           </div>
 
           {/* Sidebar Navigation */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-5 text-[12px] scrollbar-thin scrollbar-thumb-[#1E2638]">
+          <div className="flex-1 overflow-y-auto p-3 space-y-4 text-[12px] [scrollbar-width:thin] [scrollbar-color:#1E2638_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#232F48] [&::-webkit-scrollbar-thumb]:rounded-full">
             {/* PLATFORM */}
             <div className="space-y-1">
               <div className="px-3 py-1 text-[10px] font-bold text-[#2E9D50] uppercase tracking-wider font-mono">
@@ -255,7 +279,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                         : "text-[#94A3B8] hover:bg-[#161C2A] hover:text-white"
                     }`}
                   >
-                    <Icon className="w-4 h-4 text-[#64748B]" />
+                    <Icon className={`w-4 h-4 ${isActive ? "text-[#2E9D50]" : "text-[#64748B]"}`} />
                     <span>{item.label}</span>
                   </Link>
                 );
@@ -281,7 +305,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                         : "text-[#94A3B8] hover:bg-[#161C2A] hover:text-white"
                     }`}
                   >
-                    <Icon className="w-4 h-4 text-[#64748B]" />
+                    <Icon className={`w-4 h-4 ${isActive ? "text-[#2E9D50]" : "text-[#64748B]"}`} />
                     <span>{item.label}</span>
                   </Link>
                 );
@@ -588,14 +612,16 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
       </div>
 
       {/* Bottom Session / Status Bar */}
-      <footer className="bg-[#0B0E14] border-t border-[#1E2638] px-6 py-2 text-[10px] text-[#64748B] font-mono flex flex-col sm:flex-row items-center justify-between gap-2 z-30">
-        <div className="flex items-center gap-4">
+      <footer className="bg-[#0B0E14] border-t border-[#1E2638] px-6 lg:pl-[280px] py-2 text-[10px] text-[#64748B] font-mono flex flex-col sm:flex-row items-center justify-between gap-2 z-30">
+        <div className="flex flex-wrap items-center gap-4">
           <span>Logged in as: <strong className="text-white">{user.email}</strong></span>
           <span>Role: <strong className="text-[#2E9D50]">SUPER_ADMIN</strong></span>
           <span>Scope: <strong className="text-[#2E9D50]">GLOBAL PLATFORM</strong></span>
         </div>
         <div className="flex items-center gap-4">
-          <span>Last Login: Sep 1, 2026 10:24 AM</span>
+          {(user as any)?.last_login_at && (
+            <span>Last Login: {new Date((user as any).last_login_at).toLocaleString()}</span>
+          )}
           <span className="flex items-center gap-1 text-[#2E9D50] font-bold">
             <span className="w-2 h-2 rounded-full bg-[#2E9D50] animate-pulse" /> Session: Active
           </span>

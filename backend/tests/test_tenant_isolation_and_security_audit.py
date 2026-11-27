@@ -52,10 +52,14 @@ def client(db_session):
             yield db_session
         finally:
             pass
+    prev_override = app.dependency_overrides.get(get_db)
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
-    app.dependency_overrides.clear()
+    if prev_override is not None:
+        app.dependency_overrides[get_db] = prev_override
+    else:
+        app.dependency_overrides.pop(get_db, None)
 
 def create_tenant_fixtures(db):
     """Creates two distinct organizations, users, and agents for cross-tenant testing."""

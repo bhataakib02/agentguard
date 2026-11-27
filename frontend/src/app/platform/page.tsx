@@ -38,6 +38,9 @@ import {
 
 export default function PlatformDashboardPage() {
   const [overview, setOverview] = useState<any>(null);
+  const [analyticsOverview, setAnalyticsOverview] = useState<any>(null);
+  const [timeSeries, setTimeSeries] = useState<any[]>([]);
+  const [seriesGranularity, setSeriesGranularity] = useState<"Daily" | "Hourly" | "Weekly">("Daily");
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -58,28 +61,39 @@ export default function PlatformDashboardPage() {
   const [createMsg, setCreateMsg] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const loadPlatformData = useCallback(async (orgScope = selectedOrgScope) => {
+  const loadPlatformData = useCallback(async (orgScope = selectedOrgScope, rangeLabel = timeRange) => {
     setLoading(true);
     setErrorMsg(null);
     try {
       const headers: Record<string, string> = {};
       if (orgScope && orgScope !== "ALL") {
-        headers["X-Organization-Context"] = orgScope;
+        headers["X-Organization-Context"] = scopeToHeader(orgScope);
       }
 
-      const [ovData, orgsData] = await Promise.all([
+      const apiRange =
+        rangeLabel === "Today" ? "24h" :
+        rangeLabel === "Last 7 Days" ? "7d" :
+        rangeLabel === "Last 90 Days" ? "90d" : "30d";
+
+      const [ovData, orgsData, anOverview, tsData] = await Promise.all([
         fetchApi("/platform/overview", { headers }),
-        fetchApi("/platform/organizations", { headers })
+        fetchApi("/platform/organizations", { headers }),
+        fetchApi("/analytics/overview", { headers }).catch(() => null),
+        fetchApi(`/analytics/time-series?range=${apiRange}`, { headers }).catch(() => ({ data: [] }))
       ]);
       setOverview(ovData);
       setOrganizations(orgsData || []);
+      setAnalyticsOverview(anOverview);
+      setTimeSeries(tsData?.data || []);
     } catch (err: any) {
       console.error("Platform dashboard load error:", err);
       setErrorMsg(err.message || "Unable to connect to AGENTGUARD backend API.");
     } finally {
       setLoading(false);
     }
-  }, [selectedOrgScope]);
+  }, [selectedOrgScope, timeRange]);
+
+  const scopeToHeader = (scopeId: string) => scopeId;
 
   useEffect(() => {
     loadPlatformData();
@@ -93,7 +107,7 @@ export default function PlatformDashboardPage() {
       const matched = organizations.find((o) => o.id === scopeId);
       setActiveScopeLabel(matched ? matched.name.toUpperCase() : "TENANT SCOPE");
     }
-    loadPlatformData(scopeId);
+    loadPlatformData(scopeId, timeRange);
   };
 
   const handleCreateOrgSubmit = async (e: React.FormEvent) => {
@@ -146,8 +160,26 @@ export default function PlatformDashboardPage() {
     }
   };
 
-  const handleExportDashboard = () => {
-    alert("Exporting Platform Control Center Overview report...");
+  const handleExportDashboard = async () => {
+    try {
+      const token = localStorage.getItem("agentguard_token") || localStorage.getItem("token");
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/+$/, "");
+      const res = await fetch(`${baseUrl}/reports/export/pdf?type=executive`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `agentguard-platform-overview-${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Failed to export platform report.");
+    }
   };
 
   return (
@@ -254,11 +286,11 @@ export default function PlatformDashboardPage() {
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
               <h2 className="text-[26px] font-bold text-white leading-none">
-                {overview?.total_organizations ?? 5}
+                {overview?.total_organizations ?? 0}
               </h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50] flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> ↑ 2 active this month
+            <span className="text-[11px] font-bold text-[#94A3B8] flex items-center gap-1">
+              {overview?.active_organizations ?? 0} active organizations
             </span>
           </div>
 
@@ -274,10 +306,14 @@ export default function PlatformDashboardPage() {
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
               <h2 className="text-[26px] font-bold text-white leading-none">
-                {overview?.active_organizations ?? overview?.total_organizations ?? 5}
+                {overview?.active_organizations ?? 0}
               </h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50]">100% operational</span>
+            <span className="text-[11px] font-bold text-[#2E9D50]">
+              {overview?.total_organizations
+                ? `${Math.round(((overview.active_organizations ?? 0) / overview.total_organizations) * 100)}% operational`
+                : "0% operational"}
+            </span>
           </div>
 
           {/* Card 3: Total Human Users */}
@@ -292,11 +328,11 @@ export default function PlatformDashboardPage() {
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
               <h2 className="text-[26px] font-bold text-white leading-none">
-                {overview?.total_users ?? 40}
+                {overview?.total_users ?? 0}
               </h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50] flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> ↑ 8 this month
+            <span className="text-[11px] font-bold text-[#94A3B8]">
+              Across provisioned tenants
             </span>
           </div>
 
@@ -312,11 +348,11 @@ export default function PlatformDashboardPage() {
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
               <h2 className="text-[26px] font-bold text-white leading-none">
-                {overview?.total_ai_agents ?? 25}
+                {overview?.total_ai_agents ?? 0}
               </h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50] flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> ↑ 5 this month
+            <span className="text-[11px] font-bold text-[#94A3B8]">
+              Registered AI identities
             </span>
           </div>
 
@@ -332,10 +368,12 @@ export default function PlatformDashboardPage() {
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
               <h2 className="text-[26px] font-bold text-white leading-none">
-                {overview?.active_licenses ?? 5}
+                {overview?.active_licenses ?? 0}
               </h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50]">100% active</span>
+            <span className="text-[11px] font-bold text-[#94A3B8]">
+              {overview?.expiring_licenses ?? 0} expiring soon
+            </span>
           </div>
         </div>
 
@@ -352,7 +390,7 @@ export default function PlatformDashboardPage() {
             {loading ? (
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
-              <h2 className="text-[26px] font-bold text-[#F59A23] leading-none">1</h2>
+              <h2 className="text-[26px] font-bold text-[#F59A23] leading-none">{overview?.expiring_licenses ?? 0}</h2>
             )}
             <span className="text-[11px] font-bold text-[#94A3B8]">Expiring within 30 days</span>
           </div>
@@ -369,11 +407,11 @@ export default function PlatformDashboardPage() {
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
               <h2 className="text-[26px] font-bold text-white leading-none">
-                {overview?.total_api_keys ?? 12}
+                {overview?.total_api_keys ?? 0}
               </h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50] flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> ↑ 3 this month
+            <span className="text-[11px] font-bold text-[#94A3B8]">
+              Provisioned API keys
             </span>
           </div>
 
@@ -389,10 +427,10 @@ export default function PlatformDashboardPage() {
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
               <h2 className="text-[26px] font-bold text-[#E53935] leading-none">
-                {overview?.security_incidents ?? 3}
+                {overview?.security_incidents ?? 0}
               </h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50]">↓ 2 vs last 30 days</span>
+            <span className="text-[11px] font-bold text-[#94A3B8]">{overview?.critical_incidents ?? 0} critical severity</span>
           </div>
 
           {/* Card 9: Audit Events */}
@@ -406,15 +444,15 @@ export default function PlatformDashboardPage() {
             {loading ? (
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
-              <h2 className="text-[26px] font-bold text-white leading-none">1,248</h2>
+              <h2 className="text-[26px] font-bold text-white leading-none">{(overview?.audit_events ?? 0).toLocaleString()}</h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50]">↑ 18% vs last 30 days</span>
+            <span className="text-[11px] font-bold text-[#94A3B8]">Immutable ledger entries</span>
           </div>
 
-          {/* Card 10: Platform Usage */}
+          {/* Card 10: Platform Decisions */}
           <div className="bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-2 shadow-sm hover:border-[#2E9D50]/50 transition-colors">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider font-mono">PLATFORM USAGE</span>
+              <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider font-mono">DECISIONS EVALUATED</span>
               <div className="w-8 h-8 rounded-full bg-[#173B25] text-[#2E9D50] flex items-center justify-center shrink-0 border border-[#2E9D50]/30">
                 <Activity className="w-4 h-4" />
               </div>
@@ -422,9 +460,9 @@ export default function PlatformDashboardPage() {
             {loading ? (
               <div className="h-8 bg-[#161C2A] animate-pulse rounded w-16" />
             ) : (
-              <h2 className="text-[26px] font-bold text-white leading-none">78%</h2>
+              <h2 className="text-[26px] font-bold text-white leading-none">{(analyticsOverview?.total_decisions ?? 0).toLocaleString()}</h2>
             )}
-            <span className="text-[11px] font-bold text-[#2E9D50]">↑ 12% vs last 30 days</span>
+            <span className="text-[11px] font-bold text-[#94A3B8]">{analyticsOverview?.allow_rate ?? 0}% allow rate</span>
           </div>
         </div>
       </div>
@@ -435,160 +473,184 @@ export default function PlatformDashboardPage() {
         <div className="lg:col-span-5 bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-white text-[15px]">Platform Usage Telemetry</h3>
-            <select className="bg-[#161C2A] border border-[#232F48] text-white text-[11px] font-bold rounded-[6px] px-2 py-1 outline-none">
-              <option>Daily</option>
-              <option>Hourly</option>
-              <option>Weekly</option>
+            <select
+              value={seriesGranularity}
+              onChange={(e) => setSeriesGranularity(e.target.value as "Daily" | "Hourly" | "Weekly")}
+              className="bg-[#161C2A] border border-[#232F48] text-white text-[11px] font-bold rounded-[6px] px-2 py-1 outline-none"
+            >
+              <option value="Daily">Daily</option>
+              <option value="Hourly">Hourly</option>
+              <option value="Weekly">Weekly</option>
             </select>
           </div>
 
-          {/* SVG Line Graph */}
-          <div className="h-44 w-full relative pt-2 pb-1">
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 500 140" preserveAspectRatio="none">
-              <line x1="0" y1="25" x2="500" y2="25" stroke="#1E2638" strokeDasharray="3 3" />
-              <line x1="0" y1="65" x2="500" y2="65" stroke="#1E2638" strokeDasharray="3 3" />
-              <line x1="0" y1="105" x2="500" y2="105" stroke="#1E2638" strokeDasharray="3 3" />
+          {/* Dynamic SVG Line Graph from Live Analytics */}
+          {(() => {
+            const pts = timeSeries.length > 12 ? timeSeries.slice(-12) : timeSeries;
+            const maxVal = Math.max(1, ...pts.map((p) => Number(p.decisions || 0)));
+            const toPoints = (key: "decisions" | "allowed") =>
+              pts.map((p, idx) => {
+                const x = pts.length <= 1 ? 250 : Math.round((idx / (pts.length - 1)) * 500);
+                const y = Math.round(125 - (Number(p[key] || 0) / maxVal) * 100);
+                return `${x},${y}`;
+              }).join(" ");
+            return pts.length === 0 ? (
+              <div className="h-44 flex items-center justify-center text-[12px] text-[#64748B] font-mono">
+                No telemetry data recorded for this period.
+              </div>
+            ) : (
+              <div className="h-44 w-full relative pt-2 pb-1">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 500 140" preserveAspectRatio="none">
+                  <line x1="0" y1="25" x2="500" y2="25" stroke="#1E2638" strokeDasharray="3 3" />
+                  <line x1="0" y1="65" x2="500" y2="65" stroke="#1E2638" strokeDasharray="3 3" />
+                  <line x1="0" y1="105" x2="500" y2="105" stroke="#1E2638" strokeDasharray="3 3" />
+                  <polyline fill="none" stroke="#2E9D50" strokeWidth="2.5" points={toPoints("decisions")} />
+                  <polyline fill="none" stroke="#2E9D50" strokeWidth="2" strokeDasharray="4 4" points={toPoints("allowed")} />
+                </svg>
 
-              <path
-                d="M 0 100 L 40 85 L 80 65 L 120 70 L 160 45 L 200 60 L 240 50 L 280 75 L 320 55 L 360 30 L 400 35 L 440 55 L 500 45"
-                fill="none"
-                stroke="#2E9D50"
-                strokeWidth="2.5"
-              />
-              <path
-                d="M 0 120 L 40 110 L 80 100 L 120 105 L 160 90 L 200 95 L 240 85 L 280 105 L 320 90 L 360 75 L 400 80 L 440 95 L 500 90"
-                fill="none"
-                stroke="#2E9D50"
-                strokeWidth="2"
-                strokeDasharray="4 4"
-              />
-            </svg>
-
-            <div className="flex justify-between text-[10px] text-[#64748B] font-mono pt-1">
-              <span>May 4</span>
-              <span>May 9</span>
-              <span>May 14</span>
-              <span>May 19</span>
-              <span>May 24</span>
-              <span>May 29</span>
-              <span>Jun 3</span>
-            </div>
-          </div>
+                <div className="flex justify-between text-[10px] text-[#64748B] font-mono pt-1">
+                  {pts.filter((_, i) => i === 0 || i === pts.length - 1 || i % Math.max(1, Math.floor(pts.length / 5)) === 0).map((p, idx) => (
+                    <span key={idx}>{p.label || p.date || ""}</span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="flex items-center gap-6 pt-2 text-[11px] font-bold border-t border-[#1E2638]">
             <div className="flex items-center gap-2">
               <span className="w-3 h-0.5 bg-[#2E9D50]" />
-              <span className="text-[#94A3B8]">API Requests</span>
+              <span className="text-[#94A3B8]">Evaluated Decisions</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-0.5 bg-[#2E9D50] border-t border-dashed border-[#2E9D50]" />
-              <span className="text-[#94A3B8]">Active Users</span>
+              <span className="text-[#94A3B8]">Approved Decisions</span>
             </div>
           </div>
         </div>
 
         {/* Center: Organizations by Status Donut Chart */}
-        <div className="lg:col-span-4 bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-3 shadow-sm flex flex-col justify-between">
-          <h3 className="font-bold text-white text-[15px]">Organizations by Status</h3>
+        {(() => {
+          const totalOrgs = overview?.total_organizations ?? 0;
+          const activeOrgs = overview?.active_organizations ?? 0;
+          const suspendedOrgs = overview?.suspended_organizations ?? 0;
+          const otherOrgs = Math.max(0, totalOrgs - activeOrgs - suspendedOrgs);
+          const activePct = totalOrgs ? Math.round((activeOrgs / totalOrgs) * 100) : 0;
+          const suspPct = totalOrgs ? Math.round((suspendedOrgs / totalOrgs) * 100) : 0;
+          const otherPct = totalOrgs ? Math.max(0, 100 - activePct - suspPct) : 0;
+          const circumference = 289;
+          const dashOffset = totalOrgs ? Math.round(circumference * (1 - activeOrgs / totalOrgs)) : circumference;
 
-          <div className="flex items-center gap-4">
-            <div className="relative shrink-0">
-              <svg className="w-32 h-32 transform -rotate-90">
-                <circle cx="64" cy="64" r="46" stroke="#1E2638" strokeWidth="14" fill="transparent" />
-                <circle cx="64" cy="64" r="46" stroke="#2E9D50" strokeWidth="14" fill="transparent" strokeDasharray="289" strokeDashoffset="0" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-[24px] font-bold text-white leading-none">5</span>
-                <span className="text-[10px] text-[#64748B] font-mono">Total</span>
+          return (
+            <div className="lg:col-span-4 bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-3 shadow-sm flex flex-col justify-between">
+              <h3 className="font-bold text-white text-[15px]">Organizations by Status</h3>
+
+              <div className="flex items-center gap-4">
+                <div className="relative shrink-0">
+                  <svg className="w-32 h-32 transform -rotate-90">
+                    <circle cx="64" cy="64" r="46" stroke="#1E2638" strokeWidth="14" fill="transparent" />
+                    <circle cx="64" cy="64" r="46" stroke="#2E9D50" strokeWidth="14" fill="transparent" strokeDasharray={circumference} strokeDashoffset={dashOffset} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span className="text-[24px] font-bold text-white leading-none">{totalOrgs}</span>
+                    <span className="text-[10px] text-[#64748B] font-mono">Total</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-[11px] flex-1">
+                  <div className="flex items-center justify-between font-bold">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#2E9D50]" />
+                      <span className="text-[#94A3B8]">Active</span>
+                    </div>
+                    <span className="text-white">{activeOrgs} ({activePct}%)</span>
+                  </div>
+                  <div className="flex items-center justify-between font-bold">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#F59A23]" />
+                      <span className="text-[#94A3B8]">Suspended</span>
+                    </div>
+                    <span className={suspendedOrgs > 0 ? "text-[#F59A23]" : "text-[#64748B]"}>{suspendedOrgs} ({suspPct}%)</span>
+                  </div>
+                  <div className="flex items-center justify-between font-bold">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#64748B]" />
+                      <span className="text-[#94A3B8]">Inactive / Other</span>
+                    </div>
+                    <span className="text-[#64748B]">{otherOrgs} ({otherPct}%)</span>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div className="space-y-1.5 text-[11px] flex-1">
-              <div className="flex items-center justify-between font-bold">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#2E9D50]" />
-                  <span className="text-[#94A3B8]">Active</span>
-                </div>
-                <span className="text-white">5 (100%)</span>
-              </div>
-              <div className="flex items-center justify-between font-bold">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#F59A23]" />
-                  <span className="text-[#94A3B8]">Suspended</span>
-                </div>
-                <span className="text-[#64748B]">0 (0%)</span>
-              </div>
-              <div className="flex items-center justify-between font-bold">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#64748B]" />
-                  <span className="text-[#94A3B8]">Inactive</span>
-                </div>
-                <span className="text-[#64748B]">0 (0%)</span>
-              </div>
-              <div className="flex items-center justify-between font-bold">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#E53935]" />
-                  <span className="text-[#94A3B8]">Expired</span>
-                </div>
-                <span className="text-[#64748B]">0 (0%)</span>
-              </div>
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Right: License Health Panel */}
-        <div className="lg:col-span-3 bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-3 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-white text-[15px]">License Health</h3>
-            <Link href="/platform/licenses" className="text-[11px] text-[#2E9D50] hover:underline font-bold">View All</Link>
-          </div>
+        {(() => {
+          const lh = overview?.license_health || {};
+          const healthy = lh.healthy ?? 0;
+          const expiringSoon = lh.expiring_soon ?? 0;
+          const expired = lh.expired ?? 0;
+          const suspended = lh.suspended ?? 0;
+          const totalLic = Math.max(1, healthy + expiringSoon + expired + suspended);
+          const pct = (v: number) => Math.round((v / totalLic) * 100);
+          const hasAny = (healthy + expiringSoon + expired + suspended) > 0;
 
-          <div className="space-y-2 text-[11px]">
-            <div className="flex items-center justify-between p-2 bg-[#161C2A] rounded-[6px] border border-[#232F48]">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-[#2E9D50]" />
-                <span className="font-bold text-white">Healthy</span>
+          return (
+            <div className="lg:col-span-3 bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-3 shadow-sm flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-white text-[15px]">License Health</h3>
+                <Link href="/platform/licenses" className="text-[11px] text-[#2E9D50] hover:underline font-bold">View All</Link>
               </div>
-              <div className="text-right">
-                <span className="font-bold text-white block text-[13px] leading-none">4</span>
-                <span className="text-[9px] text-[#64748B]">80% of total</span>
+
+              <div className="space-y-2 text-[11px]">
+                <div className="flex items-center justify-between p-2 bg-[#161C2A] rounded-[6px] border border-[#232F48]">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-[#2E9D50]" />
+                    <span className="font-bold text-white">Healthy</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-white block text-[13px] leading-none">{healthy}</span>
+                    <span className="text-[9px] text-[#64748B]">{hasAny ? pct(healthy) : 0}% of total</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-[#3D2910]/40 rounded-[6px] border border-[#F59A23]/30">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-[#F59A23]" />
+                    <span className="font-bold text-white">Expiring Soon (≤ 30 days)</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-[#F59A23] block text-[13px] leading-none">{expiringSoon}</span>
+                    <span className="text-[9px] text-[#64748B]">{hasAny ? pct(expiringSoon) : 0}% of total</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-[#161C2A] rounded-[6px] border border-[#232F48]">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-4 h-4 text-[#E53935]" />
+                    <span className="font-bold text-white">Expired</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-white block text-[13px] leading-none">{expired}</span>
+                    <span className="text-[9px] text-[#64748B]">{hasAny ? pct(expired) : 0}% of total</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-[#161C2A] rounded-[6px] border border-[#232F48]">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-[#64748B]" />
+                    <span className="font-bold text-white">Suspended</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-white block text-[13px] leading-none">{suspended}</span>
+                    <span className="text-[9px] text-[#64748B]">{hasAny ? pct(suspended) : 0}% of total</span>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div className="flex items-center justify-between p-2 bg-[#3D2910]/40 rounded-[6px] border border-[#F59A23]/30">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-[#F59A23]" />
-                <span className="font-bold text-white">Expiring Soon (≤ 30 days)</span>
-              </div>
-              <div className="text-right">
-                <span className="font-bold text-[#F59A23] block text-[13px] leading-none">1</span>
-                <span className="text-[9px] text-[#64748B]">20% of total</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-2 bg-[#161C2A] rounded-[6px] border border-[#232F48]">
-              <div className="flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-[#E53935]" />
-                <span className="font-bold text-white">Expired</span>
-              </div>
-              <div className="text-right">
-                <span className="font-bold text-white block text-[13px] leading-none">0</span>
-                <span className="text-[9px] text-[#64748B]">0% of total</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-2 bg-[#161C2A] rounded-[6px] border border-[#232F48]">
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-[#64748B]" />
-                <span className="font-bold text-white">Suspended</span>
-              </div>
-              <div className="text-right">
-                <span className="font-bold text-white block text-[13px] leading-none">0</span>
-                <span className="text-[9px] text-[#64748B]">0% of total</span>
-              </div>
-            </div>
-          </div>
-        </div>
+          );
+        })()}
       </div>
 
       {/* 4. MAIN ROW 2: Recent Organizations Table + Security Overview + Recent Audit Events */}
@@ -629,7 +691,7 @@ export default function PlatformDashboardPage() {
                       </span>
                     </td>
                     <td className="py-2.5 px-2.5 font-mono text-[10px] text-[#64748B]">
-                      {org.expiry_date ? new Date(org.expiry_date).toISOString().split("T")[0] : "2026-08-31"}
+                      {org.expiry_date ? new Date(org.expiry_date).toISOString().split("T")[0] : "No expiry"}
                     </td>
                   </tr>
                 ))}
@@ -652,8 +714,7 @@ export default function PlatformDashboardPage() {
                 <span className="font-bold text-white">Critical Risks</span>
               </div>
               <div className="flex items-center gap-1.5 font-bold">
-                <span className="text-white">1</span>
-                <span className="text-[9px] text-[#2E9D50] font-mono">↓ 1 vs 30d</span>
+                <span className="text-white">{overview?.security_overview?.critical_risks ?? overview?.critical_incidents ?? 0}</span>
               </div>
             </div>
 
@@ -663,8 +724,7 @@ export default function PlatformDashboardPage() {
                 <span className="font-bold text-white">Security Incidents</span>
               </div>
               <div className="flex items-center gap-1.5 font-bold">
-                <span className="text-white">3</span>
-                <span className="text-[9px] text-[#2E9D50] font-mono">↓ 2 vs 30d</span>
+                <span className="text-white">{overview?.security_overview?.incidents ?? overview?.security_incidents ?? 0}</span>
               </div>
             </div>
 
@@ -674,19 +734,17 @@ export default function PlatformDashboardPage() {
                 <span className="font-bold text-white">Blocked Actions</span>
               </div>
               <div className="flex items-center gap-1.5 font-bold">
-                <span className="text-white">24</span>
-                <span className="text-[9px] text-[#2E9D50] font-mono">↑ 8 vs 30d</span>
+                <span className="text-white">{overview?.security_overview?.blocked_actions ?? 0}</span>
               </div>
             </div>
 
             <div className="flex items-center justify-between p-2 bg-[#161C2A] rounded-[6px] border border-[#232F48]">
               <div className="flex items-center gap-2">
                 <Zap className="w-3.5 h-3.5 text-[#8064C8]" />
-                <span className="font-bold text-white">Circuit Breaker Events</span>
+                <span className="font-bold text-white">Suspended Users</span>
               </div>
               <div className="flex items-center gap-1.5 font-bold">
-                <span className="text-white">7</span>
-                <span className="text-[9px] text-[#2E9D50] font-mono">↑ 3 vs 30d</span>
+                <span className="text-white">{overview?.security_overview?.suspended_users ?? 0}</span>
               </div>
             </div>
 
@@ -696,8 +754,7 @@ export default function PlatformDashboardPage() {
                 <span className="font-bold text-white">Suspended Agents</span>
               </div>
               <div className="flex items-center gap-1.5 font-bold">
-                <span className="text-white">2</span>
-                <span className="text-[9px] text-[#2E9D50] font-mono">↓ 1 vs 30d</span>
+                <span className="text-white">{overview?.security_overview?.suspended_agents ?? 0}</span>
               </div>
             </div>
           </div>

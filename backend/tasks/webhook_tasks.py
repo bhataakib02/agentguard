@@ -38,8 +38,8 @@ def dispatch_webhook_task(self, delivery_id: str, max_attempts: int = MAX_WEBHOO
             logger.error(f"[dispatch_webhook_task] Delivery record not found: {delivery_id}")
             return {"status": "NOT_FOUND", "delivery_id": delivery_id}
 
-        # Idempotency check: if already successful, skip
-        if delivery.status in ("SUCCESS", "DELIVERED"):
+        # Idempotency check: if already completed or permanently dead-lettered, skip
+        if delivery.status in ("SUCCESS", "DELIVERED", "DEAD_LETTER"):
             logger.info(f"[dispatch_webhook_task] Delivery {delivery_id} already completed ({delivery.status}). Skipping.")
             return {"status": "ALREADY_COMPLETED", "delivery_id": delivery_id}
 
@@ -232,13 +232,16 @@ def dispatch_webhook_task(self, delivery_id: str, max_attempts: int = MAX_WEBHOO
             # Create in-app integration failure notification
             try:
                 from services.notification_service import notification_service
-                notification_service.create_in_app_notification(
+                notification_service.notify_governance_event(
                     db=db,
-                    user_id=None,
+                    org_id=str(endpoint.org_id),
+                    event_type="webhook.delivery_failed",
+                    resource_type="webhook_delivery",
+                    resource_id=str(delivery.id),
                     title="Webhook Delivery Failure",
                     message=f"Webhook delivery to '{endpoint.url}' failed permanently after {curr_attempts} attempts: {last_err[:120]}",
-                    severity="HIGH",
-                    notif_type="INTEGRATION_FAILURE"
+                    data={"delivery_id": str(delivery.id), "endpoint_id": str(endpoint.id), "url": endpoint.url, "attempts": curr_attempts},
+                    severity="HIGH"
                 )
             except Exception as _notif_err:
                 pass

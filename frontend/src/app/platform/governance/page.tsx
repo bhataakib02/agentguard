@@ -133,7 +133,7 @@ export default function PlatformGovernancePage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-center font-bold text-white font-mono">
-                      {p.rules_count ?? 3}
+                      {p.rules_count ?? 0}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#3B1516] text-[#E53935] border border-[#E53935]/40 font-mono">
@@ -141,10 +141,10 @@ export default function PlatformGovernancePage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 font-mono text-[#64748B] text-[11px]">
-                      {p.created_at ? new Date(p.created_at).toLocaleDateString() : "2026-08-15"}
+                      {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-[#64748B] text-[11px]">
-                      {p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "2026-09-02"}
+                      {p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "—"}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button

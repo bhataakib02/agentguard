@@ -10,22 +10,39 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"ALL" | "UNREAD" | "CRITICAL" | "APPROVALS">("ALL");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [unreadTotal, setUnreadTotal] = useState<number | null>(null);
+  const pageSize = 20;
 
-  const loadNotifs = useCallback(async () => {
+  const loadNotifs = useCallback(async (targetPage = page) => {
     setLoading(true);
     try {
-      const data = await fetchApi("/notifications").catch(() => []);
-      setNotifs(data || []);
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String(targetPage * pageSize),
+      });
+      if (filter === "UNREAD") params.set("unread_only", "true");
+      const [data, unreadRes] = await Promise.all([
+        fetchApi(`/notifications?${params.toString()}`).catch(() => []),
+        fetchApi("/notifications/unread-count").catch(() => null),
+      ]);
+      const items = data || [];
+      setNotifs(items);
+      setHasMore(items.length === pageSize);
+      if (unreadRes && typeof unreadRes.unread_count === "number") {
+        setUnreadTotal(unreadRes.unread_count);
+      }
     } catch (err) {
       console.error("Notifications fetch error:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filter]);
 
   useEffect(() => {
-    loadNotifs();
-  }, [loadNotifs]);
+    loadNotifs(page);
+  }, [loadNotifs, page]);
 
   const handleMarkOneRead = async (id: string) => {
     setActionLoading(id);
@@ -34,6 +51,7 @@ export default function NotificationsPage() {
       setNotifs((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true, read: true } : n))
       );
+      setUnreadTotal((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
     } catch (err) {
       console.error("Mark read error:", err);
     } finally {
@@ -46,6 +64,7 @@ export default function NotificationsPage() {
     try {
       await fetchApi("/notifications/read-all", { method: "POST" });
       setNotifs((prev) => prev.map((n) => ({ ...n, is_read: true, read: true })));
+      setUnreadTotal(0);
     } catch (err) {
       console.error("Mark all read error:", err);
     } finally {
@@ -56,8 +75,12 @@ export default function NotificationsPage() {
   const handleDelete = async (id: string) => {
     setActionLoading(`del-${id}`);
     try {
+      const target = notifs.find((n) => n.id === id);
       await fetchApi(`/notifications/${id}`, { method: "DELETE" });
       setNotifs((prev) => prev.filter((n) => n.id !== id));
+      if (target && !target.is_read && !target.read) {
+        setUnreadTotal((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
+      }
     } catch (err) {
       console.error("Delete notification error:", err);
     } finally {
@@ -65,7 +88,9 @@ export default function NotificationsPage() {
     }
   };
 
-  const unreadCount = notifs.filter((n) => !n.is_read && !n.read).length;
+  const unreadCount = unreadTotal !== null
+    ? unreadTotal
+    : notifs.filter((n) => !n.is_read && !n.read).length;
 
   const filteredNotifs = notifs.filter((n) => {
     if (filter === "UNREAD") return !n.is_read && !n.read;
@@ -105,7 +130,7 @@ export default function NotificationsPage() {
           )}
 
           <button
-            onClick={() => loadNotifs()}
+            onClick={() => loadNotifs(page)}
             disabled={loading}
             className="px-3.5 py-2 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[8px] text-[#666666] hover:text-[#1F1F1F] flex items-center gap-2 text-[12px] font-bold shadow-sm transition-colors"
           >
@@ -125,7 +150,10 @@ export default function NotificationsPage() {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setFilter(tab.id as any)}
+            onClick={() => {
+              setPage(0);
+              setFilter(tab.id as any);
+            }}
             className={`px-3 py-1.5 rounded-[6px] transition-colors ${
               filter === tab.id
                 ? "bg-[#1F1F1F] text-white"
@@ -208,6 +236,29 @@ export default function NotificationsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && (page > 0 || hasMore) && (
+        <div className="flex items-center justify-between pt-2 text-[12px]">
+          <span className="text-[#666666] font-mono">Page {page + 1}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1.5 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[6px] font-bold text-[#1F1F1F] disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasMore}
+              className="px-3 py-1.5 bg-[#FFFFFF] border border-[#E8E8E4] rounded-[6px] font-bold text-[#1F1F1F] disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

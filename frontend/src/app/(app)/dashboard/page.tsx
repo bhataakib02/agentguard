@@ -126,7 +126,7 @@ export default function DashboardPage() {
 
         {["ADMIN", "SUPER_ADMIN", "OPERATOR"].includes(userRole) && (
           <Link
-            href="/agents/create"
+            href="/agents"
             className="px-4 py-2 bg-[#2E9D50] hover:bg-[#237A3C] text-white text-[13px] font-bold rounded-[8px] flex items-center gap-2 transition-colors shrink-0 shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -140,7 +140,7 @@ export default function DashboardPage() {
         <KpiCard
           label="TOTAL AI AGENTS"
           value={overview?.total_agents || agents.length || 0}
-          subtext={`${agents.filter((a) => a.status === "ACTIVE").length} Active Operational`}
+          subtext={`${agents.filter((a) => a.status === "NORMAL" || a.status === "ACTIVE").length} Active Operational`}
           icon={Bot}
           iconBgColor="#EAF7EE"
           iconColor="#2E9D50"

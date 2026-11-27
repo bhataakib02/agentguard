@@ -43,14 +43,19 @@ def override_get_db():
         db.close()
 
 
-app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
 
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_db():
+    prev_override = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=test_engine)
     yield
+    if prev_override is not None:
+        app.dependency_overrides[get_db] = prev_override
+    else:
+        app.dependency_overrides.pop(get_db, None)
     Base.metadata.drop_all(bind=test_engine)
     import os
     if os.path.exists("./test_notifications.db"):
@@ -310,6 +315,7 @@ def test_08_system_health_degraded_when_email_not_configured(test_data):
 
     notif_card = next((s for s in data["services"] if s["id"] == "s8"), None)
     assert notif_card is not None
+    assert data["overall_status"] == "Degraded"
     assert notif_card["status"] == "Degraded"
     assert "In-App Active" in notif_card["telemetry"]
     assert "In-app notifications active" in notif_card["details"]
@@ -334,6 +340,7 @@ def test_09_system_health_operational_when_email_configured(test_data):
 
     notif_card = next((s for s in data["services"] if s["id"] == "s8"), None)
     assert notif_card is not None
+    assert data["overall_status"] == "Operational"
     assert notif_card["status"] == "Operational"
     assert notif_card["telemetry"] == "Active"
     assert "operational" in notif_card["details"].lower()
@@ -348,3 +355,226 @@ def test_10_unauthorized_access_rejected():
     assert resp.status_code == 401
     resp_count = client.get("/api/v1/notifications/unread-count")
     assert resp_count.status_code == 401
+
+
+def test_11_system_health_down_when_db_unavailable(test_data):
+    """
+    Verifies that when DB/notification query fails, /api/v1/platform/health reports DOWN
+    (never hardcoded OPERATIONAL).
+    """
+    headers_super = {"Authorization": f"Bearer {test_data['token_super']}"}
+
+    class BrokenHealthSession:
+        def __init__(self):
+            self._real = TestingSessionLocal()
+
+        def execute(self, *args, **kwargs):
+            raise RuntimeError("Simulated database outage")
+
+        def query(self, *entities, **kwargs):
+            if any((e is models.Notification or getattr(e, "class_", None) is models.Notification) for e in entities):
+                raise RuntimeError("Simulated notification query failure")
+            return self._real.query(*entities, **kwargs)
+
+        def close(self):
+            self._real.close()
+
+    def broken_get_db():
+        db = BrokenHealthSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    prev = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = broken_get_db
+    try:
+        resp = client.get("/api/v1/platform/health", headers=headers_super)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["overall_status"].upper() == "DOWN"
+        notif_card = next((s for s in data["services"] if s["id"] == "s8"), None)
+        assert notif_card is not None
+        assert notif_card["status"] == "Down"
+    finally:
+        if prev is not None:
+            app.dependency_overrides[get_db] = prev
+
+
+def test_12_super_admin_read_all_does_not_clobber_tenant_unread(test_data):
+    """
+    Verifies that SUPER_ADMIN calling POST /notifications/read-all only marks
+    SUPER_ADMIN's own or system-level alerts and never clears tenant users' unread alerts.
+    """
+    db = TestingSessionLocal()
+    tenant_notif = notification_service.create_in_app_notification(
+        db=db,
+        user_id=test_data["user_a_id"],
+        title="Tenant Must Stay Unread",
+        message="Do not clear across tenants",
+        severity="HIGH",
+        notif_type="SECURITY"
+    )
+    tenant_notif_id = str(tenant_notif.id)
+    db.close()
+
+    headers_super = {"Authorization": f"Bearer {test_data['token_super']}"}
+    resp = client.post("/api/v1/notifications/read-all", headers=headers_super)
+    assert resp.status_code == 200
+
+    db = TestingSessionLocal()
+    refreshed = db.query(models.Notification).filter(models.Notification.id == tenant_notif_id).first()
+    assert refreshed is not None
+    assert refreshed.is_read is False
+    db.close()
+
+
+def test_13_pagination_and_filtering(test_data):
+    """Verifies limit, offset, severity, type, and unread_only query filters."""
+    db = TestingSessionLocal()
+    for i in range(4):
+        notification_service.create_in_app_notification(
+            db=db,
+            user_id=test_data["user_b_id"],
+            title=f"Paginated Alert {i}",
+            message=f"Msg {i}",
+            severity="WARNING" if i % 2 == 0 else "INFO",
+            notif_type="WEBHOOK_TEST"
+        )
+    db.close()
+
+    headers_b = {"Authorization": f"Bearer {test_data['token_b']}"}
+    p1 = client.get("/api/v1/notifications?limit=2&offset=0&type=WEBHOOK_TEST", headers=headers_b)
+    p2 = client.get("/api/v1/notifications?limit=2&offset=2&type=WEBHOOK_TEST", headers=headers_b)
+    assert p1.status_code == 200
+    assert p2.status_code == 200
+    ids_1 = {item["id"] for item in p1.json()}
+    ids_2 = {item["id"] for item in p2.json()}
+    assert len(ids_1) == 2
+    assert len(ids_2) == 2
+    assert ids_1.isdisjoint(ids_2)
+
+    sev_resp = client.get("/api/v1/notifications?severity=WARNING&type=WEBHOOK_TEST", headers=headers_b)
+    assert sev_resp.status_code == 200
+    assert all(n["severity"] == "WARNING" for n in sev_resp.json())
+
+
+def test_14_agent_suspend_restore_and_incident_update_notifications(test_data):
+    """Verifies suspend_agent, restore_agent, and update_incident emit accurate event notifications."""
+    original_provider = settings.EMAIL_PROVIDER
+    settings.EMAIL_PROVIDER = "DISABLED"
+    try:
+        db = TestingSessionLocal()
+        agent = models.Agent(
+            id=str(uuid.uuid4()),
+            org_id=test_data["org_a_id"],
+            owner_id=test_data["user_a_id"],
+            name="Notif Agent",
+            agent_code=f"AG-NOTIF-{uuid.uuid4().hex[:6]}",
+            purpose="Notification lifecycle test",
+            status="NORMAL",
+            autonomy_level="MEDIUM"
+        )
+        inc = models.SecurityIncident(
+            id=str(uuid.uuid4()),
+            org_id=test_data["org_a_id"],
+            title="Suspicious Probe",
+            severity="HIGH",
+            source="TEST",
+            status="OPEN"
+        )
+        db.add_all([agent, inc])
+        db.commit()
+        agent_id = str(agent.id)
+        inc_id = str(inc.id)
+        db.close()
+
+        headers_a = {"Authorization": f"Bearer {test_data['token_a']}"}
+        assert client.post(f"/api/v1/agents/{agent_id}/suspend", headers=headers_a).status_code == 200
+        assert client.post(f"/api/v1/agents/{agent_id}/restore", headers=headers_a).status_code == 200
+        assert client.patch(f"/api/v1/security/incidents/{inc_id}", json={"status": "RESOLVED"}, headers=headers_a).status_code == 200
+
+        db = TestingSessionLocal()
+        notifs = db.query(models.Notification).filter(models.Notification.user_id == test_data["user_a_id"]).all()
+        types = {n.type for n in notifs}
+        titles = " | ".join(n.title for n in notifs)
+        assert "AGENT.SUSPENDED" in types
+        assert "AGENT.RESTORED" in types
+        assert "Agent Restored: Notif Agent" in titles
+        assert "SECURITY.INCIDENT_RESOLVED" in types
+        db.close()
+    finally:
+        settings.EMAIL_PROVIDER = original_provider
+
+
+def test_15_webhook_dead_letter_tenant_notification_and_retry_dedupe(test_data, monkeypatch):
+    """
+    Verifies webhook permanent failure notifies org admins (user_id populated) and retries skip
+    already DEAD_LETTER deliveries without duplicate notifications.
+    """
+    from tasks import webhook_tasks
+
+    original_provider = settings.EMAIL_PROVIDER
+    settings.EMAIL_PROVIDER = "DISABLED"
+    try:
+        db = TestingSessionLocal()
+        ep = models.WebhookEndpoint(
+            id=str(uuid.uuid4()),
+            org_id=test_data["org_a_id"],
+            name="Test Webhook",
+            url="https://example.invalid/webhook",
+            secret_hash="testhash",
+            secret_key="test-secret",
+            event_types=["decision.refused"],
+            is_active=True
+        )
+        db.add(ep)
+        db.flush()
+        delivery = models.WebhookDelivery(
+            id=str(uuid.uuid4()),
+            webhook_id=ep.id,
+            event_type="decision.refused",
+            payload_json={"event": "test"},
+            status="RETRYING",
+            attempt_count=2  # Next failure (3rd) hits MAX_RETRIES=3 -> DEAD_LETTER
+        )
+        db.add(delivery)
+        db.commit()
+        delivery_id = str(delivery.id)
+        db.close()
+
+        monkeypatch.setattr(webhook_tasks, "SessionLocal", TestingSessionLocal)
+        monkeypatch.setattr(
+            webhook_tasks.tool_proxy_service,
+            "safe_dispatch_request",
+            lambda *args, **kwargs: {
+                "success": False,
+                "status_code": 500,
+                "error": "Simulated HTTP 500 timeout",
+            },
+        )
+
+        res1 = webhook_tasks.dispatch_webhook_task(delivery_id)
+        assert res1["status"] == "DEAD_LETTER"
+
+        db = TestingSessionLocal()
+        wh_notifs = db.query(models.Notification).filter(
+            models.Notification.user_id == test_data["user_a_id"],
+            models.Notification.type == "WEBHOOK.DELIVERY_FAILED"
+        ).all()
+        assert len(wh_notifs) == 1
+        db.close()
+
+        # Re-running dispatch on DEAD_LETTER must be idempotent and NOT create duplicate notifications
+        res2 = webhook_tasks.dispatch_webhook_task(delivery_id)
+        assert res2["status"] == "ALREADY_COMPLETED"
+
+        db = TestingSessionLocal()
+        wh_notifs_after = db.query(models.Notification).filter(
+            models.Notification.user_id == test_data["user_a_id"],
+            models.Notification.type == "WEBHOOK.DELIVERY_FAILED"
+        ).all()
+        assert len(wh_notifs_after) == 1
+        db.close()
+    finally:
+        settings.EMAIL_PROVIDER = original_provider

@@ -114,7 +114,11 @@ def mark_all_notifications_read(
     Marks all unread notifications for current user as read.
     """
     query = db.query(models.Notification)
-    if current_user.role != "SUPER_ADMIN":
+    if current_user.role == "SUPER_ADMIN":
+        query = query.filter(
+            (models.Notification.user_id == current_user.id) | (models.Notification.user_id.is_(None))
+        )
+    else:
         query = query.filter(models.Notification.user_id == current_user.id)
     notifs = query.filter(models.Notification.is_read == False).all()
     for n in notifs:

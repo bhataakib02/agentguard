@@ -134,7 +134,7 @@ export default function PlatformOrganizationsPage() {
                     <td className="py-3.5 px-4 text-center font-bold text-white">{org.user_count} / {org.max_users}</td>
                     <td className="py-3.5 px-4 text-center font-bold text-white">{org.agent_count} / {org.max_ai_agents}</td>
                     <td className="py-3.5 px-4 font-mono text-[11px] text-[#94A3B8]">
-                      {org.created_at ? new Date(org.created_at).toLocaleDateString() : "Aug 31, 2026"}
+                      {org.created_at ? new Date(org.created_at).toLocaleDateString() : "—"}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50]">

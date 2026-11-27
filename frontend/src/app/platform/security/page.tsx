@@ -77,21 +77,21 @@ export default function PlatformSecurityPage() {
         <div className="bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-1.5 shadow-sm hover:border-[#E53935]/50 transition-colors">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono block">CRITICAL RISKS</span>
           <h2 className="text-[24px] font-bold text-[#E53935] leading-none">{criticalRisks}</h2>
-          <span className="text-[10px] text-[#2E9D50] font-bold block">↓ 1 vs last 30d</span>
+          <span className="text-[10px] text-[#94A3B8] font-bold block">Live Severity Count</span>
         </div>
 
         {/* Card 2: Security Incidents */}
         <div className="bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-1.5 shadow-sm hover:border-[#F59A23]/50 transition-colors">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono block">INCIDENTS</span>
           <h2 className="text-[24px] font-bold text-[#F59A23] leading-none">{securityIncidents}</h2>
-          <span className="text-[10px] text-[#2E9D50] font-bold block">↓ 2 vs last 30d</span>
+          <span className="text-[10px] text-[#94A3B8] font-bold block">Total Recorded</span>
         </div>
 
         {/* Card 3: Blocked Actions */}
         <div className="bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-1.5 shadow-sm hover:border-[#2E9D50]/50 transition-colors">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono block">BLOCKED ACTIONS</span>
           <h2 className="text-[24px] font-bold text-[#2E9D50] leading-none">{blockedActions}</h2>
-          <span className="text-[10px] text-[#2E9D50] font-bold block">↑ 8 vs last 30d</span>
+          <span className="text-[10px] text-[#94A3B8] font-bold block">Refused by Engine</span>
         </div>
 
         {/* Card 4: Suspended Agents */}
@@ -112,7 +112,9 @@ export default function PlatformSecurityPage() {
         <div className="bg-[#121722] border border-[#1E2638] rounded-[10px] p-4 space-y-1.5 shadow-sm hover:border-[#2E9D50]/50 transition-colors">
           <span className="text-[10px] font-bold text-[#64748B] uppercase font-mono block">PLATFORM RISK SCORE</span>
           <h2 className="text-[20px] font-bold text-[#2E9D50] leading-none">{riskScore}</h2>
-          <span className="text-[10px] text-[#2E9D50] font-bold block">LOW RISK PROFILE</span>
+          <span className="text-[10px] text-[#94A3B8] font-bold block">
+            {(parseFloat(String(riskScore).split("/")[0]) || 0) >= 70 ? "HIGH RISK PROFILE" : (parseFloat(String(riskScore).split("/")[0]) || 0) >= 40 ? "MEDIUM RISK PROFILE" : "LOW RISK PROFILE"}
+          </span>
         </div>
 
         {/* Card 7: Active Threats */}
@@ -264,7 +266,7 @@ export default function PlatformSecurityPage() {
               </div>
               <div className="flex items-center justify-between p-2 bg-[#161C2A] rounded-[6px]">
                 <span className="text-[#94A3B8]">Risk Engine Score</span>
-                <span className="font-bold text-white">0.032 (Low)</span>
+                <span className="font-bold text-white">{riskScore}</span>
               </div>
             </div>
           </div>

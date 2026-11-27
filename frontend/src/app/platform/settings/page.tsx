@@ -40,8 +40,8 @@ export default function PlatformSettingsPage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setSavedMsg("Platform configuration updated successfully!");
-    setTimeout(() => setSavedMsg(""), 3000);
+    setSavedMsg("Runtime platform configuration is read-only here and managed via deployment environment variables.");
+    setTimeout(() => setSavedMsg(""), 4000);
   };
 
   return (
@@ -224,17 +224,29 @@ export default function PlatformSettingsPage() {
               <div className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between">
                 <div>
                   <span className="font-bold text-white block">Email Alerts</span>
-                  <span className="text-[11px] text-[#64748B]">Send critical security alerts to platform administrator</span>
+                  <span className="text-[11px] text-[#64748B]">Send critical security alerts via configured email provider</span>
                 </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] font-mono">ACTIVE</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                  settings?.notifications?.email_alerts_enabled
+                    ? "bg-[#173B25] text-[#2E9D50]"
+                    : "bg-[#3D2910] text-[#F59A23]"
+                }`}>
+                  {settings?.notifications?.email_alerts_enabled ? "CONFIGURED" : "NOT_CONFIGURED"}
+                </span>
               </div>
 
               <div className="p-3 bg-[#161C2A] rounded-[8px] border border-[#232F48] flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-white block">Webhook Alert Integration</span>
-                  <span className="text-[11px] text-[#64748B]">Broadcast critical security incidents to external Webhooks</span>
+                  <span className="font-bold text-white block">Slack / Webhook Alert Integration</span>
+                  <span className="text-[11px] text-[#64748B]">Broadcast critical security incidents to external webhooks</span>
                 </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#173B25] text-[#2E9D50] font-mono">ACTIVE</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                  settings?.notifications?.slack_integration_active
+                    ? "bg-[#173B25] text-[#2E9D50]"
+                    : "bg-[#1E2638] text-[#94A3B8]"
+                }`}>
+                  {settings?.notifications?.slack_integration_active ? "CONFIGURED" : "NOT_CONFIGURED"}
+                </span>
               </div>
             </div>
           </div>
@@ -263,13 +275,17 @@ export default function PlatformSettingsPage() {
           </div>
         )}
 
-        <div className="pt-4 border-t border-[#1E2638] flex justify-end">
+        <div className="pt-4 border-t border-[#1E2638] flex items-center justify-between gap-4">
+          <span className="text-[11px] text-[#64748B] font-mono">
+            Read-only runtime snapshot from backend environment configuration.
+          </span>
           <button
-            type="submit"
-            className="px-5 py-2 bg-[#2E9D50] hover:bg-[#237A3C] text-white rounded-[8px] font-bold text-[13px] transition-colors flex items-center gap-2 shadow-sm"
+            type="button"
+            onClick={() => loadSettings()}
+            className="px-4 py-2 bg-[#161C2A] hover:bg-[#1E2638] border border-[#232F48] text-white rounded-[8px] font-bold text-[12px] transition-colors flex items-center gap-2 shadow-sm"
           >
-            <Save className="w-4 h-4" />
-            <span>Save Settings</span>
+            <RefreshCw className="w-3.5 h-3.5 text-[#2E9D50]" />
+            <span>Sync From Backend</span>
           </button>
         </div>
       </form>

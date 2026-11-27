@@ -290,17 +290,19 @@ def update_incident(
 
     try:
         from services.notification_service import notification_service
+        resolved_status = getattr(inc, "status", "UPDATED") or "UPDATED"
+        is_resolved = str(resolved_status).upper() in ("RESOLVED", "CLOSED", "MITIGATED")
         notification_service.notify_governance_event(
             db=db,
-            org_id=str(current_user.org_id) if current_user.org_id else "",
-            event_type="security.incident_created",
+            org_id=str(inc.org_id) if getattr(inc, "org_id", None) else (str(current_user.org_id) if current_user.org_id else ""),
+            event_type="security.incident_resolved" if is_resolved else "security.incident_updated",
             resource_type="incident",
             resource_id=str(inc.id),
-            title=f"Security Alert: {inc.title}",
-            message=f"Incident of severity {inc.severity} logged from source {inc.source}.",
-            data={"incident_id": str(inc.id), "severity": inc.severity, "title": inc.title},
+            title=f"Security Incident {resolved_status.title()}: {inc.title}",
+            message=f"Incident '{inc.title}' (severity {inc.severity}) updated to status {resolved_status} by {current_user.email}.",
+            data={"incident_id": str(inc.id), "severity": inc.severity, "status": resolved_status, "title": inc.title},
             user_id=str(current_user.id),
-            severity=inc.severity
+            severity="INFO" if is_resolved else inc.severity
         )
     except Exception as _notif_err:
         pass

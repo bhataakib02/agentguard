@@ -1164,19 +1164,25 @@ def get_detailed_system_health(
         notif_details = "In-app notifications active; outbound email delivery provider not configured in environment"
 
     # Recent Audit Events
-    recent_audits = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).limit(3).all()
     recent_events = []
-    for a in recent_audits:
-        recent_events.append({
-            "time": a.timestamp.strftime("%H:%M:%S UTC") if a.timestamp else "Recently",
-            "event": f"{a.action} ({a.result or 'SUCCESS'})",
-            "level": "INFO" if a.result == "SUCCESS" else "WARNING",
-            "source": a.resource or "System"
-        })
+    try:
+        recent_audits = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).limit(3).all()
+        for a in recent_audits:
+            recent_events.append({
+                "time": a.timestamp.strftime("%H:%M:%S UTC") if a.timestamp else "Recently",
+                "event": f"{a.action} ({a.result or 'SUCCESS'})",
+                "level": "INFO" if a.result == "SUCCESS" else "WARNING",
+                "source": a.resource or "System"
+            })
+    except Exception:
+        recent_events = []
 
-    overall_status = "Operational" if (db_status == "Operational" and notif_status != "Down") else "Degraded"
-    if db_status == "Down":
+    if db_status == "Down" or notif_status == "Down":
         overall_status = "Down"
+    elif notif_status == "Degraded" or db_status == "Degraded" or auth_status == "Degraded":
+        overall_status = "Degraded"
+    else:
+        overall_status = "Operational"
 
     return {
         "overall_status": overall_status,
@@ -1198,7 +1204,8 @@ def get_detailed_system_health(
 def get_platform_settings(
     current_user: models.User = Depends(require_super_admin)
 ):
-    smtp_active = bool(os.getenv("SMTP_HOST") or os.getenv("SENDGRID_API_KEY"))
+    from services.email_service import email_service
+    smtp_active = email_service.is_configured()
     slack_active = bool(os.getenv("SLACK_WEBHOOK_URL") or os.getenv("SLACK_BOT_TOKEN"))
 
     return {

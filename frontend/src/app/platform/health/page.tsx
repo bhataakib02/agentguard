@@ -47,15 +47,24 @@ export default function PlatformHealthPage() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-[22px] font-bold text-white tracking-tight">System Health</h1>
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono flex items-center gap-1 ${
-              (healthData?.overall_status || "").toUpperCase() === "OPERATIONAL" || (healthData?.overall_status || "").toUpperCase() === "HEALTHY"
-                ? "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
-                : (healthData?.overall_status || "").toUpperCase() === "DEGRADED"
-                ? "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
-                : "bg-[#281816] text-[#EF4444] border border-[#EF4444]/40"
-            }`}>
-              <CheckCircle className="w-3 h-3" /> {loading ? "CHECKING HEALTH..." : (healthData?.overall_status || "OPERATIONAL").toUpperCase()}
-            </span>
+            {(() => {
+              const overall = loading ? "CHECKING HEALTH..." : (healthData?.overall_status || "UNAVAILABLE").toUpperCase();
+              const isOk = overall === "OPERATIONAL" || overall === "HEALTHY";
+              const isDegraded = overall === "DEGRADED";
+              return (
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono flex items-center gap-1 ${
+                  loading
+                    ? "bg-[#161C2A] text-[#94A3B8] border border-[#232F48]"
+                    : isOk
+                    ? "bg-[#173B25] text-[#2E9D50] border border-[#2E9D50]/40"
+                    : isDegraded
+                    ? "bg-[#3D2910] text-[#F59A23] border border-[#F59A23]/40"
+                    : "bg-[#281816] text-[#EF4444] border border-[#EF4444]/40"
+                }`}>
+                  {isOk ? <CheckCircle className="w-3 h-3" /> : isDegraded ? <AlertTriangle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />} {overall}
+                </span>
+              );
+            })()}
           </div>
           <p className="text-[12px] text-[#94A3B8] mt-0.5">
             Real-time health, latency, live telemetry, and status of AgentGuard core subsystem services.
@@ -122,7 +131,9 @@ export default function PlatformHealthPage() {
                 </div>
                 <div>
                   <span className="text-[#64748B] block">Checked</span>
-                  <span className="text-white font-bold">Just now</span>
+                  <span className="text-white font-bold">
+                    {srv.last_checked ? new Date(srv.last_checked).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"}
+                  </span>
                 </div>
               </div>
             </div>
