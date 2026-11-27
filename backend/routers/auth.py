@@ -121,6 +121,21 @@ def _dispatch_otp_and_build_response(
             ),
         )
 
+    if error_code == "UNVERIFIED_SENDER":
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Email sending failed: Sender address or domain is not verified for external recipients "
+                f"(ref: {correlation_id})."
+            ),
+        )
+
+    if error_code == "RECIPIENT_REJECTED":
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Email sending failed: Recipient address was rejected by the mail provider (ref: {correlation_id}).",
+        )
+
     if error_code == "INVALID_API_KEY":
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -131,6 +146,15 @@ def _dispatch_otp_and_build_response(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Email sending failed: Configured sender email address is invalid (ref: {correlation_id}).",
+        )
+
+    if error_code == "MALFORMED_RESPONSE":
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Email delivery could not be confirmed due to an unexpected response from the mail provider. "
+                f"Your verification code remains valid; please check your inbox or retry after cooldown (ref: {correlation_id})."
+            ),
         )
 
     raise HTTPException(

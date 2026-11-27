@@ -41,9 +41,13 @@ class EmailService:
     def __init__(self):
         self.sent_emails_mock: List[Dict[str, Any]] = []
 
+    def is_brevo_configured(self) -> bool:
+        """Returns True if BREVO_API_KEY is provisioned."""
+        return bool(getattr(settings, "BREVO_API_KEY", "").strip())
+
     def is_resend_configured(self) -> bool:
         """Returns True if RESEND_API_KEY is provisioned."""
-        return bool(getattr(settings, "RESEND_API_KEY", None))
+        return bool(getattr(settings, "RESEND_API_KEY", "").strip())
 
     def is_smtp_configured(self) -> bool:
         """Returns True if SMTP_HOST and SMTP_PORT are provisioned."""
@@ -55,13 +59,15 @@ class EmailService:
             return False
         if settings.EMAIL_PROVIDER == "MOCK":
             return True
+        if settings.EMAIL_PROVIDER == "BREVO":
+            return self.is_brevo_configured()
         if settings.EMAIL_PROVIDER == "RESEND":
             return self.is_resend_configured()
         if settings.EMAIL_PROVIDER == "SMTP":
             return self.is_smtp_configured()
         # Fallback detection if EMAIL_PROVIDER is unset
         if not settings.EMAIL_PROVIDER:
-            return self.is_resend_configured() or self.is_smtp_configured()
+            return self.is_brevo_configured() or self.is_resend_configured() or self.is_smtp_configured()
         return False
 
     def get_status(self) -> Dict[str, Any]:
@@ -74,6 +80,8 @@ class EmailService:
         if provider_name in ("NONE", "DISABLED") or not provider_name:
             if not configured:
                 provider_name = "NONE"
+            elif self.is_brevo_configured():
+                provider_name = "BREVO"
             elif self.is_resend_configured():
                 provider_name = "RESEND"
             elif self.is_smtp_configured():
@@ -81,21 +89,305 @@ class EmailService:
             else:
                 provider_name = "NONE"
 
+        brevo_from = getattr(settings, "BREVO_FROM_EMAIL", "").strip() or None if self.is_brevo_configured() else None
+        brevo_name = getattr(settings, "BREVO_FROM_NAME", "AGENTGUARD") if self.is_brevo_configured() else None
         resend_from = getattr(settings, "RESEND_FROM_EMAIL", "onboarding@resend.dev") if self.is_resend_configured() else None
-        sandbox_mode = bool(resend_from and "onboarding@resend.dev" in resend_from.lower())
+        sandbox_mode = bool(provider_name == "RESEND" and resend_from and "onboarding@resend.dev" in resend_from.lower())
+
+        active_from = settings.SMTP_FROM_EMAIL
+        if provider_name == "BREVO":
+            active_from = brevo_from
+        elif provider_name == "RESEND":
+            active_from = resend_from
 
         return {
             "configured": configured,
             "provider": provider_name if configured else "NONE",
             "status": "HEALTHY" if configured else "NOT_CONFIGURED",
+            "brevo_configured": self.is_brevo_configured(),
+            "brevo_from_email": brevo_from,
+            "brevo_from_name": brevo_name,
             "resend_configured": self.is_resend_configured(),
             "resend_from_email": resend_from,
             "resend_sandbox_mode": sandbox_mode,
             "smtp_configured": self.is_smtp_configured(),
             "smtp_host": settings.SMTP_HOST if settings.SMTP_HOST else None,
             "smtp_port": settings.SMTP_PORT if settings.SMTP_HOST else None,
-            "from_email": resend_from if (provider_name == "RESEND") else settings.SMTP_FROM_EMAIL,
+            "from_email": active_from,
             "tls_enabled": settings.SMTP_USE_TLS
+        }
+
+    @staticmethod
+    def _classify_brevo_http_error(status_code: int, raw_body: str) -> Dict[str, str]:
+        """Parses and sanitizes a Brevo HTTP error response into structured error_code and message."""
+        parsed_code = ""
+        parsed_msg = ""
+        try:
+            err_json = json.loads(raw_body)
+            if isinstance(err_json, dict):
+                parsed_code = str(err_json.get("code", "")).strip()
+                parsed_msg = str(err_json.get("message", "")).strip()
+        except Exception:
+            parsed_msg = raw_body[:300].strip()
+
+        combined = f"{parsed_code} {parsed_msg}".lower()
+        if status_code == 401 or "unauthorized" in combined or "api-key" in combined or "key not found" in combined:
+            return {
+                "error_code": "INVALID_API_KEY",
+                "sanitized_message": parsed_msg or "Brevo API key was rejected (HTTP 401)."
+            }
+        if status_code in (400, 403, 422) and (
+            "unverified" in combined or "not verified" in combined or "not validated" in combined or "verify" in combined
+        ):
+            return {
+                "error_code": "UNVERIFIED_SENDER",
+                "sanitized_message": parsed_msg or "Brevo sender email or domain is not verified."
+            }
+        if status_code in (400, 403, 422) and (
+            "recipient" in combined or "blacklisted" in combined or "blocked" in combined or "invalid email" in combined
+        ):
+            return {
+                "error_code": "RECIPIENT_REJECTED",
+                "sanitized_message": parsed_msg or "Recipient email address was rejected by Brevo."
+            }
+        if status_code in (400, 422) and ("sender" in combined or "from" in combined):
+            return {
+                "error_code": "INVALID_SENDER",
+                "sanitized_message": parsed_msg or "Brevo sender email address is invalid."
+            }
+        if status_code == 429:
+            return {
+                "error_code": "BREVO_RATE_LIMITED",
+                "sanitized_message": parsed_msg or "Brevo API rate limit exceeded."
+            }
+        if 500 <= status_code < 600:
+            return {
+                "error_code": "BREVO_5XX",
+                "sanitized_message": parsed_msg or f"Brevo server error (HTTP {status_code})."
+            }
+        return {
+            "error_code": parsed_code.upper() or f"BREVO_{status_code}",
+            "sanitized_message": parsed_msg or f"Brevo API rejected request with HTTP {status_code}."
+        }
+
+    def _send_brevo(
+        self,
+        to_email: str,
+        subject: str,
+        body_text: str,
+        body_html: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        max_retries: int = 2,
+        retry_backoff_seconds: float = 0.3
+    ) -> Dict[str, Any]:
+        """
+        Sends a transactional email using Brevo REST API (POST https://api.brevo.com/v3/smtp/email).
+        - Enforces request timeout (10s).
+        - Retries ONLY on transient failures (HTTP 5xx or network/timeout errors) to avoid duplicate emails.
+        - Never retries on deterministic 4xx rejections or malformed 2xx responses.
+        - Never logs or exposes BREVO_API_KEY, api-key headers, passwords, or OTP codes.
+        """
+        corr_id = correlation_id or uuid.uuid4().hex[:12]
+        ts = _utc_iso()
+        brevo_key = getattr(settings, "BREVO_API_KEY", "").strip()
+        if not brevo_key:
+            logger.warning(
+                f"[EmailService] corr_id={corr_id} ts={ts} provider=BREVO stage=PROVIDER_NOT_CONFIGURED "
+                f"error_code=MISSING_API_KEY recipient={to_email}"
+            )
+            return {
+                "status": "EMAIL_PROVIDER_NOT_CONFIGURED",
+                "delivery_stage": "PROVIDER_NOT_CONFIGURED",
+                "accepted": False,
+                "delivered": False,
+                "delivery_confirmed": False,
+                "provider": "BREVO",
+                "recipient": to_email,
+                "error_code": "MISSING_API_KEY",
+                "error": "BREVO_API_KEY is not configured",
+                "http_status": None,
+                "correlation_id": corr_id,
+                "timestamp": ts,
+            }
+
+        raw_from = getattr(settings, "BREVO_FROM_EMAIL", "").strip()
+        bare_from = _extract_email_address(raw_from)
+        if not bare_from or not EMAIL_REGEX.match(bare_from):
+            logger.error(
+                f"[EmailService] corr_id={corr_id} ts={ts} provider=BREVO stage=REJECTED_BY_PROVIDER "
+                f"error_code=INVALID_SENDER recipient={to_email}"
+            )
+            return {
+                "status": "EMAIL_DELIVERY_FAILED",
+                "delivery_stage": "REJECTED_BY_PROVIDER",
+                "accepted": False,
+                "delivered": False,
+                "delivery_confirmed": False,
+                "provider": "BREVO",
+                "recipient": to_email,
+                "error_code": "INVALID_SENDER",
+                "error": "BREVO_FROM_EMAIL is missing or not a valid email address.",
+                "http_status": None,
+                "correlation_id": corr_id,
+                "timestamp": ts,
+            }
+
+        from_name = getattr(settings, "BREVO_FROM_NAME", "AGENTGUARD").strip() or "AGENTGUARD"
+        url = "https://api.brevo.com/v3/smtp/email"
+        payload: Dict[str, Any] = {
+            "sender": {"name": from_name, "email": bare_from},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "textContent": body_text,
+            "htmlContent": body_html or f"<pre>{body_text}</pre>",
+        }
+
+        data = json.dumps(payload).encode("utf-8")
+        headers = {
+            "api-key": brevo_key,
+            "Content-Type": "application/json",
+            "accept": "application/json",
+            "User-Agent": "AgentGuard-Backend/1.0",
+        }
+
+        last_result: Optional[Dict[str, Any]] = None
+        for attempt in range(max_retries + 1):
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            attempt_ts = _utc_iso()
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    http_status = getattr(resp, "status", 201)
+                    resp_bytes = resp.read()
+                    try:
+                        resp_data = json.loads(resp_bytes.decode("utf-8"))
+                    except Exception:
+                        resp_data = None
+
+                    message_id = resp_data.get("messageId") if isinstance(resp_data, dict) else None
+                    if not isinstance(resp_data, dict) or not message_id or not isinstance(message_id, str):
+                        logger.error(
+                            f"[EmailService] corr_id={corr_id} ts={attempt_ts} provider=BREVO "
+                            f"stage=DELIVERY_UNCONFIRMED http_status={http_status} "
+                            f"error_code=MALFORMED_RESPONSE recipient={to_email} attempt={attempt + 1}"
+                        )
+                        return {
+                            "status": "EMAIL_DELIVERY_FAILED",
+                            "delivery_stage": "DELIVERY_UNCONFIRMED",
+                            "accepted": False,
+                            "delivered": False,
+                            "delivery_confirmed": False,
+                            "provider": "BREVO",
+                            "recipient": to_email,
+                            "error_code": "MALFORMED_RESPONSE",
+                            "error": "Brevo returned a malformed or incomplete response without messageId.",
+                            "http_status": http_status,
+                            "correlation_id": corr_id,
+                            "timestamp": attempt_ts,
+                        }
+
+                    logger.info(
+                        f"[EmailService] corr_id={corr_id} ts={attempt_ts} provider=BREVO "
+                        f"stage=ACCEPTED_BY_PROVIDER http_status={http_status} brevo_message_id={message_id} "
+                        f"recipient={to_email} attempt={attempt + 1}"
+                    )
+                    return {
+                        "status": "EMAIL_SENT",
+                        "delivery_stage": "ACCEPTED_BY_PROVIDER",
+                        "accepted": True,
+                        "delivered": True,
+                        "delivery_confirmed": False,
+                        "provider": "BREVO",
+                        "recipient": to_email,
+                        "id": message_id,
+                        "http_status": http_status,
+                        "correlation_id": corr_id,
+                        "timestamp": attempt_ts,
+                    }
+            except urllib.error.HTTPError as e:
+                err_body = e.read().decode("utf-8", errors="replace")
+                classified = self._classify_brevo_http_error(e.code, err_body)
+                is_transient = e.code >= 500
+                stage = "TRANSIENT_FAILURE" if is_transient else "REJECTED_BY_PROVIDER"
+                logger.error(
+                    f"[EmailService] corr_id={corr_id} ts={attempt_ts} provider=BREVO stage={stage} "
+                    f"http_status={e.code} error_code={classified['error_code']} "
+                    f"message={classified['sanitized_message']!r} recipient={to_email} attempt={attempt + 1}"
+                )
+                last_result = {
+                    "status": "EMAIL_DELIVERY_FAILED",
+                    "delivery_stage": stage,
+                    "accepted": False,
+                    "delivered": False,
+                    "delivery_confirmed": False,
+                    "provider": "BREVO",
+                    "error_code": classified["error_code"],
+                    "error": classified["sanitized_message"],
+                    "http_status": e.code,
+                    "recipient": to_email,
+                    "correlation_id": corr_id,
+                    "timestamp": attempt_ts,
+                }
+                if not is_transient:
+                    return last_result
+            except (TimeoutError, urllib.error.URLError) as e:
+                is_timeout = isinstance(e, TimeoutError) or (
+                    isinstance(e, urllib.error.URLError) and isinstance(getattr(e, "reason", None), TimeoutError)
+                ) or "timed out" in str(e).lower()
+                err_code = "NETWORK_TIMEOUT" if is_timeout else "NETWORK_ERROR"
+                logger.error(
+                    f"[EmailService] corr_id={corr_id} ts={attempt_ts} provider=BREVO stage=TRANSIENT_FAILURE "
+                    f"error_code={err_code} error_type={type(e).__name__} recipient={to_email} attempt={attempt + 1}"
+                )
+                last_result = {
+                    "status": "EMAIL_DELIVERY_FAILED",
+                    "delivery_stage": "TRANSIENT_FAILURE",
+                    "accepted": False,
+                    "delivered": False,
+                    "delivery_confirmed": False,
+                    "provider": "BREVO",
+                    "error_code": err_code,
+                    "error": f"{type(e).__name__}: {str(e)}",
+                    "http_status": None,
+                    "recipient": to_email,
+                    "correlation_id": corr_id,
+                    "timestamp": attempt_ts,
+                }
+            except Exception as e:
+                logger.error(
+                    f"[EmailService] corr_id={corr_id} ts={attempt_ts} provider=BREVO stage=TRANSIENT_FAILURE "
+                    f"error_code=NETWORK_ERROR error_type={type(e).__name__} recipient={to_email} attempt={attempt + 1}"
+                )
+                last_result = {
+                    "status": "EMAIL_DELIVERY_FAILED",
+                    "delivery_stage": "TRANSIENT_FAILURE",
+                    "accepted": False,
+                    "delivered": False,
+                    "delivery_confirmed": False,
+                    "provider": "BREVO",
+                    "error_code": "NETWORK_ERROR",
+                    "error": f"{type(e).__name__}: {str(e)}",
+                    "http_status": None,
+                    "recipient": to_email,
+                    "correlation_id": corr_id,
+                    "timestamp": attempt_ts,
+                }
+
+            if attempt < max_retries and retry_backoff_seconds > 0:
+                time.sleep(retry_backoff_seconds * (attempt + 1))
+
+        return last_result or {
+            "status": "EMAIL_DELIVERY_FAILED",
+            "delivery_stage": "TRANSIENT_FAILURE",
+            "accepted": False,
+            "delivered": False,
+            "delivery_confirmed": False,
+            "provider": "BREVO",
+            "error_code": "NETWORK_ERROR",
+            "error": "Brevo delivery failed after retries",
+            "http_status": None,
+            "recipient": to_email,
+            "correlation_id": corr_id,
+            "timestamp": ts,
         }
 
     @staticmethod
@@ -418,7 +710,11 @@ class EmailService:
                 "timestamp": ts,
             }
 
-        # 3. Resend Provider
+        # 3. Brevo Provider
+        if settings.EMAIL_PROVIDER == "BREVO" or (not settings.EMAIL_PROVIDER and self.is_brevo_configured()):
+            return self._send_brevo(to_email, subject, body_text, body_html, correlation_id=corr_id)
+
+        # 4. Resend Provider
         if settings.EMAIL_PROVIDER == "RESEND" or (not settings.EMAIL_PROVIDER and self.is_resend_configured()):
             return self._send_resend(to_email, subject, body_text, body_html, correlation_id=corr_id)
 
