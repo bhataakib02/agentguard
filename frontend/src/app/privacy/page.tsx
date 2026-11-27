@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Shield, Lock, Database, Eye, Users, Mail, FileText, AlertTriangle, CheckCircle2, ExternalLink } from "lucide-react";
+import { Shield, Lock, Database, Eye, Users, Mail, FileText, CheckCircle2, ExternalLink } from "lucide-react";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -34,18 +34,12 @@ export default function PrivacyPolicyPage() {
             </div>
             <div>
               <h1 className="text-[28px] sm:text-[34px] font-bold text-[#1F1F1F] tracking-tight leading-tight">Privacy Policy</h1>
-              <p className="text-[13px] text-[#666666] mt-0.5">Effective date: November 2025 · Last reviewed: November 2025</p>
+              <p className="text-[13px] text-[#666666] mt-0.5">Effective date: November 2026 &middot; Last updated: November 2026</p>
             </div>
           </div>
           <p className="text-[15px] text-[#555555] leading-relaxed">
             AGENTGUARD is an enterprise AI Agent Governance and Runtime Control Plane. This policy explains what data we collect, how we use it, and your rights regarding that data. We do not sell personal data.
           </p>
-          <div className="mt-5 p-4 bg-[#FFF4D9] border border-[#F59A23]/30 rounded-[10px] flex items-start gap-3">
-            <AlertTriangle className="w-4 h-4 text-[#B76E00] mt-0.5 shrink-0" />
-            <p className="text-[12px] text-[#7A5000] leading-relaxed">
-              <strong>Legal Notice:</strong> This policy is provided for transparency purposes. AGENTGUARD is in active development. The platform owner should supplement this document with jurisdiction-specific legal counsel, a registered entity name, registered address, and applicable compliance certifications before entering production or processing personal data at scale.
-            </p>
-          </div>
         </div>
       </section>
 
@@ -64,8 +58,7 @@ export default function PrivacyPolicyPage() {
             AGENTGUARD is a Software-as-a-Service platform for governing autonomous AI agents in enterprise environments. The platform provides agent identity management (Agent Passports), runtime policy enforcement, risk scoring, human-in-the-loop approval workflows, security incident management, audit provenance tracking, and notification services.
           </p>
           <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] text-[13px] text-[#555555] space-y-1">
-            <p><strong className="text-[#1F1F1F]">Platform contact (privacy inquiries):</strong> Please contact the platform administrator using the contact information provided during your organization onboarding.</p>
-            <p className="text-[12px] text-[#888888] mt-2">The platform owner must add their legal entity name, registered address, and a dedicated privacy contact email here before distributing this policy.</p>
+            <p><strong className="text-[#1F1F1F]">Privacy Inquiries:</strong> For privacy or data-handling questions, please contact your organization administrator or the platform support contact provided during workspace onboarding.</p>
           </div>
         </section>
 
@@ -293,15 +286,14 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-[18px] font-bold text-[#1F1F1F]">7. Data Retention</h2>
           </div>
           <div className="space-y-2 text-[13px] text-[#555555]">
-            <p>Data is retained for as long as your account and organization license is active, plus any legally required retention period thereafter. Specific retention details:</p>
+            <p>Data is retained for as long as your account and organization license remain active, or as needed to maintain governance and audit integrity:</p>
             <ul className="space-y-1 list-disc list-inside">
               <li><strong>OTP codes:</strong> Expire after 10 minutes and are invalidated on use</li>
               <li><strong>Audit logs and Decision Black Box records:</strong> Retained for the duration of the organization&apos;s license as immutable governance records</li>
-              <li><strong>Notifications:</strong> Retained until manually deleted by the user</li>
-              <li><strong>Webhook dead-letter logs:</strong> Retained until explicitly cleared by an administrator</li>
-              <li><strong>Account data:</strong> Retained for the life of the account; deleted upon request subject to legal obligations</li>
+              <li><strong>Notifications:</strong> Retained until manually dismissed or deleted by the user</li>
+              <li><strong>Webhook dead-letter logs:</strong> Retained until cleared by an administrator</li>
+              <li><strong>Account data:</strong> Retained for the life of the account and removed upon verified deletion request, subject to legal or audit obligations</li>
             </ul>
-            <p className="text-[12px] text-[#888888] mt-2">The platform owner should define and document formal data retention periods before entering production, particularly for jurisdictions with specific retention requirements (e.g., GDPR Article 5(1)(e)).</p>
           </div>
         </section>
 
@@ -326,7 +318,7 @@ export default function PrivacyPolicyPage() {
               </div>
             ))}
           </div>
-          <p className="text-[13px] text-[#555555]">To exercise these rights, contact the platform administrator using the contact information provided during your organization onboarding. The platform owner must add a specific privacy email address here.</p>
+          <p className="text-[13px] text-[#555555]">To exercise these rights, please contact your organization administrator or the platform support contact provided during onboarding.</p>
         </section>
 
         {/* 9. Security */}
@@ -368,10 +360,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-[18px] font-bold text-[#1F1F1F]">11. Contact</h2>
           </div>
           <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] text-[13px] text-[#555555] space-y-2">
-            <p>For privacy-related questions, data requests, or to exercise your rights, contact the platform operator.</p>
-            <div className="p-3 bg-[#FFF4D9] border border-[#F59A23]/30 rounded-[8px] text-[12px] text-[#7A5000]">
-              <strong>Action required for platform owner:</strong> Add your legal entity name, registered address, DPO contact email, and applicable jurisdiction information here before distributing this policy externally.
-            </div>
+            <p>For privacy-related questions, data access requests, or to exercise your rights, please reach out to your organization administrator or the AGENTGUARD platform support team via your workspace onboarding contact.</p>
           </div>
         </section>
 

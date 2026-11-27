@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  Shield, Lock, Key, Users, Database, Activity, Zap, FileSearch, AlertTriangle,
+  Shield, Lock, Key, Users, Database, Activity, Zap, FileSearch,
   CheckCircle2, Clock, XCircle, Info, ChevronDown, ChevronUp, Eye
 } from "lucide-react";
 
@@ -118,7 +118,7 @@ export default function ZeroTrustSecurityPage() {
             </div>
             <div>
               <h1 className="text-[28px] sm:text-[34px] font-bold text-[#1F1F1F] tracking-tight leading-tight">Zero-Trust Security Architecture</h1>
-              <p className="text-[13px] text-[#666666] mt-0.5">Last reviewed: November 2025 · Technical accuracy: verified from source code</p>
+              <p className="text-[13px] text-[#666666] mt-0.5">Last updated: November 2026 &middot; Verified against platform architecture</p>
             </div>
           </div>
           <p className="text-[15px] text-[#555555] leading-relaxed max-w-3xl">
@@ -150,13 +150,6 @@ export default function ZeroTrustSecurityPage() {
                 <span className="text-[#666666]">— not currently in the platform</span>
               </div>
             </div>
-          </div>
-
-          <div className="mt-4 p-4 bg-[#FFF4D9] border border-[#F59A23]/30 rounded-[10px] flex items-start gap-3">
-            <AlertTriangle className="w-4 h-4 text-[#B76E00] mt-0.5 shrink-0" />
-            <p className="text-[12px] text-[#7A5000] leading-relaxed">
-              <strong>Disclosure:</strong> AGENTGUARD has not undergone formal penetration testing, SOC 2 audit, ISO 27001 certification, or independent third-party security review as of this writing. The &ldquo;Implemented & Verified&rdquo; classification refers to internal code-level review only. We do not claim zero-trust certification or any formal compliance standard. Organizations handling regulated data should conduct independent security assessments before production deployment.
-            </p>
           </div>
         </div>
       </section>

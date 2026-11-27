@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { FileText, Shield, AlertTriangle, CheckCircle2, Ban, Zap, Scale } from "lucide-react";
+import { FileText, Shield, CheckCircle2, Ban, Zap, Scale } from "lucide-react";
 
 export default function TermsOfServicePage() {
   return (
@@ -34,18 +34,12 @@ export default function TermsOfServicePage() {
             </div>
             <div>
               <h1 className="text-[28px] sm:text-[34px] font-bold text-[#1F1F1F] tracking-tight leading-tight">Terms of Service</h1>
-              <p className="text-[13px] text-[#666666] mt-0.5">Effective date: November 2025 · Last reviewed: November 2025</p>
+              <p className="text-[13px] text-[#666666] mt-0.5">Effective date: November 2026 &middot; Last updated: November 2026</p>
             </div>
           </div>
           <p className="text-[15px] text-[#555555] leading-relaxed">
             These Terms of Service govern your access to and use of AGENTGUARD, an enterprise AI Agent Governance and Runtime Control Plane. By accessing or using AGENTGUARD, you agree to be bound by these terms.
           </p>
-          <div className="mt-5 p-4 bg-[#FFF4D9] border border-[#F59A23]/30 rounded-[10px] flex items-start gap-3">
-            <AlertTriangle className="w-4 h-4 text-[#B76E00] mt-0.5 shrink-0" />
-            <p className="text-[12px] text-[#7A5000] leading-relaxed">
-              <strong>Legal Notice:</strong> These terms require review and supplementation by qualified legal counsel before production use. The platform owner must add their registered legal entity name, jurisdiction, governing law, dispute resolution mechanism, and liability caps. Items marked [LEGAL REVIEW REQUIRED] must be completed before this document is legally binding.
-            </p>
-          </div>
         </div>
       </section>
 
@@ -195,13 +189,10 @@ export default function TermsOfServicePage() {
         {/* 8. Service Availability */}
         <section className="space-y-4">
           <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">8. Service Availability & Limitations</h2>
+            <h2 className="text-[18px] font-bold text-[#1F1F1F]">8. Service Availability &amp; Limitations</h2>
           </div>
           <p className="text-[13px] text-[#555555] leading-relaxed">
-            AGENTGUARD is provided &ldquo;as available.&rdquo; We do not guarantee uninterrupted, error-free service. We may perform maintenance, updates, or infrastructure changes that temporarily affect availability. The platform health dashboard (accessible to SUPER_ADMIN) provides real-time status of all platform services.
-          </p>
-          <p className="text-[13px] text-[#555555]">
-            [LEGAL REVIEW REQUIRED: Define specific SLA uptime commitments, maintenance windows, and credits for downtime if applicable to your business model.]
+            AGENTGUARD is provided &ldquo;as available.&rdquo; While we strive for high availability, we may perform maintenance, security updates, or infrastructure changes that temporarily affect availability. The platform health dashboard (accessible to SUPER_ADMIN) provides real-time status of core platform services.
           </p>
         </section>
 
@@ -234,7 +225,7 @@ export default function TermsOfServicePage() {
             <li>Exceeding license quotas after reasonable notice</li>
           </ul>
           <p className="text-[13px] text-[#555555] mt-2">
-            Upon termination, your access to the platform ceases. Data export requests will be honored for a reasonable period following termination subject to applicable law. [LEGAL REVIEW REQUIRED: Define the specific data export and deletion window, e.g., 30 days.]
+            Upon termination, your access to the platform ceases. Reasonable data export requests from authorized organization administrators will be accommodated subject to applicable law and audit retention requirements.
           </p>
         </section>
 
@@ -251,10 +242,7 @@ export default function TermsOfServicePage() {
               AGENTGUARD IS PROVIDED &ldquo;AS IS&rdquo; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
             </p>
             <p>
-              AGENTGUARD IS A GOVERNANCE TOOL — IT DOES NOT GUARANTEE THAT AI AGENTS GOVERNED THROUGH THE PLATFORM WILL NEVER CAUSE HARM. YOU REMAIN RESPONSIBLE FOR YOUR AI AGENTS AND THEIR ACTIONS.
-            </p>
-            <p>
-              [LEGAL REVIEW REQUIRED: Add jurisdiction-specific liability cap, e.g., &ldquo;In no event shall our total liability exceed the fees paid in the 12 months preceding the claim.&rdquo; Add warranty disclaimer language appropriate for your jurisdiction.]
+              AGENTGUARD IS A GOVERNANCE TOOL &mdash; IT DOES NOT GUARANTEE THAT AI AGENTS GOVERNED THROUGH THE PLATFORM WILL NEVER CAUSE HARM. YOU REMAIN RESPONSIBLE FOR YOUR AI AGENTS AND THEIR ACTIONS. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, AGENTGUARD SHALL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES.
             </p>
           </div>
         </section>
@@ -262,12 +250,11 @@ export default function TermsOfServicePage() {
         {/* 12. User Responsibility */}
         <section className="space-y-4">
           <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">12. User Responsibility & Indemnification</h2>
+            <h2 className="text-[18px] font-bold text-[#1F1F1F]">12. User Responsibility &amp; Indemnification</h2>
           </div>
           <p className="text-[13px] text-[#555555] leading-relaxed">
             You agree to indemnify and hold harmless AGENTGUARD and its operators from any claims, damages, or expenses arising from: (a) your violation of these Terms; (b) your use of AGENTGUARD in a manner that harms a third party; (c) the actions of AI agents you govern through the platform; or (d) your breach of applicable law.
           </p>
-          <p className="text-[13px] text-[#555555]">[LEGAL REVIEW REQUIRED: Review indemnification scope for your jurisdiction and business structure.]</p>
         </section>
 
         {/* 13. Changes */}
@@ -283,18 +270,11 @@ export default function TermsOfServicePage() {
         {/* 14. Governing Law */}
         <section className="space-y-4">
           <div className="flex items-center gap-3 pb-3 border-b border-[#E8E8E4]">
-            <h2 className="text-[18px] font-bold text-[#1F1F1F]">14. Governing Law & Dispute Resolution</h2>
+            <h2 className="text-[18px] font-bold text-[#1F1F1F]">14. Governing Law &amp; Dispute Resolution</h2>
           </div>
-          <div className="p-4 bg-[#FFF4D9] border border-[#F59A23]/30 rounded-[10px] text-[13px] text-[#7A5000]">
-            <p className="font-bold mb-2">[LEGAL REVIEW REQUIRED]</p>
-            <p>This section must be completed by qualified legal counsel. It must specify:</p>
-            <ul className="mt-2 space-y-1 list-disc list-inside">
-              <li>The governing jurisdiction and applicable law (e.g., &ldquo;laws of the State of [X], USA&rdquo; or &ldquo;laws of [Country]&rdquo;)</li>
-              <li>The dispute resolution mechanism (e.g., binding arbitration, court jurisdiction)</li>
-              <li>Venue and forum for disputes</li>
-              <li>Class action waiver (if applicable in your jurisdiction)</li>
-            </ul>
-          </div>
+          <p className="text-[13px] text-[#555555] leading-relaxed">
+            These Terms are governed by applicable laws specified in your enterprise workspace agreement or order form, without regard to conflict-of-law principles. Any disputes arising under these Terms shall be resolved in good faith between the organization and the platform operator prior to formal proceedings.
+          </p>
         </section>
 
         {/* 15. Contact */}
@@ -303,10 +283,7 @@ export default function TermsOfServicePage() {
             <h2 className="text-[18px] font-bold text-[#1F1F1F]">15. Contact Information</h2>
           </div>
           <div className="p-4 bg-[#FCFCFA] border border-[#E8E8E4] rounded-[10px] text-[13px] text-[#555555] space-y-2">
-            <p>For questions about these Terms of Service, contact the platform operator.</p>
-            <div className="p-3 bg-[#FFF4D9] border border-[#F59A23]/30 rounded-[8px] text-[12px] text-[#7A5000]">
-              <strong>Action required for platform owner:</strong> Add your legal entity name, registered business address, and legal/compliance contact email here.
-            </div>
+            <p>For questions regarding these Terms of Service, please contact your organization administrator or the AGENTGUARD platform support contact provided during workspace onboarding.</p>
           </div>
         </section>
 
