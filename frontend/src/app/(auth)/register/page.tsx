@@ -16,8 +16,19 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState<number>(0);
+
+  const syncCooldownFromError = (errMsg: string) => {
+    const match = errMsg.match(/wait\s+(\d+)\s+seconds/i);
+    if (match) {
+      const secs = parseInt(match[1], 10);
+      if (!Number.isNaN(secs) && secs > 0) {
+        setCooldown(secs);
+      }
+    }
+  };
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -31,6 +42,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setWarning(null);
     setMessage(null);
 
     try {
@@ -43,11 +55,28 @@ export default function RegisterPage() {
         }),
       });
 
-      setMessage(resp?.message || "A 6-digit verification code has been dispatched to your email address.");
+      if (resp?.delivery_status === "ACCEPTED_FOR_SENDING") {
+        setMessage(
+          resp?.message ||
+            "Your 6-digit OTP email has been accepted for sending. Please check your inbox and spam folder."
+        );
+      } else if (resp?.delivery_status === "DELIVERY_UNCONFIRMED") {
+        setWarning(
+          resp?.message ||
+            "Email delivery could not be confirmed. If you do not receive the code, please retry after the cooldown."
+        );
+      } else {
+        setMessage(
+          resp?.message ||
+            "A 6-digit verification code has been accepted for sending. Please check your email."
+        );
+      }
       setStep("VERIFY_OTP");
       setCooldown(resp?.cooldown_seconds || 120);
     } catch (err: any) {
-      setError(err?.message || "Failed to initiate registration. Please check your details and try again.");
+      const msg = err?.message || "Email sending failed. Please check your details and try again.";
+      syncCooldownFromError(msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -57,6 +86,8 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setWarning(null);
+    setMessage(null);
 
     try {
       const tokenResp = await fetchApi("/auth/register/verify-otp", {
@@ -67,6 +98,7 @@ export default function RegisterPage() {
         }),
       });
 
+      setMessage("OTP verification succeeded! Creating your workspace and redirecting...");
       if (tokenResp?.access_token) {
         document.cookie = `agentguard_token=${tokenResp.access_token}; path=/; max-age=86400; SameSite=Lax`;
         localStorage.setItem("agentguard_token", tokenResp.access_token);
@@ -75,7 +107,8 @@ export default function RegisterPage() {
         router.push("/login?registered=true");
       }
     } catch (err: any) {
-      setError(err?.message || "Verification failed. Please check the code or request a new one.");
+      const msg = err?.message || "Verification failed. Please check the code or request a new one.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -85,6 +118,7 @@ export default function RegisterPage() {
     if (cooldown > 0 || loading) return;
     setLoading(true);
     setError(null);
+    setWarning(null);
     setMessage(null);
 
     try {
@@ -96,10 +130,14 @@ export default function RegisterPage() {
           password,
         }),
       });
-      setMessage(resp?.message || "A fresh 6-digit verification code has been dispatched.");
+      setMessage(
+        resp?.message || "A fresh 6-digit verification code has been accepted for sending."
+      );
       setCooldown(resp?.cooldown_seconds || 120);
     } catch (err: any) {
-      setError(err?.message || "Failed to resend verification code.");
+      const msg = err?.message || "Failed to resend verification code.";
+      syncCooldownFromError(msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -121,6 +159,12 @@ export default function RegisterPage() {
       {error && (
         <div className="p-3 bg-[#FDECEC] border border-[#E53935]/30 rounded-[8px] text-[12px] font-bold text-[#C62828] leading-relaxed">
           {error}
+        </div>
+      )}
+
+      {warning && (
+        <div className="p-3 bg-[#FFF4D9] border border-[#F59A23]/30 rounded-[8px] text-[12px] font-bold text-[#B76E00] leading-relaxed">
+          {warning}
         </div>
       )}
 
@@ -257,11 +301,19 @@ export default function RegisterPage() {
         </form>
       )}
 
-      <div className="pt-4 border-t border-[#E8E8E4] text-center text-[12px]">
-        <span className="text-[#666666]">Already registered? </span>
-        <Link href="/login" className="text-[#2E9D50] font-bold hover:underline">
-          Sign In
-        </Link>
+      <div className="pt-4 border-t border-[#E8E8E4] text-center text-[12px] space-y-2">
+        <div>
+          <span className="text-[#666666]">Already registered? </span>
+          <Link href="/login" className="text-[#2E9D50] font-bold hover:underline">
+            Sign In
+          </Link>
+        </div>
+        <div className="text-[11px] text-[#666666]">
+          By registering, you agree to our{" "}
+          <Link href="/terms" className="text-[#2E9D50] hover:underline">Terms of Service</Link>
+          {" "}and{" "}
+          <Link href="/privacy" className="text-[#2E9D50] hover:underline">Privacy Policy</Link>.
+        </div>
       </div>
     </div>
   );

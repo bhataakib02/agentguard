@@ -753,18 +753,18 @@ export default function PublicLandingPage() {
             {/* Col 4 Legal */}
             <div className="space-y-2">
               <span className="font-bold text-[#1F1F1F] block mb-2">Legal & Security</span>
-              <span className="block text-[#666666]">Privacy Policy</span>
-              <span className="block text-[#666666]">Terms of Service</span>
-              <span className="block text-[#666666]">Zero-Trust Security</span>
+              <Link href="/privacy" className="block text-[#666666] hover:text-[#1F1F1F] transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="block text-[#666666] hover:text-[#1F1F1F] transition-colors">Terms of Service</Link>
+              <Link href="/security" className="block text-[#666666] hover:text-[#1F1F1F] transition-colors">Zero-Trust Security</Link>
             </div>
           </div>
 
           <div className="pt-8 border-t border-[#E8E8E4] flex flex-col sm:flex-row items-center justify-between text-[12px] text-[#666666] gap-4">
             <span>© {new Date().getFullYear()} AGENTGUARD. All rights reserved.</span>
             <div className="flex items-center gap-6">
-              <span>Privacy</span>
-              <span>Terms</span>
-              <span>Security</span>
+              <Link href="/privacy" className="hover:text-[#1F1F1F] transition-colors">Privacy</Link>
+              <Link href="/terms" className="hover:text-[#1F1F1F] transition-colors">Terms</Link>
+              <Link href="/security" className="hover:text-[#1F1F1F] transition-colors">Security</Link>
             </div>
           </div>
         </div>

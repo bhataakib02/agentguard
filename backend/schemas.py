@@ -24,6 +24,9 @@ class OtpActionResponse(BaseModel):
     message: str
     cooldown_seconds: Optional[int] = None
     reset_ticket: Optional[str] = None
+    delivery_status: Optional[str] = None
+    correlation_id: Optional[str] = None
+    provider_message_id: Optional[str] = None
 
 class RegisterOtpRequest(BaseModel):
     full_name: str

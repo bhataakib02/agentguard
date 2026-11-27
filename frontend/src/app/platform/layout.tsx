@@ -542,6 +542,15 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                         })
                       )}
                     </div>
+                    <div className="pt-2 border-t border-[#1E2638] text-center">
+                      <Link
+                        href="/notifications"
+                        onClick={() => setShowNotifDropdown(false)}
+                        className="text-[11px] font-bold text-[#2E9D50] hover:underline"
+                      >
+                        View All Notifications &rarr;
+                      </Link>
+                    </div>
                   </div>
                 )}
               </div>

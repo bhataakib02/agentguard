@@ -1,4 +1,5 @@
 # type: ignore
+import uuid
 from typing import Optional, List, Dict, Any
 import logging
 from pydantic import BaseModel
@@ -31,6 +32,111 @@ def get_client_ip(request: Request) -> str:
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "127.0.0.1"
+
+
+def _dispatch_otp_and_build_response(
+    db: Session,
+    *,
+    clean_email: str,
+    raw_code: str,
+    purpose: str,
+    ip_addr: str,
+    event_type: str,
+    action: str,
+    actor_type: str = "SYSTEM",
+    actor_id: str = "anonymous",
+    org_id: Optional[str] = None,
+    success_message: str = "A 6-digit verification code has been accepted for email delivery. Please check your inbox.",
+) -> schemas.OtpActionResponse:
+    """
+    Sends an OTP email synchronously through the configured provider with correlation tracking,
+    records a sanitized AuditLog entry, and raises a clear HTTP error if delivery fails—without
+    consuming or invalidating the issued OTP challenge.
+    """
+    correlation_id = uuid.uuid4().hex[:12]
+    email_result = email_service.send_otp_email(
+        clean_email,
+        raw_code,
+        purpose,
+        correlation_id=correlation_id,
+    )
+
+    accepted = bool(email_result.get("accepted"))
+    stage = email_result.get("delivery_stage") or ("ACCEPTED_BY_PROVIDER" if accepted else "REJECTED_BY_PROVIDER")
+    error_code = email_result.get("error_code")
+
+    audit = models.AuditLog(
+        org_id=org_id,
+        event_type=event_type,
+        actor_type=actor_type,
+        actor_id=actor_id,
+        action=action,
+        resource="users",
+        result=stage if accepted else (error_code or stage),
+        metadata_json={
+            "email": clean_email,
+            "ip": ip_addr,
+            "correlation_id": correlation_id,
+            "provider": email_result.get("provider"),
+            "delivery_stage": stage,
+            "provider_message_id": email_result.get("id"),
+            "http_status": email_result.get("http_status"),
+            "error_code": error_code,
+        },
+    )
+    db.add(audit)
+    db.commit()
+
+    if accepted:
+        return schemas.OtpActionResponse(
+            status="SUCCESS",
+            message=success_message,
+            cooldown_seconds=RESEND_COOLDOWN_SECONDS,
+            delivery_status="ACCEPTED_FOR_SENDING",
+            correlation_id=correlation_id,
+            provider_message_id=email_result.get("id"),
+        )
+
+    if email_result.get("status") == "EMAIL_PROVIDER_NOT_CONFIGURED":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Email provider configuration is missing. Verification email could not be sent (ref: {correlation_id}).",
+        )
+
+    if stage == "TRANSIENT_FAILURE":
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Email delivery could not be confirmed due to a temporary mail service or network error. "
+                f"Your verification code remains valid; please wait for the cooldown or try resending (ref: {correlation_id})."
+            ),
+        )
+
+    if error_code in ("RECIPIENT_RESTRICTED", "UNVERIFIED_SENDER_DOMAIN"):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Email sending failed: Sender domain is not verified for external recipients "
+                f"(ref: {correlation_id})."
+            ),
+        )
+
+    if error_code == "INVALID_API_KEY":
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Email sending failed: Email provider API key was rejected (ref: {correlation_id}).",
+        )
+
+    if error_code == "INVALID_SENDER":
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Email sending failed: Configured sender email address is invalid (ref: {correlation_id}).",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"Email sending failed. Please verify your email address or try again later (ref: {correlation_id}).",
+    )
 
 
 # ============================================================================
@@ -132,26 +238,16 @@ def register_request_otp(
         metadata_json=challenge_meta
     )
 
-    # 6. Send OTP asynchronously via background task (Resend, SMTP, or MOCK)
-    background_tasks.add_task(email_service.send_otp_email, clean_email, raw_code, PURPOSE_REGISTRATION)
-
-    # 7. Audit log event
-    audit = models.AuditLog(
+    # 6. Dispatch OTP email synchronously with delivery verification and audit logging
+    return _dispatch_otp_and_build_response(
+        db,
+        clean_email=clean_email,
+        raw_code=raw_code,
+        purpose=PURPOSE_REGISTRATION,
+        ip_addr=ip_addr,
         event_type="USER_REGISTER_OTP_REQUESTED",
-        actor_type="SYSTEM",
-        actor_id="anonymous",
         action="REQUEST_REGISTRATION_OTP",
-        resource="users",
-        result="DISPATCHED",
-        metadata_json={"email": clean_email, "ip": ip_addr}
-    )
-    db.add(audit)
-    db.commit()
-
-    return schemas.OtpActionResponse(
-        status="SUCCESS",
-        message="If this email address is eligible, a 6-digit verification code has been sent.",
-        cooldown_seconds=RESEND_COOLDOWN_SECONDS
+        success_message="A 6-digit verification code has been accepted for email delivery. Please check your inbox.",
     )
 
 
@@ -373,27 +469,19 @@ def login_request_otp(
         ip_address=ip_addr
     )
 
-    # 5. Dispatch email asynchronously via background task
-    background_tasks.add_task(email_service.send_otp_email, clean_email, raw_code, PURPOSE_PASSWORDLESS_LOGIN)
-
-    # 6. Audit log
-    audit = models.AuditLog(
-        org_id=user.org_id,
+    # 5. Dispatch OTP email synchronously with delivery verification and audit logging
+    return _dispatch_otp_and_build_response(
+        db,
+        clean_email=clean_email,
+        raw_code=raw_code,
+        purpose=PURPOSE_PASSWORDLESS_LOGIN,
+        ip_addr=ip_addr,
         event_type="USER_LOGIN_OTP_REQUESTED",
+        action="REQUEST_LOGIN_OTP",
         actor_type="USER",
         actor_id=str(user.id),
-        action="REQUEST_LOGIN_OTP",
-        resource="users",
-        result="DISPATCHED",
-        metadata_json={"email": clean_email, "ip": ip_addr}
-    )
-    db.add(audit)
-    db.commit()
-
-    return schemas.OtpActionResponse(
-        status="SUCCESS",
-        message="If the account exists and is eligible, a 6-digit verification code has been sent.",
-        cooldown_seconds=RESEND_COOLDOWN_SECONDS
+        org_id=str(user.org_id) if user.org_id else None,
+        success_message="A 6-digit verification code has been accepted for email delivery. Please check your inbox.",
     )
 
 
@@ -555,27 +643,19 @@ def forgot_password_request_otp(
         ip_address=ip_addr
     )
 
-    # 5. Dispatch email asynchronously via background task
-    background_tasks.add_task(email_service.send_otp_email, clean_email, raw_code, PURPOSE_PASSWORD_RESET)
-
-    # 6. Audit Log
-    audit = models.AuditLog(
-        org_id=user.org_id,
+    # 5. Dispatch OTP email synchronously with delivery verification and audit logging
+    return _dispatch_otp_and_build_response(
+        db,
+        clean_email=clean_email,
+        raw_code=raw_code,
+        purpose=PURPOSE_PASSWORD_RESET,
+        ip_addr=ip_addr,
         event_type="PASSWORD_RESET_OTP_REQUESTED",
+        action="REQUEST_PASSWORD_RESET_OTP",
         actor_type="USER",
         actor_id=str(user.id),
-        action="REQUEST_PASSWORD_RESET_OTP",
-        resource="users",
-        result="DISPATCHED",
-        metadata_json={"email": clean_email, "ip": ip_addr}
-    )
-    db.add(audit)
-    db.commit()
-
-    return schemas.OtpActionResponse(
-        status="SUCCESS",
-        message="If the account exists and is eligible, a 6-digit recovery code has been sent.",
-        cooldown_seconds=RESEND_COOLDOWN_SECONDS
+        org_id=str(user.org_id) if user.org_id else None,
+        success_message="A 6-digit recovery code has been accepted for email delivery. Please check your inbox.",
     )
 
 

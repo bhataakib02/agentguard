@@ -355,11 +355,20 @@ export default function LoginPage() {
         </form>
       )}
 
-      <div className="pt-4 border-t border-[#E8E8E4] text-center text-[12px]">
-        <span className="text-[#666666]">Don&apos;t have an account? </span>
-        <Link href="/register" className="text-[#2E9D50] font-bold hover:underline">
-          Register New Account
-        </Link>
+      <div className="pt-4 border-t border-[#E8E8E4] text-center text-[12px] space-y-2">
+        <div>
+          <span className="text-[#666666]">Don&apos;t have an account? </span>
+          <Link href="/register" className="text-[#2E9D50] font-bold hover:underline">
+            Register New Account
+          </Link>
+        </div>
+        <div className="text-[11px] text-[#666666] flex items-center justify-center gap-3">
+          <Link href="/privacy" className="hover:text-[#1F1F1F] hover:underline">Privacy Policy</Link>
+          <span>·</span>
+          <Link href="/terms" className="hover:text-[#1F1F1F] hover:underline">Terms of Service</Link>
+          <span>·</span>
+          <Link href="/security" className="hover:text-[#1F1F1F] hover:underline">Security</Link>
+        </div>
       </div>
     </div>
   );
