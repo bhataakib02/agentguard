@@ -812,6 +812,16 @@ This code is valid for exactly 10 minutes and can only be used once.
 
 Security notice: If you did not initiate this request, please disregard this email. Never share your passcode.
 """
+        digit_tiles = "".join(
+            f'<td style="padding: 0 4px;">'
+            f'<div style="width: 42px; height: 52px; line-height: 52px; text-align: center; '
+            f'background-color: #FFFFFF; border: 1.5px solid #B7E4C7; border-radius: 10px; '
+            f'font-family: \'SFMono-Regular\', Consolas, \'Liberation Mono\', Menlo, monospace; '
+            f'font-size: 26px; font-weight: 800; color: #1F1F1F; '
+            f'box-shadow: 0 2px 6px rgba(46, 157, 80, 0.08);">{ch}</div>'
+            f'</td>'
+            for ch in str(otp_code).strip()
+        )
         body_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -819,33 +829,29 @@ Security notice: If you did not initiate this request, please disregard this ema
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{title}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #F4F5F2; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1F1F1F; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F4F5F2; padding: 32px 16px;">
+<body style="margin: 0; padding: 0; background-color: #EEF0EC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1F1F1F; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #EEF0EC; padding: 36px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 540px; background-color: #FFFFFF; border: 1px solid #E8E8E4; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 16px rgba(31, 31, 31, 0.04);">
-          <!-- Top Accent Bar -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 560px; background-color: #FFFFFF; border: 1px solid #E2E4DF; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(15, 23, 20, 0.08);">
+          <!-- Dark Obsidian-Emerald Brand Header -->
           <tr>
-            <td style="height: 4px; background: linear-gradient(90deg, #237A3C 0%, #2E9D50 100%); font-size: 0; line-height: 0;">&nbsp;</td>
-          </tr>
-          <!-- Header -->
-          <tr>
-            <td style="padding: 28px 32px 20px 32px; border-bottom: 1px solid #E8E8E4; background-color: #FCFCFA;">
+            <td style="padding: 26px 32px; background: linear-gradient(135deg, #0E1713 0%, #162820 100%); border-bottom: 3px solid #2E9D50;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td align="left" style="vertical-align: middle;">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0">
                       <tr>
-                        <td style="vertical-align: middle; padding-right: 12px;">
-                          <div style="width: 40px; height: 40px; border-radius: 10px; background-color: #EAF7EE; border: 1px solid #B7E4C7; text-align: center; line-height: 40px;">
-                            <img src="https://agentguard-beta-ten.vercel.app/logo.png" alt="AGENTGUARD Logo" width="28" height="28" style="display: inline-block; vertical-align: middle; width: 28px; height: 28px; object-fit: contain; border: 0;" />
+                        <td style="vertical-align: middle; padding-right: 14px;">
+                          <div style="width: 44px; height: 44px; border-radius: 11px; background-color: #173B25; border: 1px solid #2E9D50; text-align: center; line-height: 44px;">
+                            <img src="https://agentguard-beta-ten.vercel.app/logo.png" alt="AGENTGUARD Logo" width="30" height="30" style="display: inline-block; vertical-align: middle; width: 30px; height: 30px; object-fit: contain; border: 0;" />
                           </div>
                         </td>
                         <td style="vertical-align: middle;">
-                          <div style="font-size: 18px; font-weight: 800; letter-spacing: -0.02em; color: #1F1F1F; line-height: 1.2;">
-                            AGENT<span style="color: #2E9D50;">GUARD</span>
+                          <div style="font-size: 19px; font-weight: 800; letter-spacing: 0.01em; color: #FFFFFF; line-height: 1.2;">
+                            AGENT<span style="color: #4ADE80;">GUARD</span>
                           </div>
-                          <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #237A3C; margin-top: 3px;">
+                          <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #94B8A3; margin-top: 4px;">
                             Runtime Control Plane
                           </div>
                         </td>
@@ -853,64 +859,86 @@ Security notice: If you did not initiate this request, please disregard this ema
                     </table>
                   </td>
                   <td align="right" style="vertical-align: middle;">
-                    <span style="display: inline-block; padding: 4px 10px; background-color: #EAF7EE; border: 1px solid #B7E4C7; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #237A3C;">
-                      Security Verification
+                    <span style="display: inline-block; padding: 5px 11px; background-color: rgba(46, 157, 80, 0.18); border: 1px solid rgba(74, 222, 128, 0.4); border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #4ADE80;">
+                      Zero-Trust Auth
                     </span>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
-          <!-- Body -->
+
+          <!-- Main Body -->
           <tr>
-            <td style="padding: 32px;">
-              <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #1F1F1F; line-height: 1.3;">
+            <td style="padding: 34px 32px 28px 32px;">
+              <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #2E9D50; margin-bottom: 8px;">
+                Identity Verification
+              </div>
+              <h1 style="margin: 0 0 12px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: #111827; line-height: 1.25;">
                 {title}
               </h1>
-              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #555555;">
-                Use the 6-digit one-time passcode below to {action_text}. Enter this code on the verification screen to continue.
+              <p style="margin: 0 0 26px 0; font-size: 14px; line-height: 1.65; color: #4B5563;">
+                Enter the 6-digit verification passcode below to {action_text}. For your protection, this code is cryptographically bound to your request.
               </p>
 
-              <!-- OTP Box -->
+              <!-- Segmented OTP Container -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0 0 24px 0;">
                 <tr>
-                  <td align="center" style="background-color: #F7FBF8; border: 1px solid #B7E4C7; border-radius: 12px; padding: 22px 16px;">
-                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #237A3C; margin-bottom: 10px;">
-                      One-Time Verification Code
+                  <td align="center" style="background-color: #F4FBF6; border: 1px solid #C6ECD3; border-radius: 14px; padding: 24px 12px;">
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #237A3C; margin-bottom: 14px;">
+                      One-Time Passcode
                     </div>
-                    <div style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 34px; font-weight: 800; letter-spacing: 10px; color: #1F1F1F; line-height: 1.2; padding-left: 10px;">
-                      {otp_code}
-                    </div>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Expiry & Single-Use Callout -->
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0 0 24px 0;">
-                <tr>
-                  <td style="background-color: #FCFCFA; border: 1px solid #E8E8E4; border-radius: 10px; padding: 14px 16px;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
                       <tr>
-                        <td style="font-size: 12px; line-height: 1.5; color: #555555;">
-                          <strong style="color: #1F1F1F;">Expires in 10 minutes</strong> &middot; Valid for a single use only.
-                        </td>
+                        {digit_tiles}
                       </tr>
                     </table>
                   </td>
                 </tr>
               </table>
 
-              <!-- Security Notice -->
-              <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #777777; border-top: 1px solid #E8E8E4; padding-top: 20px;">
-                <strong style="color: #444444;">Security Notice:</strong> If you did not request this verification code, you can safely ignore this email. Never share your passcode with anyone — AGENTGUARD staff will never ask for it.
-              </p>
+              <!-- 2-Column Metadata Cards -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 0 0 24px 0;">
+                <tr>
+                  <td width="49%" style="background-color: #FCFCFA; border: 1px solid #E8E8E4; border-radius: 10px; padding: 12px 14px; vertical-align: top;">
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6B7280; margin-bottom: 3px;">
+                      Expires In
+                    </div>
+                    <div style="font-size: 13px; font-weight: 700; color: #1F1F1F;">
+                      10 Minutes
+                    </div>
+                  </td>
+                  <td width="2%">&nbsp;</td>
+                  <td width="49%" style="background-color: #FCFCFA; border: 1px solid #E8E8E4; border-radius: 10px; padding: 12px 14px; vertical-align: top;">
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6B7280; margin-bottom: 3px;">
+                      Policy
+                    </div>
+                    <div style="font-size: 13px; font-weight: 700; color: #1F1F1F;">
+                      Single-Use Only
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Security Callout -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="background-color: #F9FAFB; border-left: 3px solid #2E9D50; border-radius: 0 8px 8px 0; padding: 12px 16px; font-size: 12px; line-height: 1.6; color: #6B7280;">
+                    <strong style="color: #1F1F1F;">Security Notice:</strong> If you did not initiate this request, you can safely ignore this email. Never share your verification code &mdash; AGENTGUARD will never ask for it.
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
+
           <!-- Footer -->
           <tr>
-            <td style="padding: 16px 32px; background-color: #FCFCFA; border-top: 1px solid #E8E8E4; text-align: center;">
-              <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.5;">
-                AGENTGUARD &middot; Enterprise AI Agent Governance &amp; Runtime Control Plane
+            <td style="padding: 18px 32px; background-color: #FCFCFA; border-top: 1px solid #E8E8E4; text-align: center;">
+              <p style="margin: 0 0 4px 0; font-size: 11px; font-weight: 700; color: #4B5563;">
+                AGENTGUARD &middot; Enterprise AI Agent Governance
+              </p>
+              <p style="margin: 0; font-size: 10px; color: #9CA3AF;">
+                Automated security message &middot; Please do not reply directly to this email.
               </p>
             </td>
           </tr>
