@@ -142,6 +142,23 @@ class Settings:
         else:
             self.CELERY_TASK_ALWAYS_EAGER = not bool(self.REDIS_URL)
 
+        # -------------------------------------------------------------------------
+        # AG-SEC-02: Global Distributed Rate Limiting Configuration
+        # -------------------------------------------------------------------------
+        self.RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "True").lower() in ("true", "1")
+        self.RATE_LIMIT_REDIS_URL = os.getenv("RATE_LIMIT_REDIS_URL", "").strip() or self.REDIS_URL
+        self.RATE_LIMIT_PUBLIC_LIMIT = int(os.getenv("RATE_LIMIT_PUBLIC_LIMIT", "60"))
+        self.RATE_LIMIT_AUTH_LIMIT = int(os.getenv("RATE_LIMIT_AUTH_LIMIT", "5"))
+        self.RATE_LIMIT_API_KEY_LIMIT = int(os.getenv("RATE_LIMIT_API_KEY_LIMIT", "1200"))
+        self.RATE_LIMIT_AI_USER_LIMIT = int(os.getenv("RATE_LIMIT_AI_USER_LIMIT", "20"))
+        self.RATE_LIMIT_AI_TENANT_LIMIT = int(os.getenv("RATE_LIMIT_AI_TENANT_LIMIT", "100"))
+        self.RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+        self.RATE_LIMIT_STORAGE_BACKEND = os.getenv("RATE_LIMIT_STORAGE_BACKEND", "AUTO").upper().strip()  # AUTO, REDIS, MEMORY
+        self.RATE_LIMIT_TRUSTED_PROXIES = os.getenv(
+            "RATE_LIMIT_TRUSTED_PROXIES",
+            "127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+        )
+
         # Email / Brevo / Resend / SMTP Delivery
         self.EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "NONE").upper()  # NONE, BREVO, RESEND, SMTP, MOCK
         self.BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()

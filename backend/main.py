@@ -83,6 +83,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# AG-SEC-02: Globally distributed, atomic rate limiting across all API endpoints
+from core.rate_limiter import RateLimitingMiddleware
+app.add_middleware(RateLimitingMiddleware)
+
 from fastapi.responses import JSONResponse
 
 @app.exception_handler(Exception)
@@ -116,6 +120,7 @@ for r in DOMAIN_ROUTERS:
 @app.get("/")
 @app.get("/health")
 @app.get(f"{settings.API_V1_STR}/health")
+@app.get("/api/v1/health")
 def root():
     return {
         "platform": settings.PROJECT_NAME,
@@ -129,6 +134,7 @@ def root():
 @app.get("/health/live")
 @app.get("/health/liveness")
 @app.get(f"{settings.API_V1_STR}/health/live")
+@app.get("/api/v1/health/live")
 def health_liveness():
     """
     Liveness probe: verifies that the FastAPI process is alive and responsive.
@@ -143,6 +149,7 @@ def health_liveness():
 @app.get("/health/ready")
 @app.get("/health/readiness")
 @app.get(f"{settings.API_V1_STR}/health/ready")
+@app.get("/api/v1/health/ready")
 def health_readiness(response: Response, db: Session = Depends(get_db)):
     """
     Readiness probe: verifies that the service can connect to the database and serve traffic.
