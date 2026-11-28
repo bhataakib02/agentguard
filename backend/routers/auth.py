@@ -387,7 +387,12 @@ def register_verify_otp(
     otp_service.consume_challenge(db, challenge, scrub=True)
 
     # 6. Session Creation
-    token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
+    token = security.create_access_token(
+        str(user.id),
+        email=str(user.email),
+        role=str(user.role),
+        additional_claims={"org_id": str(user.org_id)} if getattr(user, "org_id", None) else None
+    )
     session = models.Session(
         user_id=user.id,
         token=token,
@@ -559,7 +564,12 @@ def login_verify_otp(
     db.commit()
 
     # 4. Create Session
-    session_token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
+    session_token = security.create_access_token(
+        str(user.id),
+        email=str(user.email),
+        role=str(user.role),
+        additional_claims={"org_id": str(user.org_id)} if getattr(user, "org_id", None) else None
+    )
     session = models.Session(
         user_id=user.id,
         token=session_token,
@@ -928,7 +938,12 @@ def register_organization(req: schemas.RegisterRequest, db: Session = Depends(ge
     db.refresh(user)
 
     # 5. Session & Access Token Creation
-    token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
+    token = security.create_access_token(
+        str(user.id),
+        email=str(user.email),
+        role=str(user.role),
+        additional_claims={"org_id": str(user.org_id)} if getattr(user, "org_id", None) else None
+    )
     session = models.Session(
         user_id=user.id,
         token=token,
@@ -1053,7 +1068,12 @@ def login(
     setattr(user, "last_login_at", security.utcnow())
     db.commit()
 
-    session_token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
+    session_token = security.create_access_token(
+        str(user.id),
+        email=str(user.email),
+        role=str(user.role),
+        additional_claims={"org_id": str(user.org_id)} if getattr(user, "org_id", None) else None
+    )
     session = models.Session(
         user_id=user.id,
         token=session_token,
@@ -1121,7 +1141,12 @@ def local_login(req: schemas.LocalLoginRequest, db: Session = Depends(get_db)):
     setattr(user, "last_login_at", security.utcnow())
     db.commit()
 
-    token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
+    token = security.create_access_token(
+        str(user.id),
+        email=str(user.email),
+        role=str(user.role),
+        additional_claims={"org_id": str(user.org_id)} if getattr(user, "org_id", None) else None
+    )
     session = models.Session(
         user_id=user.id,
         token=token,
@@ -1339,7 +1364,12 @@ def accept_invitation(
     db.refresh(user)
 
     # Issue access token
-    access_token = security.create_access_token(str(user.id), email=str(user.email), role=str(user.role))
+    access_token = security.create_access_token(
+        str(user.id),
+        email=str(user.email),
+        role=str(user.role),
+        additional_claims={"org_id": str(user.org_id)} if getattr(user, "org_id", None) else None
+    )
     session = models.Session(
         user_id=user.id,
         token=access_token,

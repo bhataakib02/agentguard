@@ -73,7 +73,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# AG-SEC-02: Globally distributed, atomic rate limiting across all API endpoints
+from core.rate_limiter import RateLimitingMiddleware
+app.add_middleware(RateLimitingMiddleware)
+
 # Enable CORS for Next.js frontend with restricted trusted origins
+# Mounted AFTER RateLimitingMiddleware so CORSMiddleware is outermost, ensuring
+# CORS headers are properly attached to all responses including 429 and 503 errors
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -82,10 +88,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-
-# AG-SEC-02: Globally distributed, atomic rate limiting across all API endpoints
-from core.rate_limiter import RateLimitingMiddleware
-app.add_middleware(RateLimitingMiddleware)
 
 from fastapi.responses import JSONResponse
 

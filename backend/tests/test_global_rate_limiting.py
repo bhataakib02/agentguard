@@ -487,3 +487,221 @@ class TestRouteExemptions:
             with client.websocket_connect("/ws"):
                 pass
         assert excinfo.value.code == 1008
+
+
+# =============================================================================
+# 8. Adversarial Remediation Verification (ADV-01 through ADV-07)
+# =============================================================================
+
+class TestAdversarialRemediations:
+    def test_21_cors_headers_preserved_on_rate_limit_429(self):
+        """ADV-01: CORS headers (Access-Control-Allow-Origin) are attached to HTTP 429 responses for allowed origins."""
+        allowed_origin = "http://localhost:3000"
+        disallowed_origin = "http://evil-attacker.com"
+        rate_limiter._memory_engine.clear()
+
+        # Send requests to exceed public limit (e.g., 60 requests with x-test-rate-limit)
+        headers = {
+            "Origin": allowed_origin,
+            "x-test-rate-limit": "1",
+            "X-Forwarded-For": "198.51.100.99"
+        }
+
+        # Exhaust limit
+        for _ in range(60):
+            res = client.get("/api/v1/agents", headers=headers)
+
+        # 61st request triggers HTTP 429
+        blocked_res = client.get("/api/v1/agents", headers=headers)
+        assert blocked_res.status_code == 429
+        assert "access-control-allow-origin" in blocked_res.headers
+        assert blocked_res.headers["access-control-allow-origin"] == allowed_origin
+
+        # Verify disallowed origin does NOT get access-control-allow-origin
+        disallowed_headers = {
+            "Origin": disallowed_origin,
+            "x-test-rate-limit": "1",
+            "X-Forwarded-For": "198.51.100.99"
+        }
+        disallowed_res = client.get("/api/v1/agents", headers=disallowed_headers)
+        assert disallowed_res.status_code == 429
+        assert "access-control-allow-origin" not in disallowed_res.headers
+
+    def test_22_ip_spoofing_cf_connecting_ip_and_x_real_ip_rejected(self):
+        """ADV-02: CF-Connecting-IP and X-Real-IP cannot spoof IP when direct host is Render internal proxy."""
+        # Simulate request coming from internal proxy (10.0.0.5) with spoofed CF-Connecting-IP and X-Real-IP
+        req = MagicMock(spec=Request)
+        req.client = MagicMock()
+        req.client.host = "10.0.0.5"  # Render internal router in 10.0.0.0/8
+        req.headers = {
+            "cf-connecting-ip": "1.1.1.1",
+            "x-real-ip": "2.2.2.2",
+            "x-forwarded-for": "203.0.113.195, 10.0.0.5"
+        }
+
+        with patch.object(settings, "RATE_LIMIT_TRUST_CLOUDFLARE_HEADERS", False):
+            resolved_ip = get_trusted_client_ip(req)
+            # Must NOT trust spoofed cf-connecting-ip (1.1.1.1) or x-real-ip (2.2.2.2)
+            # Must resolve to the true client IP from X-Forwarded-For: 203.0.113.195
+            assert resolved_ip == "203.0.113.195"
+
+    def test_23_ipv4_mapped_ipv6_normalized(self):
+        """ADV-02: IPv4-mapped IPv6 addresses in X-Forwarded-For are correctly normalized and evaluated."""
+        req = MagicMock(spec=Request)
+        req.client = MagicMock()
+        req.client.host = "10.0.0.5"
+        req.headers = {
+            "x-forwarded-for": "::ffff:203.0.113.77, 10.0.0.5"
+        }
+        resolved_ip = get_trusted_client_ip(req)
+        assert resolved_ip == "203.0.113.77"
+
+    def test_24_unified_login_scope_prevents_dual_endpoint_brute_force(self):
+        """ADV-04: /auth/login and /auth/local-login share identical scope to prevent 2x brute forcing."""
+        rate_limiter._memory_engine.clear()
+        ip_header = {"X-Forwarded-For": "198.51.100.123", "x-test-rate-limit": "1"}
+
+        # Perform 3 attempts on /api/v1/auth/login
+        for _ in range(3):
+            res = client.post("/api/v1/auth/login", json={"email": "wrong@example.com", "password": "wrong"}, headers=ip_header)
+            assert res.status_code != 429
+
+        # Perform 2 attempts on /api/v1/auth/local-login
+        for _ in range(2):
+            res = client.post("/api/v1/auth/local-login", json={"email": "wrong@example.com", "password": "wrong"}, headers=ip_header)
+            assert res.status_code != 429
+
+        # Total attempts = 5 (limit reached for auth_login scope).
+        # 6th attempt on EITHER endpoint must be blocked with HTTP 429!
+        res_blocked_1 = client.post("/api/v1/auth/login", json={"email": "wrong@example.com", "password": "wrong"}, headers=ip_header)
+        assert res_blocked_1.status_code == 429
+        assert res_blocked_1.headers.get("X-RateLimit-Remaining") == "0"
+
+        res_blocked_2 = client.post("/api/v1/auth/local-login", json={"email": "wrong@example.com", "password": "wrong"}, headers=ip_header)
+        assert res_blocked_2.status_code == 429
+
+    def test_25_tenant_wide_ai_quota_enforced_across_multiple_users(self):
+        """ADV-03: Two different users in the same organization share the 100 req/min AI tenant quota."""
+        limiter = DistributedRateLimiter(storage_backend="MEMORY")
+        shared_org = "org-enterprise-corp-01"
+        user_1_id = "user-alice-01"
+        user_2_id = "user-bob-02"
+
+        # Construct requests with JWTs containing org_id
+        from jose import jwt
+        token_1 = jwt.encode(
+            {"sub": user_1_id, "org_id": shared_org, "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)},
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM
+        )
+        token_2 = jwt.encode(
+            {"sub": user_2_id, "org_id": shared_org, "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)},
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM
+        )
+
+        # Mock request 1
+        req1 = MagicMock(spec=Request)
+        req1.url = MagicMock()
+        req1.url.path = "/api/v1/ai/chat"
+        req1.client = MagicMock()
+        req1.client.host = "192.168.1.10"
+        req1.headers = {"authorization": f"Bearer {token_1}"}
+
+        # Mock request 2
+        req2 = MagicMock(spec=Request)
+        req2.url = MagicMock()
+        req2.url.path = "/api/v1/ai/chat"
+        req2.client = MagicMock()
+        req2.client.host = "192.168.1.20"
+        req2.headers = {"authorization": f"Bearer {token_2}"}
+
+        # User 1 consumes 20 AI requests (user limit is 20)
+        for _ in range(20):
+            d1 = limiter.evaluate_request(req1)
+            assert d1.allowed is True
+
+        # User 1's 21st request is blocked by AI_USER limit
+        d1_blocked = limiter.evaluate_request(req1)
+        assert d1_blocked.allowed is False
+        assert d1_blocked.scope == "AI_USER"
+
+        # User 2 now sends requests under the SAME org quota
+        # User 2 has their own user quota (20), but tenant quota has already consumed 20 of 100
+        d2 = limiter.evaluate_request(req2)
+        assert d2.allowed is True
+        # Remaining tenant quota should be 100 - 20 - 1 = 79
+        assert d2.remaining == 19  # min(user remaining (19), tenant remaining (79))
+
+    def test_26_machine_auth_rate_limiting_and_fail_closed(self):
+        """ADV-05: /runtime/auth enforces RATE_LIMIT_MACHINE_AUTH_LIMIT (30 req/min) and fails closed on Redis outage."""
+        limiter = DistributedRateLimiter(storage_backend="MEMORY")
+        req = MagicMock(spec=Request)
+        req.url = MagicMock()
+        req.url.path = "/api/v1/runtime/auth"
+        req.client = MagicMock()
+        req.client.host = "192.168.1.50"
+        req.headers = {"x-test-rate-limit": "1"}
+
+        # Consume 30 requests
+        for _ in range(30):
+            d = limiter.evaluate_request(req)
+            assert d.allowed is True
+            assert d.scope == "MACHINE_AUTH"
+
+        # 31st request blocked
+        d_blocked = limiter.evaluate_request(req)
+        assert d_blocked.allowed is False
+        assert d_blocked.scope == "MACHINE_AUTH"
+        assert d_blocked.remaining == 0
+
+        # Test fail-closed on Redis outage
+        broken_redis = MagicMock()
+        broken_redis.eval.side_effect = Exception("Redis cluster partition")
+        broken_limiter = DistributedRateLimiter(redis_client=broken_redis, storage_backend="REDIS")
+        d_fail_closed = broken_limiter.evaluate_request(req)
+        assert d_fail_closed.allowed is False
+        assert d_fail_closed.is_service_unavailable is True
+        assert d_fail_closed.scope == "MACHINE_AUTH"
+
+    def test_27_redis_cluster_hash_tag_compatibility(self):
+        """ADV-06: Generated Redis keys use hash tag syntax {..} ensuring cluster slot colocation for key and key:seq."""
+        key = rate_limiter._make_key("ip", "203.0.113.1", "auth_login", 60)
+        assert key.startswith("{rl:ip:")
+        assert key.endswith(":auth_login:60}")
+
+        # In Redis Cluster, string inside {...} determines the slot:
+        hash_tag_1 = key[key.find("{") + 1 : key.find("}")]
+        key_seq = key + ":seq"
+        hash_tag_2 = key_seq[key_seq.find("{") + 1 : key_seq.find("}")]
+        assert hash_tag_1 == hash_tag_2
+        assert len(hash_tag_1) > 0
+
+    def test_28_supabase_jwt_verification_and_org_extraction(self):
+        """ADV-07: Valid Supabase Auth JWT is decoded using SUPABASE_JWT_SECRET and classified as JWT."""
+        from jose import jwt
+        supabase_secret = "test-supabase-jwt-secret-audit-key-32ch"
+        sub_id = "supabase-user-uuid-999"
+        expected_org = "supabase-org-uuid-888"
+
+        token = jwt.encode(
+            {
+                "sub": sub_id,
+                "aud": "authenticated",
+                "role": "authenticated",
+                "app_metadata": {"org_id": expected_org},
+                "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+            },
+            supabase_secret,
+            algorithm="HS256"
+        )
+
+        req = MagicMock(spec=Request)
+        req.headers = {"authorization": f"Bearer {token}"}
+
+        with patch.object(settings, "SUPABASE_JWT_SECRET", supabase_secret):
+            auth_type, actor_id, org_id, apk_hash = rate_limiter.extract_caller_identity(req)
+            assert auth_type == "JWT"
+            assert actor_id == sub_id
+            assert org_id == expected_org
+

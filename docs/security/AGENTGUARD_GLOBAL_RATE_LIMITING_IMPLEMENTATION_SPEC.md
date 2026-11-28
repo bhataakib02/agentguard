@@ -251,6 +251,36 @@ X-RateLimit-Reset: 1732800042
 The global distributed rate-limiting system has been fully implemented in the AGENTGUARD codebase:
 
 1. **Core Service & Middleware**: `backend/core/rate_limiter.py` provides `DistributedRateLimiter`, `RateLimitingMiddleware`, `MemorySlidingWindowEngine`, `get_trusted_client_ip`, and `normalize_path`.
-2. **ASGI Registration**: `RateLimitingMiddleware` is mounted in `backend/main.py` directly behind `CORSMiddleware`, wrapping all HTTP routes.
-3. **Configuration**: Configurable via `backend/config.py` settings (`RATE_LIMIT_ENABLED`, `RATE_LIMIT_AUTH_LIMIT`, `RATE_LIMIT_PUBLIC_LIMIT`, `RATE_LIMIT_API_KEY_LIMIT`, `RATE_LIMIT_AI_USER_LIMIT`, `RATE_LIMIT_AI_TENANT_LIMIT`, `RATE_LIMIT_TRUSTED_PROXIES`).
-4. **Verification**: 20 automated tests in `backend/tests/test_global_rate_limiting.py` pass 100% green, verifying sliding-window mechanics, multi-instance concurrency, anti-spoofing, fail-closed auth, fail-open APIs, and zero regression across existing auth, IAM, and tenant suites.
+2. **ASGI Registration**: `RateLimitingMiddleware` is mounted in `backend/main.py` before `CORSMiddleware` so that Starlette's `reversed()` middleware execution ensures `CORSMiddleware` wraps all HTTP responses, guaranteeing CORS headers on HTTP 429 and 503 responses.
+3. **Configuration**: Configurable via `backend/config.py` settings (`RATE_LIMIT_ENABLED`, `RATE_LIMIT_AUTH_LIMIT`, `RATE_LIMIT_MACHINE_AUTH_LIMIT`, `RATE_LIMIT_PUBLIC_LIMIT`, `RATE_LIMIT_API_KEY_LIMIT`, `RATE_LIMIT_AI_USER_LIMIT`, `RATE_LIMIT_AI_TENANT_LIMIT`, `RATE_LIMIT_TRUSTED_PROXIES`, `RATE_LIMIT_TRUST_CLOUDFLARE_HEADERS`).
+4. **Verification**: 28 automated tests in `backend/tests/test_global_rate_limiting.py` pass 100% green, verifying sliding-window mechanics, multi-instance concurrency, anti-spoofing, fail-closed auth, fail-open APIs, and zero regression across existing auth, IAM, and tenant suites.
+
+---
+
+## 11. Adversarial Audit Remediations (ADV-01 through ADV-08)
+
+Following independent adversarial review (`docs/audits/AGENTGUARD_AG_SEC_02_INDEPENDENT_ADVERSARIAL_REVIEW.md`), all eight identified findings were remediated and verified:
+
+1. **ADV-01 (CORS Drop on 429/503)**:
+   - *Fix*: Reversed registration order in `backend/main.py` so `CORSMiddleware` is registered *after* `RateLimitingMiddleware`. Under Starlette's LIFO onion model (`reversed(user_middleware)`), `CORSMiddleware` acts as the outermost layer, ensuring `Access-Control-Allow-Origin` and related headers wrap all 429 and 503 responses for allowed origins.
+
+2. **ADV-02 (IP Spoofing via Edge Headers)**:
+   - *Fix*: Removed blind trust of `CF-Connecting-IP` and `X-Real-IP`. Added `settings.RATE_LIMIT_TRUST_CLOUDFLARE_HEADERS` (default `False`). In `get_trusted_client_ip()`, reverse proxy chains in `X-Forwarded-For` are traversed strictly right-to-left, extracting the rightmost non-trusted IP and normalizing IPv4-mapped IPv6 addresses (`::ffff:x.x.x.x`).
+
+3. **ADV-03 (Tenant-Wide AI Quota Bypass)**:
+   - *Fix*: Updated all 6 token issuance points in `backend/routers/auth.py` (OTP verify, local register, local login, standard login, invitation accept) to embed `"org_id"` in `additional_claims`. Rate limiter extracts `org_id` from verified JWTs and correctly aggregates usage across multi-user tenants against the 100 req/min tenant-wide AI limit.
+
+4. **ADV-04 (Dual-Endpoint Login Brute Force)**:
+   - *Fix*: Unified rate limit scope for `/auth/login` and `/auth/local-login` into a single canonical bucket: `{rl:ip:{hash}:auth_login:{window}}`. Exceeding 5 attempts across either or both endpoints trips HTTP 429 across both.
+
+5. **ADV-05 (Machine Agent Auth Omission)**:
+   - *Fix*: Added `MACHINE_AUTH_CANONICAL_PREFIXES = ("runtime/auth",)`. Enforces dedicated `settings.RATE_LIMIT_MACHINE_AUTH_LIMIT` (30 req/min) with strict `fail_policy="closed"` to prevent brute-force attacks during Redis outages.
+
+6. **ADV-06 (Redis Cluster CROSSSLOT Compatibility)**:
+   - *Fix*: Formatted all Redis keys with curly brace hash tags `{rl:...}`. Both the sliding-window sorted set `key` and sequence counter `key:seq` share the exact same hash tag, guaranteeing Redis Cluster slot colocation. Truncation expanded from 16 to 32 hex chars (128-bit collision resistance).
+
+7. **ADV-07 (Supabase Auth JWT Verification)**:
+   - *Fix*: Added secondary verification in `extract_caller_identity()` using `settings.SUPABASE_JWT_SECRET` with HS256 algorithm. Valid Supabase tokens are properly classified as authenticated users with `org_id` extracted from claims or metadata.
+
+8. **ADV-08 (Mock vs. Real Redis Architecture)**:
+   - *Fix*: Formalized dual-engine testing. Local development and automated CI run cleanly against `MemorySlidingWindowEngine` and `SharedMockRedisAdapter`, while staging and production connect directly to live Redis clusters using identical sliding-window algorithms and Lua scripts.

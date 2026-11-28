@@ -100,6 +100,10 @@ AUTH_CANONICAL_PREFIXES: Tuple[str, ...] = (
     "auth/verify-reset-token",
 )
 
+MACHINE_AUTH_CANONICAL_PREFIXES: Tuple[str, ...] = (
+    "runtime/auth",
+)
+
 AI_CANONICAL_PREFIXES: Tuple[str, ...] = (
     "ai/",
     "assistant/",
@@ -181,11 +185,22 @@ def get_trusted_client_ip(
 ) -> str:
     """
     Safely resolves the true client IP address, preventing header injection and spoofing.
-    - If direct connection client host is not in trusted proxies, headers are not trusted.
-    - For reverse proxy chains in X-Forwarded-For, extracts rightmost non-trusted IP.
+    - If direct connection client host is not in trusted proxies, headers are NOT trusted.
+    - Cloudflare headers (CF-Connecting-IP) are only trusted if RATE_LIMIT_TRUST_CLOUDFLARE_HEADERS
+      is explicitly enabled AND direct connection is from a trusted proxy.
+    - For reverse proxy chains in X-Forwarded-For, walks right-to-left to find the rightmost
+      untrusted IP, properly handling IPv4-mapped IPv6 addresses.
     - Validates IP syntax with ipaddress.ip_address to block non-IP strings.
     """
     raw_host = request.client.host if request.client else "127.0.0.1"
+
+    # Normalize IPv4-mapped IPv6 for direct socket host if present
+    try:
+        ip_direct = ipaddress.ip_address(raw_host)
+        if ip_direct.version == 6 and ip_direct.ipv4_mapped:
+            raw_host = str(ip_direct.ipv4_mapped)
+    except ValueError:
+        pass
     
     # Allow testclient and testserver directly during development/testing
     if raw_host in ("testclient", "testserver"):
@@ -194,7 +209,9 @@ def get_trusted_client_ip(
         if xff:
             first_ip = xff.split(",")[0].strip()
             try:
-                ipaddress.ip_address(first_ip)
+                ip_obj = ipaddress.ip_address(first_ip)
+                if ip_obj.version == 6 and ip_obj.ipv4_mapped:
+                    first_ip = str(ip_obj.ipv4_mapped)
                 return first_ip
             except ValueError:
                 pass
@@ -203,34 +220,41 @@ def get_trusted_client_ip(
     networks = trusted_proxies or DEFAULT_TRUSTED_PROXIES
     is_direct_trusted = is_ip_in_networks(raw_host, networks)
 
-    # 1. Edge Provider Headers (e.g. Cloudflare or trusted reverse proxy edge)
-    cf_ip = request.headers.get("cf-connecting-ip") or request.headers.get("CF-Connecting-IP")
-    if cf_ip and is_direct_trusted:
-        clean_cf = cf_ip.strip()
+    # If direct connection is not from a trusted proxy, headers MUST NOT be trusted
+    if not is_direct_trusted:
         try:
-            ipaddress.ip_address(clean_cf)
-            return clean_cf
+            ipaddress.ip_address(raw_host)
+            return raw_host
         except ValueError:
-            pass
+            return "127.0.0.1"
 
-    real_ip = request.headers.get("x-real-ip") or request.headers.get("X-Real-IP")
-    if real_ip and is_direct_trusted:
-        clean_real = real_ip.strip()
-        try:
-            ipaddress.ip_address(clean_real)
-            return clean_real
-        except ValueError:
-            pass
+    # 1. Cloudflare Edge Provider Header (only if explicitly enabled via config)
+    trust_cf = getattr(settings, "RATE_LIMIT_TRUST_CLOUDFLARE_HEADERS", False)
+    if trust_cf:
+        cf_ip = request.headers.get("cf-connecting-ip") or request.headers.get("CF-Connecting-IP")
+        if cf_ip:
+            clean_cf = cf_ip.strip()
+            try:
+                cf_obj = ipaddress.ip_address(clean_cf)
+                if cf_obj.version == 6 and cf_obj.ipv4_mapped:
+                    clean_cf = str(cf_obj.ipv4_mapped)
+                return clean_cf
+            except ValueError:
+                pass
 
-    # 2. X-Forwarded-For Header inspection
+    # 2. X-Forwarded-For Header inspection (standard reverse proxy chain)
     xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
-    if xff and is_direct_trusted:
+    if xff:
         # Split chain from left to right: client, proxy1, proxy2
         ips = [i.strip() for i in xff.split(",") if i.strip()]
-        # Walk backwards from rightmost (closest to our proxy) to find first untrusted client IP
+        # Walk backwards from rightmost (closest to our trusted proxy) to find first untrusted client IP
         for candidate in reversed(ips):
             try:
                 ip_obj = ipaddress.ip_address(candidate)
+                # Handle IPv4-mapped IPv6 (::ffff:x.x.x.x)
+                if ip_obj.version == 6 and ip_obj.ipv4_mapped:
+                    ip_obj = ip_obj.ipv4_mapped
+                    candidate = str(ip_obj)
                 if not any(ip_obj in net for net in networks):
                     return candidate
             except ValueError:
@@ -377,10 +401,12 @@ class DistributedRateLimiter:
 
     def _make_key(self, dimension: str, identifier: str, scope: str, window: int) -> str:
         """
-        Creates a deterministic Redis key while pseudonymizing sensitive identifiers.
+        Creates a deterministic Redis key with Redis Cluster hash tag compatibility {..}
+        and collision-resistant 128-bit truncated SHA-256 hash (32 hex characters).
+        Ensures both key and key:seq map to the exact same Redis Cluster hash slot.
         """
-        safe_hash = hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:16]
-        return f"rl:{dimension}:{safe_hash}:{scope}:{window}"
+        safe_hash = hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:32]
+        return f"{{rl:{dimension}:{safe_hash}:{scope}:{window}}}"
 
     def check_rate_limit(
         self,
@@ -496,8 +522,8 @@ class DistributedRateLimiter:
         if auth_header.startswith("Bearer "):
             token = auth_header.replace("Bearer ", "").strip()
             if token and not token.startswith("ag_live_"):
+                # Try 1: Local AgentGuard JWT signature verification using settings.SECRET_KEY
                 try:
-                    # Cryptographically verify signature locally using settings.SECRET_KEY
                     payload = jwt.decode(
                         token,
                         settings.SECRET_KEY,
@@ -509,8 +535,33 @@ class DistributedRateLimiter:
                     if user_id:
                         return "JWT", str(user_id), str(org_id) if org_id else None, None
                 except JWTError:
-                    # Invalid, forged or expired JWT: do NOT trust claims! Treat as anonymous
                     pass
+
+                # Try 2: Supabase Auth JWT signature verification (ADV-07)
+                supabase_secret = getattr(settings, "SUPABASE_JWT_SECRET", None)
+                if supabase_secret:
+                    try:
+                        payload = jwt.decode(
+                            token,
+                            supabase_secret,
+                            algorithms=["HS256"],
+                            options={"verify_exp": True, "verify_aud": False}
+                        )
+                        user_id = payload.get("sub") or payload.get("id")
+                        org_id = payload.get("org_id")
+                        if not org_id:
+                            app_meta = payload.get("app_metadata", {})
+                            if isinstance(app_meta, dict):
+                                org_id = app_meta.get("org_id") or app_meta.get("tenant_id")
+                        if not org_id:
+                            user_meta = payload.get("user_metadata", {})
+                            if isinstance(user_meta, dict):
+                                org_id = user_meta.get("org_id") or user_meta.get("tenant_id")
+
+                        if user_id:
+                            return "JWT", str(user_id), str(org_id) if org_id else None, None
+                    except JWTError:
+                        pass
 
         return "ANONYMOUS", None, None, None
 
@@ -542,7 +593,13 @@ class DistributedRateLimiter:
                     allowed=True, limit=limit, remaining=limit, reset_time=0, retry_after=0, scope="AUTH"
                 )
 
-            key = self._make_key("ip", client_ip, f"auth_{path.replace('/', '_')}", window)
+            # Unify /auth/login and /auth/local-login into identical scope to prevent 2x brute forcing (ADV-04)
+            if path in ("auth/login", "auth/local-login"):
+                scope_name = "auth_login"
+            else:
+                scope_name = f"auth_{path.replace('/', '_')}"
+
+            key = self._make_key("ip", client_ip, scope_name, window)
             res = self.check_rate_limit(key, max_requests=limit, window_seconds=window, fail_policy="closed", scope="AUTH")
             
             headers = {
@@ -562,6 +619,44 @@ class DistributedRateLimiter:
                 reset_time=res.reset_time,
                 retry_after=res.retry_after,
                 scope="AUTH",
+                degraded=res.degraded,
+                is_service_unavailable=res.is_service_unavailable,
+                error_message=res.error_message,
+                headers=headers
+            )
+
+        # 2b. Category: Machine Agent Authentication Endpoints (/runtime/auth) (ADV-05)
+        # (Strict fail-closed on Redis failure, dedicated rate limit)
+        is_machine_auth_route = any(path.startswith(prefix) for prefix in MACHINE_AUTH_CANONICAL_PREFIXES)
+        if is_machine_auth_route:
+            machine_limit = getattr(settings, "RATE_LIMIT_MACHINE_AUTH_LIMIT", 30)
+            if client_ip in ("testclient", "testserver") and not request.headers.get("x-test-rate-limit"):
+                return RateLimitDecision(
+                    allowed=True, limit=machine_limit, remaining=machine_limit, reset_time=0, retry_after=0, scope="MACHINE_AUTH"
+                )
+
+            key = self._make_key("ip", client_ip, "machine_auth", window)
+            res = self.check_rate_limit(
+                key, max_requests=machine_limit, window_seconds=window, fail_policy="closed", scope="MACHINE_AUTH"
+            )
+
+            headers = {
+                "X-RateLimit-Limit": str(res.limit),
+                "X-RateLimit-Remaining": str(res.remaining),
+                "X-RateLimit-Reset": str(res.reset_time)
+            }
+            if not res.allowed:
+                headers["Retry-After"] = str(res.retry_after)
+            if res.degraded:
+                headers["X-RateLimit-Degraded"] = "fail_closed" if res.is_service_unavailable else "fail_open"
+
+            return RateLimitDecision(
+                allowed=res.allowed,
+                limit=res.limit,
+                remaining=res.remaining,
+                reset_time=res.reset_time,
+                retry_after=res.retry_after,
+                scope="MACHINE_AUTH",
                 degraded=res.degraded,
                 is_service_unavailable=res.is_service_unavailable,
                 error_message=res.error_message,

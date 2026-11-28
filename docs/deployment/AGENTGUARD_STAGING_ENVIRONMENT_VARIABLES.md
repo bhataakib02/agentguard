@@ -119,12 +119,14 @@ Each environment variable is classified across three operational axes:
 | `RATE_LIMIT_REDIS_URL` | Optional | **Secret** | Common (Distinct) | `rediss://default:[STAGING-REDIS-PW]@agentguard-staging-redis:6379` | Dedicated Redis URL for rate limiting; falls back to `REDIS_URL` if empty. |
 | `RATE_LIMIT_PUBLIC_LIMIT` | Optional | Non-Secret | Common | `60` | Public / general API rate limit in requests per 60-second window. |
 | `RATE_LIMIT_AUTH_LIMIT` | Optional | Non-Secret | Common | `5` | Sensitive authentication limit (login, register, OTP) per 60-second window. |
+| `RATE_LIMIT_MACHINE_AUTH_LIMIT` | Optional | Non-Secret | Common | `30` | Machine Agent Auth (`/runtime/auth`) limit per 60-second window (fail-closed). |
 | `RATE_LIMIT_API_KEY_LIMIT` | Optional | Non-Secret | Common | `1200` | API key / machine token limit per organization per 60-second window. |
 | `RATE_LIMIT_AI_USER_LIMIT` | Optional | Non-Secret | Common | `20` | AI assistant / LLM inference limit per authenticated user per 60-second window. |
 | `RATE_LIMIT_AI_TENANT_LIMIT` | Optional | Non-Secret | Common | `100` | AI assistant aggregate limit per tenant per 60-second window. |
 | `RATE_LIMIT_WINDOW_SECONDS` | Optional | Non-Secret | Common | `60` | Rolling sliding-window duration in seconds. |
 | `RATE_LIMIT_STORAGE_BACKEND` | Optional | Non-Secret | Staging-Only | `AUTO` | `AUTO` (uses Redis if available, memory fallback in dev), `REDIS`, or `MEMORY`. |
 | `RATE_LIMIT_TRUSTED_PROXIES` | Optional | Non-Secret | Common | `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` | Comma-separated trusted reverse proxy CIDR networks for anti-spoofing. |
+| `RATE_LIMIT_TRUST_CLOUDFLARE_HEADERS` | Optional | Non-Secret | Staging-Only | `False` | Only enable (`True`) if edge proxy is verified Cloudflare terminating at staging. |
 
 ### 4.5 Email & Notification Delivery
 
